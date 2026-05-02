@@ -1,6 +1,13 @@
 /*
- * Cacao Accounting — Design System v3
- * Visual model: Dark green chrome (navbar + sidebar)  →  warm gray content  →  white cards
+ * Cacao Accounting — Design System v4
+ * Visual model:
+ *   Charcoal chrome (navbar + sidebar, barely-green undertone)
+ *   → warm gray content background
+ *   → white cards
+ *
+ * Chrome philosophy: dark, professional, NOT a green app —
+ *   green appears only in accents, active states, brand mark.
+ *
  * Supports light (default) and dark themes via [data-theme="dark"] on <html>
  */
 
@@ -8,15 +15,12 @@
    1. DESIGN TOKENS — LIGHT THEME
    ═══════════════════════════════════════════════════════ */
 :root {
-  /* ── Brand greens ──────────────────── */
-  --ca-p900:  #1B5E20;   /* deepest — sidebar item active border */
-  --ca-p800:  #2E7D32;   /* navbar, primary buttons              */
-  --ca-p600:  #43A047;   /* hover states                         */
-  --ca-p400:  #78BF30;   /* brand accent                         */
-  --ca-p300:  #B7DD34;   /* secondary accent                     */
-  --ca-p200:  #C8E6C9;   /* sidebar active background            */
-  --ca-p100:  #E8F5E9;   /* sidebar hover, card tint             */
-  --ca-p050:  #F1FAF1;   /* very subtle green wash               */
+  /* ── Brand greens (accent only, NOT chrome) ─── */
+  --ca-p800:  #2E7D32;   /* primary action buttons, active borders */
+  --ca-p600:  #43A047;   /* hover states on buttons                */
+  --ca-p400:  #78BF30;   /* brand accent / logo companion          */
+  --ca-p300:  #B7DD34;   /* secondary accent / active dot          */
+  --ca-p100:  #E8F5E9;   /* tint backgrounds                       */
 
   /* ── Gray scale ───────────────────── */
   --ca-g900: #1F2937;
@@ -40,42 +44,42 @@
   --ca-disabled:    #9CA3AF;
   --ca-disabled-bg: #F3F4F6;
 
-  /* ── Surface layers (light) ───────── */
-  /* Layer 0 — app background (warm, NOT white) */
-  --ca-bg:            #EEF3EE;
-  /* Layer 1 — cards / panels (white, "pops" off background) */
-  --ca-surface:       #FFFFFF;
+  /* ── Surface layers ───────────────── */
+  --ca-bg:            #ECEEED;   /* body — barely warm, not pure white, not green */
+  --ca-surface:       #FFFFFF;   /* cards — pop above background                  */
   --ca-surface-hover: #F3F4F6;
-  /* Layer 2 — chrome: navbar & sidebar */
-  --ca-chrome-deep:   #1B5E20;   /* sidebar bottom gradient */
-  --ca-chrome:        #2E7D32;   /* navbar + sidebar top    */
+
+  /* ── Chrome: near-black with a faint green undertone ──
+     Think "professional charcoal" not "forest app".
+     Navbar is the darkest anchor; sidebar is 1 stop lighter.   */
+  --ca-navbar-bg:   #1E2422;   /* ≈70% black, barely perceptibly greenish       */
+  --ca-navbar-text: #F0F4F2;   /* off-white, not stark white                    */
+  --ca-navbar-hover: rgba(255,255,255,.09);
+
+  --ca-sidebar-bg:          #252E2A;   /* slightly lighter charcoal-green              */
+  --ca-sidebar-border-end:  #1C2421;   /* right edge shadow — darker than sidebar       */
+  --ca-sidebar-text:        rgba(240,244,242,.75);
+  --ca-sidebar-icon:        rgba(240,244,242,.45);
+  --ca-sidebar-hover-bg:    rgba(255,255,255,.07);
+  --ca-sidebar-hover-text:  #F0F4F2;
+  --ca-sidebar-hover-icon:  rgba(183,221,52,.80);   /* subtle lime on hover   */
+  --ca-sidebar-active-bg:   rgba(183,221,52,.13);
+  --ca-sidebar-active-text: #FFFFFF;
+  --ca-sidebar-active-border: #B7DD34;              /* lime accent stripe     */
+
+  /* ── Sizes ────────────────────────── */
+  --ca-navbar-height: 52px;
+  --ca-sidebar-width: 220px;
+
+  /* ── Shadows ──────────────────────── */
+  --ca-shadow-sm: 0 1px 4px rgba(0,0,0,.09), 0 1px 2px rgba(0,0,0,.05);
+  --ca-shadow:    0 4px 12px rgba(0,0,0,.11), 0 2px 6px rgba(0,0,0,.06);
+  --ca-shadow-lg: 0 8px 24px rgba(0,0,0,.13), 0 4px 10px rgba(0,0,0,.07);
 
   --ca-border:         #D1D5DB;
   --ca-text:           #1F2937;
   --ca-text-secondary: #4B5563;
   --ca-text-muted:     #9CA3AF;
-
-  /* ── Navbar ───────────────────────── */
-  --ca-navbar-bg:      var(--ca-chrome);
-  --ca-navbar-text:    #FFFFFF;
-  --ca-navbar-hover:   rgba(255,255,255,.15);
-  --ca-navbar-height:  52px;
-
-  /* ── Sidebar ──────────────────────── */
-  --ca-sidebar-bg:            var(--ca-chrome);
-  --ca-sidebar-text:          rgba(255,255,255,.82);
-  --ca-sidebar-icon:          rgba(255,255,255,.60);
-  --ca-sidebar-hover-bg:      rgba(255,255,255,.10);
-  --ca-sidebar-hover-text:    #FFFFFF;
-  --ca-sidebar-active-bg:     rgba(255,255,255,.18);
-  --ca-sidebar-active-text:   #FFFFFF;
-  --ca-sidebar-active-border: #B7DD34;
-  --ca-sidebar-width:  220px;
-
-  /* ── Shadows ──────────────────────── */
-  --ca-shadow-sm: 0 1px 4px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
-  --ca-shadow:    0 4px 12px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.07);
-  --ca-shadow-lg: 0 8px 24px rgba(0,0,0,.14), 0 4px 10px rgba(0,0,0,.08);
 
   --ca-radius: 6px;
 
@@ -85,6 +89,8 @@
   --ca-primary-light:  var(--ca-p100);
   --ca-secondary:      var(--ca-p300);
   --ca-accent:         #F5F239;
+  --ca-chrome:         var(--ca-navbar-bg);
+  --ca-chrome-deep:    #1C2421;
   --ca-gray-100:       var(--ca-g100);
   --ca-gray-200:       var(--ca-g300);
   --ca-gray-300:       var(--ca-g300);
@@ -98,41 +104,43 @@
    2. DARK THEME
    ═══════════════════════════════════════════════════════ */
 [data-theme="dark"] {
-  --ca-bg:            #111827;
-  --ca-surface:       #1F2937;
-  --ca-surface-hover: #283548;
-  --ca-border:        #374151;
-  --ca-text:          #F9FAFB;
-  --ca-text-secondary:#D1D5DB;
-  --ca-text-muted:    #9CA3AF;
+  --ca-bg:            #0F1612;
+  --ca-surface:       #1A2320;
+  --ca-surface-hover: #222E29;
+  --ca-border:        #2E3D37;
+  --ca-text:          #EEF2F0;
+  --ca-text-secondary:#C5CEC9;
+  --ca-text-muted:    #7A9088;
 
-  --ca-navbar-bg:     #0D2311;
-  --ca-navbar-hover:  rgba(255,255,255,.08);
+  /* In dark mode: navbar gets even darker, sidebar marginally lighter */
+  --ca-navbar-bg:      #101714;
+  --ca-navbar-hover:   rgba(255,255,255,.07);
 
-  --ca-chrome:        #0D2311;
-  --ca-chrome-deep:   #071509;
-
-  --ca-sidebar-bg:    #0F2814;
-  --ca-sidebar-text:  rgba(255,255,255,.78);
-  --ca-sidebar-icon:  rgba(255,255,255,.50);
-  --ca-sidebar-hover-bg:      rgba(255,255,255,.07);
-  --ca-sidebar-hover-text:    #FFFFFF;
-  --ca-sidebar-active-bg:     rgba(183,221,52,.15);
-  --ca-sidebar-active-text:   #B7DD34;
+  --ca-sidebar-bg:     #161E1A;
+  --ca-sidebar-text:   rgba(238,242,240,.72);
+  --ca-sidebar-icon:   rgba(238,242,240,.40);
+  --ca-sidebar-hover-bg:    rgba(255,255,255,.06);
+  --ca-sidebar-hover-text:  #EEF2F0;
+  --ca-sidebar-hover-icon:  rgba(183,221,52,.75);
+  --ca-sidebar-active-bg:   rgba(183,221,52,.12);
+  --ca-sidebar-active-text: #FFFFFF;
   --ca-sidebar-active-border: #B7DD34;
 
-  --ca-shadow-sm: 0 1px 4px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.20);
-  --ca-shadow:    0 4px 12px rgba(0,0,0,.40), 0 2px 6px rgba(0,0,0,.25);
+  --ca-chrome:      #101714;
+  --ca-chrome-deep: #0B1009;
+
+  --ca-shadow-sm: 0 1px 4px rgba(0,0,0,.40), 0 1px 2px rgba(0,0,0,.25);
+  --ca-shadow:    0 4px 12px rgba(0,0,0,.50), 0 2px 6px rgba(0,0,0,.30);
 
   /* compat */
-  --ca-primary-light: rgba(78,175,80,.12);
+  --ca-primary-light: rgba(78,175,80,.10);
   --ca-primary-dark:  #4CAF50;
-  --ca-gray-100:      #283548;
-  --ca-gray-200:      #374151;
-  --ca-gray-300:      #374151;
-  --ca-gray-400:      #6B7280;
-  --ca-gray-600:      #D1D5DB;
-  --ca-gray-800:      #F9FAFB;
+  --ca-gray-100:      #222E29;
+  --ca-gray-200:      #2E3D37;
+  --ca-gray-300:      #2E3D37;
+  --ca-gray-400:      #5A7068;
+  --ca-gray-600:      #C5CEC9;
+  --ca-gray-800:      #EEF2F0;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -165,7 +173,7 @@ h5 { font-size: 1.05rem; }
 h6 { font-size: .9rem; color: var(--ca-text-secondary); }
 
 /* ═══════════════════════════════════════════════════════
-   5. NAVBAR  (Layer 2 — chrome, dark green)
+   5. NAVBAR  (charcoal anchor — darkest surface in UI)
    ═══════════════════════════════════════════════════════ */
 .ca-navbar {
   height: var(--ca-navbar-height) !important;
@@ -233,7 +241,7 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
 }
 
 /* ═══════════════════════════════════════════════════════
-   6. SIDEBAR  (Layer 2 — chrome, dark green)
+   6. SIDEBAR  (charcoal — 1 stop lighter than navbar)
    ═══════════════════════════════════════════════════════ */
 .ca-sidebar {
   position: fixed !important;
@@ -241,14 +249,14 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
   left: 0 !important; bottom: 0 !important;
   width: var(--ca-sidebar-width) !important;
   background: var(--ca-sidebar-bg) !important;
-  border-right: none !important;
+  /* Right edge: subtle darker shadow creates separation from content */
+  border-right: 1px solid var(--ca-sidebar-border-end) !important;
+  box-shadow: 2px 0 8px rgba(0,0,0,.18);
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 100;
   padding: .5rem 0 1rem;
   transition: background .25s;
-  /* Subtle gradient for depth within the sidebar itself */
-  background: linear-gradient(180deg, var(--ca-chrome) 0%, var(--ca-chrome-deep) 100%) !important;
 }
 
 .ca-sidebar .nav {
@@ -286,7 +294,7 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
   color: var(--ca-sidebar-hover-text) !important;
   border-left-color: var(--ca-p300) !important;
 }
-.ca-sidebar .nav-link:hover i { color: var(--ca-p300) !important; }
+.ca-sidebar .nav-link:hover i { color: var(--ca-sidebar-hover-icon) !important; }
 
 .ca-sidebar .nav-link.active {
   background: var(--ca-sidebar-active-bg) !important;
@@ -302,7 +310,7 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.38);
+  color: rgba(240,244,242,.30);
   padding: .9rem 1.1rem .25rem;
 }
 
