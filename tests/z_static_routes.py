@@ -187,7 +187,7 @@ static_rutes = [
                 "utf-8"
             ),
             "Listado de Unidades de Negocio.".encode("utf-8"),
-            "Código de Entidad".encode("utf-8"),
+            "Código".encode("utf-8"),
             "Nombre".encode("utf-8"),
             "Entidad".encode("utf-8"),
             "/accounting/unit/new".encode("utf-8"),
@@ -203,7 +203,7 @@ static_rutes = [
         url="/accounting/project/list",
         text=[
             "Listado de Proyectos.".encode("utf-8"),
-            "Código de Proyecto".encode("utf-8"),
+            "Código".encode("utf-8"),
             "Nombre".encode("utf-8"),
             "Fecha Inicio".encode("utf-8"),
             "Fecha Fin".encode("utf-8"),
