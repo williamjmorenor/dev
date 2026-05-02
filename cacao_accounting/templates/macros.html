@@ -6,6 +6,13 @@
 {# Linea en blanco intencional #}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{# Anti-FOUC: apply saved theme before any render #}
+<script>
+  (function(){
+    var t = localStorage.getItem('ca-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 
 
 <meta name="theme-color" content="#78BF30">
