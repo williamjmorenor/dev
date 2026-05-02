@@ -21,34 +21,34 @@
   <div class="ca-module-card">
     <h5><i class="bi bi-sliders"></i> Configuración</h5>
     <ul class="ca-module-links">
-      <li><a href="{{ url_for('contabilidad.entidades') }}">Entidades</a></li>
-      <li><a href="{{ url_for('contabilidad.cuentas') }}">Catálogo de Cuentas</a></li>
-      <li><a href="{{ url_for('contabilidad.ccostos') }}">Centros de Costos</a></li>
-      <li><a href="{{ url_for('contabilidad.unidades') }}">Unidades de Negocio</a></li>
-      <li><a href="{{ url_for('contabilidad.libros') }}">Libros de Contabilidad</a></li>
-      <li><a href="{{ url_for('contabilidad.proyectos') }}">Proyectos</a></li>
-      <li><a href="{{ url_for('contabilidad.monedas') }}">Monedas</a></li>
-      <li><a href="{{ url_for('contabilidad.tasa_cambio') }}">Tasas de Cambio</a></li>
-      <li><a href="{{ url_for('contabilidad.periodo_contable') }}">Períodos Contables</a></li>
-      <li><a href="{{ url_for('contabilidad.series') }}">Series e Identificadores</a></li>
+      <li><a href="{{ url_for('contabilidad.entidades') }}">Entidades</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
+      <li><a href="{{ url_for('contabilidad.cuentas') }}">Catálogo de Cuentas</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
+      <li><a href="{{ url_for('contabilidad.ccostos') }}">Centros de Costos</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
+      <li><a href="{{ url_for('contabilidad.unidades') }}">Unidades de Negocio</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
+      <li><a href="{{ url_for('contabilidad.libros') }}">Libros de Contabilidad</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
+      <li><a href="{{ url_for('contabilidad.proyectos') }}">Proyectos</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
+      <li><a href="{{ url_for('contabilidad.monedas') }}">Monedas</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
+      <li><a href="{{ url_for('contabilidad.tasa_cambio') }}">Tasas de Cambio</a><span class="ca-status-dot ca-status-warning" title="Hay registros pendientes de aprobación"></span></li>
+      <li><a href="{{ url_for('contabilidad.periodo_contable') }}">Períodos Contables</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
+      <li><a href="{{ url_for('contabilidad.series') }}">Series e Identificadores</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
     </ul>
   </div>
 
   <div class="ca-module-card">
     <h5><i class="bi bi-card-list"></i> Registros</h5>
     <ul class="ca-module-links">
-      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Comprobantes Contables</a></li>
+      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Comprobantes Contables</a><span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span></li>
     </ul>
   </div>
 
   <div class="ca-module-card">
     <h5><i class="bi bi-bar-chart-fill"></i> Reportes</h5>
     <ul class="ca-module-links">
-      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Diario</a></li>
-      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Mayor</a></li>
-      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Balanza de Comprobación</a></li>
-      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Balance General</a></li>
-      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Ganancias y Pérdidas</a></li>
+      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Diario</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>
+      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Mayor</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>
+      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Balanza de Comprobación</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>
+      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Balance General</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>
+      <li><a href="{{ url_for('contabilidad.gl.gl_list') }}">Ganancias y Pérdidas</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>
     </ul>
   </div>
 

@@ -6,7 +6,7 @@
 {# Linea en blanco intencional #}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-{# Anti-FOUC: apply saved theme before any render #}
+{# Anti-FOUC: apply saved theme before ANY paint #}
 <script>
   (function(){
     var t = localStorage.getItem('ca-theme') || 'light';
@@ -14,20 +14,20 @@
   })();
 </script>
 
-
-<meta name="theme-color" content="#78BF30">
-<meta name="msapplication-TileColor" content="#78BF30">
+<meta name="theme-color" content="#2E7D32">
+<meta name="msapplication-TileColor" content="#2E7D32">
 
 <meta name="description" content="Aplicación Contable.">
 <meta name="author" content="William Moreno Reyes">
 
+{# Bootstrap first so our CSS can override it #}
+<link rel="stylesheet" href="{{ url_for('static', filename='node_modules/bootstrap/dist/css/bootstrap.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='node_modules/bootstrap-icons/font/bootstrap-icons.css') }}">
+{# Our design system last — wins over Bootstrap #}
 <link href="{{ url_for('static', filename='css/cacaoaccounting.css') }}" rel="stylesheet">
 
-<link rel="stylesheet" href="{{ url_for('static', filename='node_modules/bootstrap/dist/css/bootstrap.css') }}">
 <script src="{{ url_for('static', filename='node_modules/bootstrap/dist/js/bootstrap.bundle.js') }}"></script>
 <script src="{{ url_for('static', filename='node_modules/@popperjs/core/dist/umd/popper.min.js') }}"></script>
-
-<link rel="stylesheet" href="{{ url_for('static', filename='node_modules/bootstrap-icons/font/bootstrap-icons.css') }}">
 
 <link rel="apple-touch-icon" sizes="57x57"
   href="{{ url_for('static', filename='media/favicon/apple-icon-57x57.png') }}">
@@ -66,21 +66,42 @@
 {# Ayuda a renderizar la barra superior en las páginas de la aplicación #}
 {% macro cabecera() %}
 <header class="ca-navbar">
-  <a class="navbar-brand" href="{{ url_for('cacao_app.pagina_inicio') }}">
-    <img height="32" src="{{ url_for('static', filename='media/cacao_accounting _logo.svg') }}" alt="Cacao Accounting"
-      class="d-inline-block align-middle">
-  </a>
-  <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse"
-    data-bs-target="#BarraLateralMenu" aria-expanded="false" aria-controls="BarraLateralMenu"
-    style="border:none;background:none;font-size:1.4rem;color:#64748b;">
-    <i class="bi bi-list"></i>
-  </button>
-  <div class="nav-actions d-none d-md-flex">
-    <a class="btn-logout" href="{{ url_for('login.cerrar_sesion') }}" title="Cerrar sesión">
+  <div class="ca-navbar-start">
+    <button class="ca-navbar-toggler d-md-none" type="button" data-bs-toggle="collapse"
+      data-bs-target="#BarraLateralMenu" aria-expanded="false" aria-controls="BarraLateralMenu">
+      <i class="bi bi-list"></i>
+    </button>
+    <a class="ca-navbar-brand" href="{{ url_for('cacao_app.pagina_inicio') }}">
+      <img height="30" src="{{ url_for('static', filename='media/cacao_accounting _logo.svg') }}" alt="Cacao Accounting"
+        class="d-inline-block align-middle">
+    </a>
+  </div>
+  <div class="ca-navbar-end">
+    <button class="ca-nav-btn" id="ca-theme-btn" onclick="caToggleTheme()" title="Cambiar tema" type="button">
+      <i class="bi bi-moon-stars-fill" id="ca-theme-icon"></i>
+    </button>
+    <a class="ca-nav-btn" href="{{ url_for('login.cerrar_sesion') }}" title="Cerrar sesión">
       <i class="bi bi-box-arrow-right"></i>
     </a>
   </div>
 </header>
+<script>
+  (function () {
+    var icon = document.getElementById('ca-theme-icon');
+    function syncIcon() {
+      var t = document.documentElement.getAttribute('data-theme');
+      if (icon) icon.className = (t === 'dark') ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+    }
+    syncIcon();
+    window.caToggleTheme = function () {
+      var current = document.documentElement.getAttribute('data-theme') || 'light';
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('ca-theme', next);
+      syncIcon();
+    };
+  })();
+</script>
 {%- endmacro %}
 
 {# Ayuda a renderizar la barra lateral en las páginas de la aplicación #}
