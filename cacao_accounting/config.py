@@ -20,16 +20,16 @@ from cacao_accounting.logs import log
 # < --------------------------------------------------------------------------------------------- >
 # Directorios de la aplicacion
 DIRECTORIO_APP = Path(__file__).parent
-DIRECTORIO_PRINCICIPAL = DIRECTORIO_APP.parent
+DIRECTORIO_PRINCIPAL = DIRECTORIO_APP.parent
 DIRECTORIO_PLANTILLAS = str(DIRECTORIO_APP / "templates")
 DIRECTORIO_ARCHIVOS = str(DIRECTORIO_APP / "static")
 
 # < --------------------------------------------------------------------------------------------- >
 # URI de conexión a bases de datos por defecto
 if name == "nt":
-    SQLITE = f"sqlite:///{DIRECTORIO_PRINCICIPAL}\\cacaoaccounting.db"
+    SQLITE = f"sqlite:///{DIRECTORIO_PRINCIPAL}\\cacaoaccounting.db"
 else:
-    SQLITE = f"sqlite:///{DIRECTORIO_PRINCICIPAL}/cacaoaccounting.db"
+    SQLITE = f"sqlite:///{DIRECTORIO_PRINCIPAL}/cacaoaccounting.db"
 
 # < --------------------------------------------------------------------------------------------- >
 # Permite al usuario establecer cuantos hilos utilizar para ejecutar el servidor WSGI por defecto,
@@ -67,7 +67,7 @@ def valida_direccion_base_datos(uri: str) -> bool:
             return False
 
 
-configuracion: dict = {}
+configuracion: dict[str, str] = {}
 
 if valida_direccion_base_datos(DATABASE_URL):
     configuracion["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
