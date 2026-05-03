@@ -17,11 +17,18 @@ from cacao_accounting.database import (
     Accounts,
     Bank,
     CostCenter,
+    DeliveryNote,
     Entity,
     ExchangeRate,
     Item,
     Party,
     Project,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseReceipt,
+    PurchaseReceiptItem,
+    SalesOrder,
+    SalesOrderItem,
     Serie,
     UOM,
     Unit,
@@ -506,4 +513,84 @@ ARTICULOS = (
 BODEGAS = (
     Warehouse(code="PRINCIPAL", name="Bodega Principal", company="cacao", is_active=True),
     Warehouse(code="SUCURSAL", name="Bodega Sucursal", company="cacao", is_active=True),
+)
+
+# Pre-built transactional documents with predictable IDs used in tests.
+PURCHASE_ORDER_ID = "POR-DEMO-0000001"
+PURCHASE_RECEIPT_ID = "REC-DEMO-0000001"
+SALES_ORDER_ID = "SOV-DEMO-0000001"
+DELIVERY_NOTE_ID = "ENT-DEMO-0000001"
+
+DOCUMENTOS = (
+    PurchaseOrder(
+        id=PURCHASE_ORDER_ID,
+        document_no="POR-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 15),
+        docstatus=1,
+        remarks="Orden de compra de demostración",
+    ),
+    PurchaseReceipt(
+        id=PURCHASE_RECEIPT_ID,
+        document_no="REC-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 20),
+        purchase_order_id=PURCHASE_ORDER_ID,
+        docstatus=0,
+        remarks="Recepción de demostración",
+    ),
+    SalesOrder(
+        id=SALES_ORDER_ID,
+        document_no="SOV-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 15),
+        docstatus=1,
+        remarks="Orden de venta de demostración",
+    ),
+    DeliveryNote(
+        id=DELIVERY_NOTE_ID,
+        document_no="ENT-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 22),
+        sales_order_id=SALES_ORDER_ID,
+        docstatus=0,
+        remarks="Nota de entrega de demostración",
+    ),
+)
+
+ITEMS_ORDEN_COMPRA = (
+    PurchaseOrderItem(
+        purchase_order_id=PURCHASE_ORDER_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=10,
+        uom="UND",
+        rate=5.00,
+        amount=50.00,
+    ),
+)
+
+ITEMS_ORDEN_VENTA = (
+    SalesOrderItem(
+        sales_order_id=SALES_ORDER_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=5,
+        uom="UND",
+        rate=8.00,
+        amount=40.00,
+    ),
+)
+
+ITEMS_RECEPCION = (
+    PurchaseReceiptItem(
+        purchase_receipt_id=PURCHASE_RECEIPT_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=10,
+        uom="UND",
+        rate=5.00,
+        amount=50.00,
+        warehouse="PRINCIPAL",
+    ),
 )

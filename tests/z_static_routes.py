@@ -553,4 +553,60 @@ static_rutes = [
             "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/pago_nuevo.html".encode("utf-8"),
         ],
     ),
+    Route(
+        url="/buying/purchase-order/POR-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/orden_compra.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-receipt/REC-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/recepcion.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-order/SOV-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/orden_venta.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/delivery-note/ENT-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/entrega.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-receipt/new?from_order=POR-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/recepcion_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-invoice/new?from_order=POR-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/delivery-note/new?from_order=SOV-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/entrega_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-invoice/new?from_order=SOV-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/api/buying/purchase-order/POR-DEMO-0000001/items",
+        text=[],
+    ),
+    Route(
+        url="/api/sales/sales-order/SOV-DEMO-0000001/items",
+        text=[],
+    ),
 ]

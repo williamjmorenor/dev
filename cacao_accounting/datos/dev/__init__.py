@@ -23,7 +23,11 @@ from cacao_accounting.datos.dev.data import (
     BODEGAS,
     CENTROS_DE_COSTOS,
     CUENTAS,
+    DOCUMENTOS,
     ENTIDADES,
+    ITEMS_ORDEN_COMPRA,
+    ITEMS_ORDEN_VENTA,
+    ITEMS_RECEPCION,
     PERIODOS,
     PROYECTOS,
     SERIES,
@@ -179,7 +183,22 @@ def periodo_contable():
 def transacciones():
     """Crea transacciones de desarrollo en la base de datos."""
     periodo_contable()
+    _cargar_documentos_demo()
     log.debug("Transacciones de Pruebas Creadas correctamente.")
+
+
+def _cargar_documentos_demo():
+    """Crea documentos transaccionales de demostración."""
+    for d in DOCUMENTOS:
+        database.session.add(d)
+    database.session.commit()
+    for i in ITEMS_ORDEN_COMPRA:
+        database.session.add(i)
+    for i in ITEMS_ORDEN_VENTA:
+        database.session.add(i)
+    for i in ITEMS_RECEPCION:
+        database.session.add(i)
+    database.session.commit()
 
 
 def dev_data():
