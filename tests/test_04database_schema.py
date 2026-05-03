@@ -640,7 +640,7 @@ class TestDocBaseFields(unittest.TestCase):
 # -------------------------------------------------------------------------------------
 # Tests: NamingSeries — resolve_naming_series_prefix
 # -------------------------------------------------------------------------------------
-class TestResolvNamingSeriesPrefix(unittest.TestCase):
+class TestResolveNamingSeriesPrefix(unittest.TestCase):
     """Pruebas unitarias para la resolucion de tokens de series."""
 
     def test_resolves_full_year_token(self):

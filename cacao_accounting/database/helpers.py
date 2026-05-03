@@ -250,7 +250,7 @@ def resolve_naming_series_prefix(template: str, posting_date: date) -> str:
     result = template
     result = result.replace("*YYYY*", str(posting_date.year))
     result = result.replace("*YY*", str(posting_date.year)[-2:])
-    result = result.replace("*MMM*", MONTH_ABBR.get(posting_date.month, "???"))
+    result = result.replace("*MMM*", MONTH_ABBR[posting_date.month])
     result = result.replace("*MM*", f"{posting_date.month:02d}")
     result = result.replace("*DD*", f"{posting_date.day:02d}")
 
@@ -387,16 +387,16 @@ def get_active_naming_series(entity_type: str, company: Optional[str] = None) ->
     """
     from cacao_accounting.database import NamingSeries
 
-    query = database.select(NamingSeries).filter_by(
-        entity_type=entity_type, is_active=True
-    )
-
     if company:
         from sqlalchemy import or_
         query = database.select(NamingSeries).filter(
             NamingSeries.entity_type == entity_type,
             NamingSeries.is_active.is_(True),
             or_(NamingSeries.company == company, NamingSeries.company.is_(None)),
+        )
+    else:
+        query = database.select(NamingSeries).filter_by(
+            entity_type=entity_type, is_active=True
         )
 
     results = database.session.execute(query).scalars().all()
