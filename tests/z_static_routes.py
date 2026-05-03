@@ -306,4 +306,124 @@ static_rutes = [
             "Crear un Nuevo Comprobante de Diario.".encode("utf-8"),
         ],
     ),
+    Route(
+        url="/cash_management/",
+        text=[
+            "Módulo de Caja y Bancos".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/cash_management/bank/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/banco_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/cash_management/bank-account/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/banco_cuenta_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/cash_management/payment/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/pago_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/cash_management/bank-transaction/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/transaccion_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/",
+        text=[
+            "Módulo de Compras".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-order/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/orden_compra_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-receipt/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/recepcion_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-invoice/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/supplier/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/proveedor_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/",
+        text=[
+            "Módulo de Control de Inventario".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/item/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/articulo_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/uom/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/uom_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/warehouse/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/bodega_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/stock-entry/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/entrada_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/",
+        text=[
+            "Módulo de Ventas".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-order/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/orden_venta_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/delivery-note/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/entrega_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-invoice/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta_lista.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/customer/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/cliente_lista.html".encode("utf-8"),
+        ],
+    ),
 ]

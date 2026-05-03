@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block contenido %}
+{% import "macros.html" as macros %}
+
+{%- if TESTING -%}
+<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/entrada_lista.html"></div>
+{%- endif -%}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb lh-sm">
+    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('inventario.inventario_') }}" class="link-dark">Inventario</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Listado de Entradas de Almacen</li>
+  </ol>
+</nav>
+
+<div class="ca-card">
+  <div class="ca-card-header">
+    <h5 class="ca-card-title"><i class="bi bi-arrow-down-circle"></i> Listado de Entradas de Almacen.</h5>
+  </div>
+  <table class="ca-table">
+    <caption style="display: none;">Listado de entradas de almacen.</caption>
+    <thead>
+      <tr>
+        <th scope="col">Propósito</th>
+        <th scope="col">Fecha</th>
+        <th scope="col">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in consulta.items -%}
+      <tr>
+        <td>{{ item.purpose }}</td>
+        <td>{{ item.posting_date or "" }}</td>
+        <td>{{ item.total_amount or "" }}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  <div class="mt-2">{{ macros.rendizar_paginacion(consulta=consulta, vista="inventario.inventario_entrada_lista") }}</div>
+</div>
+
+{% endblock %}

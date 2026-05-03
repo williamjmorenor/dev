@@ -589,22 +589,25 @@ def periodo_contable():
 @verifica_acceso("accounting")
 def nuevo_comprobante():
     """Nuevo comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_new"))
 
 
 @contabilidad.route("/journal/<identifier>")
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def ver_comprobante():
-    """Nuevo comprobante contable."""
+def ver_comprobante(identifier: str):
+    """Ver comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_list"))
 
 
 @contabilidad.route("/journal/edit/<identifier>", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def editar_comprobante():
+def editar_comprobante(identifier: str):
     """Editar comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_list"))
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #

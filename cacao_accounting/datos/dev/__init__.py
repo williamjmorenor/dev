@@ -17,7 +17,10 @@
 from cacao_accounting.auth.roles import asigna_rol_a_usuario
 from cacao_accounting.database import database
 from cacao_accounting.datos.dev.data import (
+    ARTICULOS,
+    BANCOS,
     BASE_USUARIOS,
+    BODEGAS,
     CENTROS_DE_COSTOS,
     CUENTAS,
     ENTIDADES,
@@ -25,7 +28,9 @@ from cacao_accounting.datos.dev.data import (
     PROYECTOS,
     SERIES,
     TASAS_DE_CAMBIO,
+    TERCEROS,
     UNIDADES,
+    UNIDADES_MEDIDA,
     USUARIO_ROLES,
 )
 from cacao_accounting.logs import log
@@ -108,6 +113,41 @@ def tasas_de_cambio():
     database.session.commit()
 
 
+def cargar_bancos():
+    """Bancos de demostración."""
+    for b in BANCOS:
+        database.session.add(b)
+    database.session.commit()
+
+
+def cargar_terceros():
+    """Terceros de demostración."""
+    for t in TERCEROS:
+        database.session.add(t)
+    database.session.commit()
+
+
+def cargar_unidades_medida():
+    """Unidades de medida de demostración."""
+    for u in UNIDADES_MEDIDA:
+        database.session.add(u)
+    database.session.commit()
+
+
+def cargar_articulos():
+    """Articulos de demostración."""
+    for a in ARTICULOS:
+        database.session.add(a)
+    database.session.commit()
+
+
+def cargar_bodegas():
+    """Bodegas de demostración."""
+    for b in BODEGAS:
+        database.session.add(b)
+    database.session.commit()
+
+
 def master_data():
     """Carga datos maestros de desarrollo a la base de datos."""
     log.info("Iniciando carga de master data de pruebas.")
@@ -120,6 +160,11 @@ def master_data():
     cargar_proyectos()
     tasas_de_cambio()
     cargar_catalogo_de_cuentas()
+    cargar_bancos()
+    cargar_terceros()
+    cargar_unidades_medida()
+    cargar_articulos()
+    cargar_bodegas()
 
     log.debug("Master data de prueba creada correctamente.")
 

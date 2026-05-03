@@ -15,12 +15,17 @@ from cacao_accounting.auth import proteger_passwd as _pg
 from cacao_accounting.database import (
     AccountingPeriod,
     Accounts,
+    Bank,
     CostCenter,
     Entity,
     ExchangeRate,
+    Item,
+    Party,
     Project,
     Serie,
+    UOM,
     Unit,
+    Warehouse,
 )
 
 # ---------------------------------------------------------------------------------------
@@ -448,4 +453,57 @@ PERIODOS = (
         start=date(year=(int(datetime.now().year) - 1), month=1, day=1),
         end=date(year=(int(datetime.now().year) - 1), month=12, day=31),
     ),
+)
+
+BANCOS = (
+    Bank(name="Banco Nacional de Desarrollo", swift_code="BNDENI2N", is_active=True),
+    Bank(name="Banco de América Central", swift_code="BANCNI2N", is_active=True),
+)
+
+TERCEROS = (
+    Party(
+        party_type="supplier",
+        name="Proveedor Demo SA",
+        comercial_name="Demo Proveedor",
+        tax_id="P001",
+        is_active=True,
+    ),
+    Party(
+        party_type="customer",
+        name="Cliente Demo SA",
+        comercial_name="Demo Cliente",
+        tax_id="C001",
+        is_active=True,
+    ),
+)
+
+UNIDADES_MEDIDA = (
+    UOM(code="UND", name="Unidad", is_active=True),
+    UOM(code="KG", name="Kilogramo", is_active=True),
+    UOM(code="LT", name="Litro", is_active=True),
+    UOM(code="MT", name="Metro", is_active=True),
+)
+
+ARTICULOS = (
+    Item(
+        code="ART-001",
+        name="Chocolate 100g",
+        item_type="goods",
+        is_stock_item=True,
+        default_uom="UND",
+        is_active=True,
+    ),
+    Item(
+        code="SRV-001",
+        name="Servicio de Entrega",
+        item_type="service",
+        is_stock_item=False,
+        default_uom="UND",
+        is_active=True,
+    ),
+)
+
+BODEGAS = (
+    Warehouse(code="PRINCIPAL", name="Bodega Principal", company="cacao", is_active=True),
+    Warehouse(code="SUCURSAL", name="Bodega Sucursal", company="cacao", is_active=True),
 )
