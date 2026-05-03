@@ -27,7 +27,10 @@ static_rutes = [
         url="/accounting/",
         text=[
             "Módulo de Contabilidad.".encode("utf-8"),
-            "Configuración".encode("utf-8"),
+            "La Plantilla fue renderizada correctamente: cacao_accounting/contabilidad/templates/contabilidad.html".encode("utf-8"),
+            "Configuración del Módulo".encode("utf-8"),
+            "Registros del Módulo".encode("utf-8"),
+            "Reportes del Módulo".encode("utf-8"),
             "Entidades".encode("utf-8"),
         ],
     ),
@@ -310,6 +313,10 @@ static_rutes = [
         url="/cash_management/",
         text=[
             "Módulo de Caja y Bancos".encode("utf-8"),
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos.html".encode("utf-8"),
+            "Configuración del Módulo".encode("utf-8"),
+            "Registros del Módulo".encode("utf-8"),
+            "Reportes del Módulo".encode("utf-8"),
         ],
     ),
     Route(
@@ -340,6 +347,10 @@ static_rutes = [
         url="/buying/",
         text=[
             "Módulo de Compras".encode("utf-8"),
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras.html".encode("utf-8"),
+            "Configuración del Módulo".encode("utf-8"),
+            "Registros del Módulo".encode("utf-8"),
+            "Reportes del Módulo".encode("utf-8"),
         ],
     ),
     Route(
@@ -370,6 +381,10 @@ static_rutes = [
         url="/inventory/",
         text=[
             "Módulo de Control de Inventario".encode("utf-8"),
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario.html".encode("utf-8"),
+            "Configuración del Módulo".encode("utf-8"),
+            "Registros del Módulo".encode("utf-8"),
+            "Reportes del Módulo".encode("utf-8"),
         ],
     ),
     Route(
@@ -400,6 +415,10 @@ static_rutes = [
         url="/sales/",
         text=[
             "Módulo de Ventas".encode("utf-8"),
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas.html".encode("utf-8"),
+            "Configuración del Módulo".encode("utf-8"),
+            "Registros del Módulo".encode("utf-8"),
+            "Reportes del Módulo".encode("utf-8"),
         ],
     ),
     Route(

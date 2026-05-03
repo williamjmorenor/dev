@@ -361,11 +361,26 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
 /* ═══════════════════════════════════════════════════════
    9. MODULE INDEX CARDS
    ═══════════════════════════════════════════════════════ */
+
+/*
+ * Module grid: always exactly 3 equal columns that fill the full
+ * available width.  On very narrow viewports (< 600 px) collapse
+ * to a single column so the layout stays readable on mobile.
+ */
 .ca-module-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.1rem;
   margin-top: .75rem;
+  width: 100%;
+}
+
+@media (max-width: 860px) {
+  .ca-module-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .ca-module-grid { grid-template-columns: 1fr; }
 }
 
 .ca-module-card {
@@ -376,6 +391,9 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
   box-shadow: var(--ca-shadow-sm) !important;
   padding: 1rem 1.25rem;
   transition: box-shadow .2s, transform .15s, border-top-color .2s;
+  /* Make all cards stretch to the same height within each row */
+  display: flex;
+  flex-direction: column;
 }
 
 .ca-module-card:hover {
@@ -401,7 +419,7 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
 .ca-module-card h5 i { color: var(--ca-p600); }
 
 /* Module link list */
-.ca-module-links { list-style: none; padding: 0; margin: 0; }
+.ca-module-links { list-style: none; padding: 0; margin: 0; flex: 1; }
 
 .ca-module-links li {
   display: flex;
@@ -414,6 +432,10 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
 }
 
 .ca-module-links li:hover { background: var(--ca-surface-hover); }
+
+/* Dimmed row when the user has no access */
+.ca-module-links li.ca-no-access { opacity: .45; pointer-events: none; cursor: not-allowed; }
+.ca-module-links li.ca-no-access a { color: var(--ca-disabled) !important; }
 
 .ca-module-links a {
   color: var(--ca-text-secondary) !important;
@@ -428,7 +450,13 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
 [data-theme="dark"] .ca-module-links a:hover { color: var(--ca-p300) !important; }
 
 /* ── Status dot badges ─────────────────────────────────
-   Usage: <span class="ca-status-dot ca-status-ok" title="Configurado correctamente"></span>
+   Semantic meanings
+   ─────────────────────────────────────────────────────
+   ca-status-ok          green   — everything configured / all good
+   ca-status-warning     amber   — pending approval (user can approve)
+   ca-status-error       red     — requires immediate attention
+   ca-status-no-access   gray    — user has no access to this section
+   ca-status-disabled    gray    — feature disabled / not available
    ────────────────────────────────────────────────────── */
 .ca-status-dot {
   display: inline-block;
@@ -438,10 +466,11 @@ h6 { font-size: .9rem; color: var(--ca-text-secondary); }
   flex-shrink: 0;
   margin-left: auto;
 }
-.ca-status-ok       { background: var(--ca-success); }
-.ca-status-warning  { background: var(--ca-warning); }
-.ca-status-error    { background: var(--ca-error);   }
-.ca-status-disabled { background: var(--ca-disabled); }
+.ca-status-ok        { background: var(--ca-success);  }
+.ca-status-warning   { background: var(--ca-warning);  }
+.ca-status-error     { background: var(--ca-error);    }
+.ca-status-disabled  { background: var(--ca-disabled); }
+.ca-status-no-access { background: var(--ca-g400);     }
 .ca-status-dot[title] { cursor: help; }
 
 /* ═══════════════════════════════════════════════════════
