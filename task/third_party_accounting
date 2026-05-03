@@ -1,0 +1,139 @@
+Implementation Requirement
+Cacao Accounting — Third Party Accounting Framework
+1. 🎯 Objetivo
+
+Diseñar un modelo de datos que permita:
+
+Asociar movimientos contables a terceros (clientes/proveedores)
+Soportar cuentas por cobrar (AR) y pagar (AP)
+Permitir conciliación y análisis por tercero
+Mantener consistencia total con el General Ledger (GL)
+2. 🧱 Principio Base
+
+No existen subledgers separados físicamente.
+
+AR/AP son:
+
+✔ proyecciones del GL filtradas por tercero
+
+3. 🧩 Modelo Base
+3.1 Extensión de gl_entry
+
+Campos obligatorios:
+
+party_type (customer, supplier, null)
+party_id (nullable)
+account_id
+debit
+credit
+3.2 Regla fundamental
+
+Si una cuenta es de tipo AR/AP → SIEMPRE requiere party_id
+
+4. 🧮 Clasificación de Cuentas
+En account:
+
+Campo obligatorio:
+
+account_type
+
+Valores relevantes:
+
+receivable
+payable
+bank
+cash
+expense
+income
+asset
+liability
+Regla:
+receivable → requiere party_type = customer
+payable → requiere party_type = supplier
+5. 🔗 Integración con Transacciones
+5.1 Sales Invoice
+Débito → cuenta por cobrar (con party_id)
+Crédito → ingresos
+5.2 Purchase Invoice
+Crédito → cuenta por pagar (con party_id)
+Débito → gasto o inventario
+5.3 Payment Entry
+Debe referenciar:
+party
+documentos (facturas)
+6. 📊 Balance por Tercero
+
+El sistema debe permitir calcular:
+
+saldo por cliente
+saldo por proveedor
+
+Usando:
+
+SUM(GL WHERE party_id = X)
+
+7. 🔄 Conciliación
+Tabla: reconciliation
+id
+company_id
+party_id
+type (AR/AP)
+Tabla: reconciliation_item
+reference_type (invoice/payment)
+reference_id
+allocated_amount
+Reglas:
+soportar pagos parciales
+soportar múltiples facturas por pago
+8. 💱 Multimoneda
+Reglas:
+Un mismo party puede tener múltiples monedas
+Cada gl_entry guarda:
+moneda original
+moneda base
+Implicación:
+
+El saldo por tercero puede analizarse por moneda o consolidado
+
+9. 🧾 Aging (Base estructural)
+
+El modelo debe permitir calcular:
+
+0–30 días
+31–60 días
+etc.
+
+Basado en:
+
+posting_date
+saldo pendiente
+10. ⚠️ Reglas de Integridad
+No permitir party_id en cuentas no relacionadas (opcional configurable)
+No permitir GL en cuentas AR/AP sin party_id
+No eliminar terceros en uso
+Uso de company_party para activación
+11. 🧠 Extensiones Futuras
+Límite de crédito por cliente
+Condiciones de pago
+Intereses por mora
+Clasificación por riesgo
+12. 🚫 Anti-Patrones Prohibidos
+
+❌ Tabla separada de AR/AP
+❌ Guardar saldo en tabla de cliente
+❌ No usar GL como fuente
+❌ Duplicar lógica contable
+
+13. 🔗 Relación con Otros Módulos
+GL → fuente de verdad
+Reconciliation → matching
+Multimoneda → análisis
+Multi-ledger → reporting paralelo
+14. 🚀 Criterio de Éxito
+
+El sistema será exitoso si:
+
+Permite calcular saldos por tercero directamente desde GL
+Soporta conciliación parcial y múltiple
+Mantiene consistencia total con contabilidad general
+Funciona con múltiples monedas y libros
