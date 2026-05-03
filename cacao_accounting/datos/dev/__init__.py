@@ -25,6 +25,8 @@ from cacao_accounting.datos.dev.data import (
     CUENTAS,
     DOCUMENTOS,
     ENTIDADES,
+    ITEMS_ENTREGA,
+    ITEMS_FACTURA_COMPRA,
     ITEMS_ORDEN_COMPRA,
     ITEMS_ORDEN_VENTA,
     ITEMS_RECEPCION,
@@ -197,6 +199,10 @@ def _cargar_documentos_demo():
     for i in ITEMS_ORDEN_VENTA:
         database.session.add(i)
     for i in ITEMS_RECEPCION:
+        database.session.add(i)
+    for i in ITEMS_FACTURA_COMPRA:
+        database.session.add(i)
+    for i in ITEMS_ENTREGA:
         database.session.add(i)
     database.session.commit()
 

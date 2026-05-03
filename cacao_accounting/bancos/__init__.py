@@ -16,7 +16,7 @@ from flask_login import login_required
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
-from cacao_accounting.database import Bank, BankAccount, BankTransaction, PaymentEntry, database
+from cacao_accounting.database import Bank, BankAccount, BankTransaction, PaymentEntry, PurchaseInvoice, SalesInvoice, database
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
 
@@ -177,10 +177,33 @@ def bancos_cuenta_bancaria(account_id):
 def bancos_pago_nuevo():
     """Formulario para crear un nuevo pago."""
     from cacao_accounting.bancos.forms import FormularioPago
+    from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.database import Party
 
     formulario = FormularioPago()
+    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.party_id.choices = [("", "")] + [
+        (str(p[0].id), p[0].name)
+        for p in database.session.execute(database.select(Party)).all()
+    ]
+    from_purchase_invoice_id = request.args.get("from_purchase_invoice")
+    from_sales_invoice_id = request.args.get("from_sales_invoice")
+    factura_compra_origen = (
+        database.session.get(PurchaseInvoice, from_purchase_invoice_id) if from_purchase_invoice_id else None
+    )
+    factura_venta_origen = (
+        database.session.get(SalesInvoice, from_sales_invoice_id) if from_sales_invoice_id else None
+    )
     titulo = "Nuevo Pago - " + APPNAME
-    return render_template("bancos/pago_nuevo.html", form=formulario, titulo=titulo)
+    return render_template(
+        "bancos/pago_nuevo.html",
+        form=formulario,
+        titulo=titulo,
+        from_purchase_invoice_id=from_purchase_invoice_id,
+        from_sales_invoice_id=from_sales_invoice_id,
+        factura_compra_origen=factura_compra_origen,
+        factura_venta_origen=factura_venta_origen,
+    )
 
 
 @bancos.route("/payment/<payment_id>")

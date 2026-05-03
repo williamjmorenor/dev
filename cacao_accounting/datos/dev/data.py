@@ -23,10 +23,14 @@ from cacao_accounting.database import (
     Item,
     Party,
     Project,
+    PurchaseInvoice,
+    PurchaseInvoiceItem,
     PurchaseOrder,
     PurchaseOrderItem,
     PurchaseReceipt,
     PurchaseReceiptItem,
+    SalesInvoice,
+    SalesInvoiceItem,
     SalesOrder,
     SalesOrderItem,
     Serie,
@@ -518,8 +522,10 @@ BODEGAS = (
 # Pre-built transactional documents with predictable IDs used in tests.
 PURCHASE_ORDER_ID = "POR-DEMO-0000001"
 PURCHASE_RECEIPT_ID = "REC-DEMO-0000001"
+PURCHASE_INVOICE_ID = "FCC-DEMO-0000001"
 SALES_ORDER_ID = "SOV-DEMO-0000001"
 DELIVERY_NOTE_ID = "ENT-DEMO-0000001"
+SALES_INVOICE_ID = "FCV-DEMO-0000001"
 
 DOCUMENTOS = (
     PurchaseOrder(
@@ -553,8 +559,32 @@ DOCUMENTOS = (
         company="cacao",
         posting_date=date(2025, 1, 22),
         sales_order_id=SALES_ORDER_ID,
-        docstatus=0,
+        docstatus=1,
         remarks="Nota de entrega de demostración",
+    ),
+    PurchaseInvoice(
+        id=PURCHASE_INVOICE_ID,
+        document_no="FCC-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 25),
+        purchase_order_id=PURCHASE_ORDER_ID,
+        purchase_receipt_id=PURCHASE_RECEIPT_ID,
+        grand_total=50.00,
+        outstanding_amount=50.00,
+        docstatus=1,
+        remarks="Factura de compra de demostración",
+    ),
+    SalesInvoice(
+        id=SALES_INVOICE_ID,
+        document_no="FCV-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 25),
+        sales_order_id=SALES_ORDER_ID,
+        delivery_note_id=DELIVERY_NOTE_ID,
+        grand_total=40.00,
+        outstanding_amount=40.00,
+        docstatus=1,
+        remarks="Factura de venta de demostración",
     ),
 )
 
@@ -592,5 +622,29 @@ ITEMS_RECEPCION = (
         rate=5.00,
         amount=50.00,
         warehouse="PRINCIPAL",
+    ),
+)
+
+ITEMS_FACTURA_COMPRA = (
+    PurchaseInvoiceItem(
+        purchase_invoice_id=PURCHASE_INVOICE_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=10,
+        uom="UND",
+        rate=5.00,
+        amount=50.00,
+    ),
+)
+
+ITEMS_ENTREGA = (
+    SalesInvoiceItem(
+        sales_invoice_id=SALES_INVOICE_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=5,
+        uom="UND",
+        rate=8.00,
+        amount=40.00,
     ),
 )

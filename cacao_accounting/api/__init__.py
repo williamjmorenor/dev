@@ -21,8 +21,12 @@ from jwt import decode
 from cacao_accounting.database import (
     DeliveryNote,
     DeliveryNoteItem,
+    PurchaseInvoice,
+    PurchaseInvoiceItem,
     PurchaseOrder,
     PurchaseOrderItem,
+    SalesInvoice,
+    SalesInvoiceItem,
     SalesOrder,
     SalesOrderItem,
     database,
@@ -182,3 +186,51 @@ def api_delivery_note_items(note_id: str):
         for li in lineas
     ]
     return jsonify({"note_id": note_id, "items": items})
+
+
+@api.route("/api/buying/purchase-invoice/<invoice_id>/items")
+@login_required
+def api_purchase_invoice_items(invoice_id: str):
+    """Devuelve las líneas de una factura de compra en formato JSON."""
+    factura = database.session.get(PurchaseInvoice, invoice_id)
+    if not factura:
+        abort(404)
+    lineas = database.session.execute(
+        database.select(PurchaseInvoiceItem).filter_by(purchase_invoice_id=invoice_id)
+    ).all()
+    items = [
+        {
+            "item_code": li[0].item_code,
+            "item_name": li[0].item_name or "",
+            "qty": float(li[0].qty) if li[0].qty is not None else 1,
+            "uom": li[0].uom or "",
+            "rate": float(li[0].rate) if li[0].rate is not None else 0,
+            "amount": float(li[0].amount) if li[0].amount is not None else 0,
+        }
+        for li in lineas
+    ]
+    return jsonify({"invoice_id": invoice_id, "items": items})
+
+
+@api.route("/api/sales/sales-invoice/<invoice_id>/items")
+@login_required
+def api_sales_invoice_items(invoice_id: str):
+    """Devuelve las líneas de una factura de venta en formato JSON."""
+    factura = database.session.get(SalesInvoice, invoice_id)
+    if not factura:
+        abort(404)
+    lineas = database.session.execute(
+        database.select(SalesInvoiceItem).filter_by(sales_invoice_id=invoice_id)
+    ).all()
+    items = [
+        {
+            "item_code": li[0].item_code,
+            "item_name": li[0].item_name or "",
+            "qty": float(li[0].qty) if li[0].qty is not None else 1,
+            "uom": li[0].uom or "",
+            "rate": float(li[0].rate) if li[0].rate is not None else 0,
+            "amount": float(li[0].amount) if li[0].amount is not None else 0,
+        }
+        for li in lineas
+    ]
+    return jsonify({"invoice_id": invoice_id, "items": items})

@@ -415,8 +415,10 @@ def compras_factura_compra_nuevo():
     ]
     from_order_id = request.args.get("from_order") or request.form.get("from_order")
     from_receipt_id = request.args.get("from_receipt") or request.form.get("from_receipt")
+    from_return_id = request.args.get("from_return") or request.form.get("from_return")
     orden_origen = database.session.get(PurchaseOrder, from_order_id) if from_order_id else None
     recepcion_origen = database.session.get(PurchaseReceipt, from_receipt_id) if from_receipt_id else None
+    factura_origen = database.session.get(PurchaseInvoice, from_return_id) if from_return_id else None
     items_disponibles = [
         {"code": i[0].code, "name": i[0].name, "uom": i[0].default_uom}
         for i in database.session.execute(database.select(Item)).all()
@@ -434,6 +436,8 @@ def compras_factura_compra_nuevo():
             supplier_invoice_no=request.form.get("supplier_invoice_no"),
             purchase_order_id=request.form.get("from_order") or None,
             purchase_receipt_id=request.form.get("from_receipt") or None,
+            is_return=bool(request.form.get("is_return")),
+            reversal_of=request.form.get("from_return") or None,
             remarks=request.form.get("remarks"),
             docstatus=0,
         )
@@ -449,8 +453,10 @@ def compras_factura_compra_nuevo():
         titulo=titulo,
         orden_origen=orden_origen,
         recepcion_origen=recepcion_origen,
+        factura_origen=factura_origen,
         from_order_id=from_order_id,
         from_receipt_id=from_receipt_id,
+        from_return_id=from_return_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
     )

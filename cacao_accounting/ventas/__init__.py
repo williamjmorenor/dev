@@ -401,8 +401,10 @@ def ventas_factura_venta_nuevo():
     ]
     from_order_id = request.args.get("from_order") or request.form.get("from_order")
     from_note_id = request.args.get("from_note") or request.form.get("from_note")
+    from_return_id = request.args.get("from_return") or request.form.get("from_return")
     orden_origen = database.session.get(SalesOrder, from_order_id) if from_order_id else None
     entrega_origen = database.session.get(DeliveryNote, from_note_id) if from_note_id else None
+    factura_origen = database.session.get(SalesInvoice, from_return_id) if from_return_id else None
     items_disponibles = [
         {"code": i[0].code, "name": i[0].name, "uom": i[0].default_uom}
         for i in database.session.execute(database.select(Item)).all()
@@ -419,6 +421,8 @@ def ventas_factura_venta_nuevo():
             posting_date=request.form.get("posting_date") or None,
             sales_order_id=request.form.get("from_order") or None,
             delivery_note_id=request.form.get("from_note") or None,
+            is_return=bool(request.form.get("is_return")),
+            reversal_of=request.form.get("from_return") or None,
             remarks=request.form.get("remarks"),
             docstatus=0,
         )
@@ -434,8 +438,10 @@ def ventas_factura_venta_nuevo():
         titulo=titulo,
         orden_origen=orden_origen,
         entrega_origen=entrega_origen,
+        factura_origen=factura_origen,
         from_order_id=from_order_id,
         from_note_id=from_note_id,
+        from_return_id=from_return_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
     )

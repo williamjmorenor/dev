@@ -26,6 +26,12 @@
             registro.docstatus,
             url_for('ventas.ventas_factura_venta_submit', invoice_id=registro.id),
             url_for('ventas.ventas_factura_venta_cancel', invoice_id=registro.id)) }}
+      {% if registro.docstatus == 1 %}
+        {{ macros.crear_dropdown([
+              ("Pago", url_for('bancos.bancos_pago_nuevo', from_sales_invoice=registro.id)),
+              ("Nota de Crédito", url_for('ventas.ventas_factura_venta_nuevo', from_return=registro.id))
+           ]) }}
+      {% endif %}
     </div>
   </div>
   <div class="row g-3 p-3">

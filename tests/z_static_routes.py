@@ -609,4 +609,65 @@ static_rutes = [
         url="/api/sales/sales-order/SOV-DEMO-0000001/items",
         text=[],
     ),
+    # ── Detail pages for submitted invoices ───────────────────────────────
+    Route(
+        url="/buying/purchase-invoice/FCC-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-invoice/FCV-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta.html".encode("utf-8"),
+        ],
+    ),
+    # ── "Crear → Nota de Crédito" shortcuts ───────────────────────────────
+    Route(
+        url="/buying/purchase-invoice/new?from_return=FCC-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-invoice/new?from_return=FCV-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    # ── "Crear → Pago" shortcuts ──────────────────────────────────────────
+    Route(
+        url="/cash_management/payment/new?from_purchase_invoice=FCC-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/pago_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/cash_management/payment/new?from_sales_invoice=FCV-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/pago_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    # ── Item API endpoints for invoices ───────────────────────────────────
+    Route(
+        url="/api/buying/purchase-invoice/FCC-DEMO-0000001/items",
+        text=[],
+    ),
+    Route(
+        url="/api/sales/sales-invoice/FCV-DEMO-0000001/items",
+        text=[],
+    ),
+    # ── Nota de entrega con auto-completar desde recepción aprobada ───────
+    Route(
+        url="/buying/purchase-invoice/new?from_receipt=REC-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-invoice/new?from_note=ENT-DEMO-0000001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html".encode("utf-8"),
+        ],
+    ),
 ]
