@@ -1410,8 +1410,8 @@ class TestExchangeRateUniqueConstraint(unittest.TestCase):
         from cacao_accounting.database import Currency, ExchangeRate
         from sqlalchemy.exc import IntegrityError
 
-        c1 = Currency(code="USD-T", name="US Dollar Test", is_active=True)
-        c2 = Currency(code="NIO-T", name="Córdoba Test", is_active=True)
+        c1 = Currency(code="USD-T", name="US Dollar Test", active=True)
+        c2 = Currency(code="NIO-T", name="Córdoba Test", active=True)
         self.database.session.add_all([c1, c2])
         self.database.session.flush()
 

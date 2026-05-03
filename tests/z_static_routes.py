@@ -426,4 +426,112 @@ static_rutes = [
             "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/cliente_lista.html".encode("utf-8"),
         ],
     ),
+    Route(
+        url="/buying/supplier/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/proveedor_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-order/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/orden_compra_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-receipt/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/recepcion_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/buying/purchase-invoice/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/customer/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/cliente_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-order/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/orden_venta_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/delivery-note/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/entrega_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/sales/sales-invoice/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/item/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/articulo_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/item/ART-001",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/articulo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/uom/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/uom_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/uom/UND",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/uom.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/warehouse/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/bodega_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/warehouse/PRINCIPAL",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/bodega.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/inventory/stock-entry/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/entrada_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/cash_management/bank/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/banco_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/cash_management/bank-account/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/banco_cuenta_nuevo.html".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/cash_management/payment/new",
+        text=[
+            "La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/pago_nuevo.html".encode("utf-8"),
+        ],
+    ),
 ]

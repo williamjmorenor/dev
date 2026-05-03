@@ -10,7 +10,7 @@
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
-from flask import Blueprint, render_template, request
+from flask import Blueprint, redirect, render_template, request
 from flask_login import login_required
 
 # ---------------------------------------------------------------------------------------
@@ -92,3 +92,120 @@ def compras_proveedor_lista():
     )
     titulo = "Listado de Proveedores - " + APPNAME
     return render_template("compras/proveedor_lista.html", consulta=consulta, titulo=titulo)
+
+
+@compras.route("/supplier/new", methods=["GET", "POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_proveedor_nuevo():
+    """Formulario para crear un nuevo proveedor."""
+    from cacao_accounting.compras.forms import FormularioProveedor
+
+    formulario = FormularioProveedor()
+    titulo = "Nuevo Proveedor - " + APPNAME
+    if formulario.validate_on_submit() or request.method == "POST":
+        proveedor = Party(
+            party_type="supplier",
+            name=request.form.get("name"),
+            comercial_name=request.form.get("comercial_name"),
+            tax_id=request.form.get("tax_id"),
+            classification=request.form.get("classification"),
+        )
+        database.session.add(proveedor)
+        database.session.commit()
+        return redirect("/buying/supplier/list")
+    return render_template("compras/proveedor_nuevo.html", form=formulario, titulo=titulo)
+
+
+@compras.route("/supplier/<supplier_id>")
+@modulo_activo("purchases")
+@login_required
+def compras_proveedor(supplier_id):
+    """Detalle de proveedor."""
+    from flask import abort
+
+    registro = database.session.execute(
+        database.select(Party).filter_by(id=supplier_id, party_type="supplier")
+    ).first()
+    if not registro:
+        abort(404)
+    titulo = registro[0].name + " - " + APPNAME
+    return render_template("compras/proveedor.html", registro=registro[0], titulo=titulo)
+
+
+@compras.route("/purchase-order/new", methods=["GET", "POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_orden_compra_nuevo():
+    """Formulario para crear una orden de compra."""
+    from cacao_accounting.compras.forms import FormularioOrdenCompra
+
+    formulario = FormularioOrdenCompra()
+    titulo = "Nueva Orden de Compra - " + APPNAME
+    return render_template("compras/orden_compra_nuevo.html", form=formulario, titulo=titulo)
+
+
+@compras.route("/purchase-order/<order_id>")
+@modulo_activo("purchases")
+@login_required
+def compras_orden_compra(order_id):
+    """Detalle de orden de compra."""
+    from flask import abort
+
+    registro = database.session.get(PurchaseOrder, order_id)
+    if not registro:
+        abort(404)
+    titulo = (registro.document_no or order_id) + " - " + APPNAME
+    return render_template("compras/orden_compra.html", registro=registro, titulo=titulo)
+
+
+@compras.route("/purchase-receipt/new", methods=["GET", "POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_recepcion_nuevo():
+    """Formulario para crear una recepción de compra."""
+    from cacao_accounting.compras.forms import FormularioRecepcionCompra
+
+    formulario = FormularioRecepcionCompra()
+    titulo = "Nueva Recepción de Compra - " + APPNAME
+    return render_template("compras/recepcion_nuevo.html", form=formulario, titulo=titulo)
+
+
+@compras.route("/purchase-receipt/<receipt_id>")
+@modulo_activo("purchases")
+@login_required
+def compras_recepcion(receipt_id):
+    """Detalle de recepción de compra."""
+    from flask import abort
+
+    registro = database.session.get(PurchaseReceipt, receipt_id)
+    if not registro:
+        abort(404)
+    titulo = (registro.document_no or receipt_id) + " - " + APPNAME
+    return render_template("compras/recepcion.html", registro=registro, titulo=titulo)
+
+
+@compras.route("/purchase-invoice/new", methods=["GET", "POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_factura_compra_nuevo():
+    """Formulario para crear una factura de compra."""
+    from cacao_accounting.compras.forms import FormularioFacturaCompra
+
+    formulario = FormularioFacturaCompra()
+    titulo = "Nueva Factura de Compra - " + APPNAME
+    return render_template("compras/factura_compra_nuevo.html", form=formulario, titulo=titulo)
+
+
+@compras.route("/purchase-invoice/<invoice_id>")
+@modulo_activo("purchases")
+@login_required
+def compras_factura_compra(invoice_id):
+    """Detalle de factura de compra."""
+    from flask import abort
+
+    registro = database.session.get(PurchaseInvoice, invoice_id)
+    if not registro:
+        abort(404)
+    titulo = (registro.document_no or invoice_id) + " - " + APPNAME
+    return render_template("compras/factura_compra.html", registro=registro, titulo=titulo)

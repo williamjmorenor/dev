@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block contenido %}
+{% import "macros.html" as macros %}
+
+{%- if TESTING -%}
+<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra.html"></div>
+{%- endif -%}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb lh-sm">
+    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_') }}" class="link-dark">Compras</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_factura_compra_lista') }}" class="link-dark">Facturas de Compra</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+  </ol>
+</nav>
+
+<div class="ca-card">
+  <div class="ca-card-header">
+    <h5 class="ca-card-title"><i class="bi bi-receipt"></i> {{ registro.document_no or registro.id }}</h5>
+  </div>
+  <dl class="row p-3">
+    <dt class="col-sm-3">Número de Documento</dt>
+    <dd class="col-sm-9">{{ registro.document_no or "" }}</dd>
+    <dt class="col-sm-3">Compañía</dt>
+    <dd class="col-sm-9">{{ registro.company or "" }}</dd>
+    <dt class="col-sm-3">Fecha</dt>
+    <dd class="col-sm-9">{{ registro.posting_date or "" }}</dd>
+    <dt class="col-sm-3">Estado</dt>
+    <dd class="col-sm-9">{{ registro.docstatus }}</dd>
+  </dl>
+</div>
+
+{% endblock %}

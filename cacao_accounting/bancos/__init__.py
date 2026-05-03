@@ -10,7 +10,7 @@
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
-from flask import Blueprint, render_template, request
+from flask import Blueprint, redirect, render_template, request
 from flask_login import login_required
 
 # ---------------------------------------------------------------------------------------
@@ -93,3 +93,105 @@ def bancos_transaccion_lista():
     )
     titulo = "Listado de Transacciones Bancarias - " + APPNAME
     return render_template("bancos/transaccion_lista.html", consulta=consulta, titulo=titulo)
+
+
+@bancos.route("/bank/new", methods=["GET", "POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_banco_nuevo():
+    """Formulario para crear un nuevo banco."""
+    from cacao_accounting.bancos.forms import FormularioBanco
+
+    formulario = FormularioBanco()
+    titulo = "Nuevo Banco - " + APPNAME
+    if formulario.validate_on_submit() or request.method == "POST":
+        banco = Bank(
+            name=request.form.get("name"),
+            swift_code=request.form.get("swift_code"),
+        )
+        database.session.add(banco)
+        database.session.commit()
+        return redirect("/cash_management/bank/list")
+    return render_template("bancos/banco_nuevo.html", form=formulario, titulo=titulo)
+
+
+@bancos.route("/bank/<bank_id>")
+@modulo_activo("cash")
+@login_required
+def bancos_banco(bank_id):
+    """Detalle de banco."""
+    from flask import abort
+
+    registro = database.session.get(Bank, bank_id)
+    if not registro:
+        abort(404)
+    titulo = registro.name + " - " + APPNAME
+    return render_template("bancos/banco.html", registro=registro, titulo=titulo)
+
+
+@bancos.route("/bank-account/new", methods=["GET", "POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_cuenta_bancaria_nuevo():
+    """Formulario para crear una nueva cuenta bancaria."""
+    from cacao_accounting.bancos.forms import FormularioCuentaBancaria
+
+    formulario = FormularioCuentaBancaria()
+    formulario.bank_id.choices = [
+        (b[0].id, b[0].name)
+        for b in database.session.execute(database.select(Bank)).all()
+    ]
+    titulo = "Nueva Cuenta Bancaria - " + APPNAME
+    if formulario.validate_on_submit() or request.method == "POST":
+        cuenta = BankAccount(
+            bank_id=request.form.get("bank_id"),
+            company=request.form.get("company"),
+            account_name=request.form.get("account_name"),
+            account_no=request.form.get("account_no"),
+            iban=request.form.get("iban"),
+            currency=request.form.get("currency") or None,
+        )
+        database.session.add(cuenta)
+        database.session.commit()
+        return redirect("/cash_management/bank-account/list")
+    return render_template("bancos/banco_cuenta_nuevo.html", form=formulario, titulo=titulo)
+
+
+@bancos.route("/bank-account/<account_id>")
+@modulo_activo("cash")
+@login_required
+def bancos_cuenta_bancaria(account_id):
+    """Detalle de cuenta bancaria."""
+    from flask import abort
+
+    registro = database.session.get(BankAccount, account_id)
+    if not registro:
+        abort(404)
+    titulo = registro.account_name + " - " + APPNAME
+    return render_template("bancos/banco_cuenta.html", registro=registro, titulo=titulo)
+
+
+@bancos.route("/payment/new", methods=["GET", "POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_pago_nuevo():
+    """Formulario para crear un nuevo pago."""
+    from cacao_accounting.bancos.forms import FormularioPago
+
+    formulario = FormularioPago()
+    titulo = "Nuevo Pago - " + APPNAME
+    return render_template("bancos/pago_nuevo.html", form=formulario, titulo=titulo)
+
+
+@bancos.route("/payment/<payment_id>")
+@modulo_activo("cash")
+@login_required
+def bancos_pago(payment_id):
+    """Detalle de pago."""
+    from flask import abort
+
+    registro = database.session.get(PaymentEntry, payment_id)
+    if not registro:
+        abort(404)
+    titulo = (registro.document_no or payment_id) + " - " + APPNAME
+    return render_template("bancos/pago.html", registro=registro, titulo=titulo)
