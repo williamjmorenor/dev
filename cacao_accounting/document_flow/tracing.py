@@ -71,8 +71,8 @@ def _relation_payload(relation: DocumentRelation, upstream: bool) -> dict[str, A
     }
 
 
-def _group_key(doctype: str) -> str:
-    """Devuelve el modulo al que pertenece un tipo documental."""
+def _doctype_module(doctype: str) -> str:
+    """Devuelve la etiqueta del modulo al que pertenece un tipo documental."""
 
     spec = DOCUMENT_TYPES.get(doctype)
     return spec.module_label if spec else "General"
@@ -83,13 +83,6 @@ def _doctype_label(doctype: str) -> str:
 
     spec = DOCUMENT_TYPES.get(doctype)
     return spec.label if spec and spec.label else doctype
-
-
-def _doctype_list_endpoint(doctype: str) -> str | None:
-    """Devuelve el endpoint de lista de un tipo documental registrado."""
-
-    spec = DOCUMENT_TYPES.get(doctype)
-    return spec.list_endpoint if spec else None
 
 
 def document_flow_summary(document_type: str, document_id: str) -> dict[str, Any]:
@@ -149,6 +142,8 @@ def _build_groups(
 ) -> list[dict[str, Any]]:
     """Agrupa relaciones por tipo documental con contadores y documentos."""
 
+    from flask import url_for
+
     groups: dict[str, dict[str, Any]] = {}
     for relation in rows:
         related_type = relation.source_type if use_source else relation.target_type
@@ -156,11 +151,21 @@ def _build_groups(
         is_active = relation.status == "active"
 
         if related_type not in groups:
+            try:
+                list_url: str | None = url_for(
+                    "api.document_flow_related_list",
+                    doctype=related_type,
+                    related_doctype=current_type,
+                    related_id=current_id,
+                )
+            except Exception:  # noqa: BLE001 — url_for puede fallar fuera de contexto de peticion
+                list_url = None
+
             groups[related_type] = {
                 "doctype": related_type,
                 "label": _doctype_label(related_type),
-                "module": _group_key(related_type),
-                "list_endpoint": _doctype_list_endpoint(related_type),
+                "module": _doctype_module(related_type),
+                "list_url": list_url,
                 "active_count": 0,
                 "historical_count": 0,
                 "documents": [],
@@ -171,12 +176,16 @@ def _build_groups(
         else:
             groups[related_type]["historical_count"] += 1
 
+        doc_payload = _document_payload(related_type, related_id)
         groups[related_type]["documents"].append(
             {
                 "relation_id": relation.id,
                 "relation_type": relation.relation_type,
                 "status": relation.status,
-                "document": _document_payload(related_type, related_id),
+                "document": doc_payload,
+                "badge_class": doc_payload.get("status", {}).get("badge_class", "text-bg-secondary")
+                if doc_payload.get("status")
+                else "text-bg-secondary",
             }
         )
 

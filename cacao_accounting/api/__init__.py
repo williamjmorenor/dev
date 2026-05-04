@@ -322,8 +322,8 @@ def document_flow_related_list(doctype: str):
     related_doc = get_document(related_doctype, related_id) if related_doctype and related_id else None
     related_no = getattr(related_doc, "document_no", related_id) if related_doc else related_id
 
-    related_label = DOCUMENT_TYPES.get(related_doctype, None)
-    related_label_str = related_label.label if related_label and related_label.label else related_doctype
+    related_spec = DOCUMENT_TYPES.get(related_doctype, None)
+    related_label = related_spec.label if related_spec and related_spec.label else related_doctype
 
     target_ids: list[str] = []
     if related_doctype and related_id:
@@ -345,7 +345,7 @@ def document_flow_related_list(doctype: str):
             .scalars()
             .all()
         )
-        target_ids = list({*rows_as_target, *rows_as_source})
+        target_ids = list(set(rows_as_target) | set(rows_as_source))
 
     documents = []
     if target_ids:
@@ -364,6 +364,6 @@ def document_flow_related_list(doctype: str):
         related_doctype=related_doctype,
         related_id=related_id,
         related_no=related_no,
-        related_label=related_label_str,
+        related_label=related_label,
         titulo=f"Documentos relacionados — {spec.label}",
     )

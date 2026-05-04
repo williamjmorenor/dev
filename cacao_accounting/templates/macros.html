@@ -267,7 +267,6 @@
        upstream: [],
        downstream: [],
        createActions: [],
-       currentStatus: null,
        toggle() {
          this.open = !this.open;
          if (this.open && !this.loaded) this.load();
@@ -284,21 +283,6 @@
              this.loading = false;
            })
            .catch(() => { this.loading = false; });
-       },
-       totalCount(groups) {
-         return groups.reduce((s, g) => s + g.active_count + g.historical_count, 0);
-       },
-       badgeClass(status) {
-         const map = {active:'text-bg-success', reverted:'text-bg-secondary', closed:'text-bg-secondary'};
-         return map[status] || 'text-bg-secondary';
-       },
-       docStatusClass(code) {
-         const greens = ['completed','paid','approved','posted'];
-         const reds = ['requires_attention','overdue'];
-         if (greens.includes(code)) return 'text-bg-success';
-         if (reds.includes(code)) return 'text-bg-danger';
-         if (code === 'cancelled') return 'text-bg-secondary';
-         return 'text-bg-primary';
        }
      }">
   <div class="ca-card-header" style="cursor:pointer;" @click="toggle()">
@@ -315,19 +299,6 @@
     </div>
 
     <div x-show="!loading && loaded">
-      {# ── Acciones de creacion ─────────────────────────────── #}
-      <template x-if="createActions.length > 0">
-        <div class="px-3 pt-3 pb-1 border-bottom">
-          <span class="small fw-semibold text-muted me-2">Crear:</span>
-          <template x-for="action in createActions" :key="action.target_type">
-            <a :href="'{{ url_for('cacao_app.pagina_inicio') | replace('/index', '') }}' + action.endpoint.replace('.', '/').replace('_', '-')"
-               class="btn btn-sm btn-outline-primary me-1 mb-1">
-              <i class="bi bi-plus-circle me-1"></i><span x-text="action.label"></span>
-            </a>
-          </template>
-        </div>
-      </template>
-
       {# ── Documentos origen (upstream) ─────────────────────── #}
       <template x-if="upstream.length > 0">
         <div class="px-3 pt-2">
@@ -339,15 +310,19 @@
                 <span class="badge text-bg-primary" x-text="group.active_count" x-show="group.active_count > 0"></span>
                 <span class="badge text-bg-secondary" x-show="group.historical_count > 0"
                       :title="'Históricos: ' + group.historical_count" x-text="group.historical_count + ' hist.'"></span>
+                <template x-if="group.list_url">
+                  <a :href="group.list_url" class="btn btn-link btn-sm p-0 ms-auto small">
+                    <i class="bi bi-list-ul me-1"></i>Ver lista
+                  </a>
+                </template>
               </div>
               <template x-for="rel in group.documents" :key="rel.relation_id">
                 <div class="d-flex align-items-center gap-2 ms-2 mb-1 small">
-                  <span class="badge"
-                        :class="docStatusClass(rel.document.status ? rel.document.status.code : '')"
+                  <span class="badge" :class="rel.badge_class"
                         x-text="rel.document.status ? rel.document.status.label : '—'"></span>
-                  <span x-text="rel.document.document_no"></span>
-                  <span class="badge text-bg-light border" x-text="rel.relation_type"
+                  <span x-text="rel.document.document_no"
                         :class="{'text-decoration-line-through text-muted': rel.status !== 'active'}"></span>
+                  <span class="badge text-bg-light border" x-text="rel.relation_type"></span>
                 </div>
               </template>
             </div>
@@ -366,17 +341,15 @@
                 <span class="badge text-bg-primary" x-text="group.active_count" x-show="group.active_count > 0"></span>
                 <span class="badge text-bg-secondary" x-show="group.historical_count > 0"
                       :title="'Históricos: ' + group.historical_count" x-text="group.historical_count + ' hist.'"></span>
-                <template x-if="group.list_endpoint">
-                  <a :href="'/document-flow/list/' + group.doctype + '?related_doctype={{ document_type }}&related_id={{ document.id }}'"
-                     class="btn btn-link btn-sm p-0 ms-auto small">
+                <template x-if="group.list_url">
+                  <a :href="group.list_url" class="btn btn-link btn-sm p-0 ms-auto small">
                     <i class="bi bi-list-ul me-1"></i>Ver lista
                   </a>
                 </template>
               </div>
               <template x-for="rel in group.documents" :key="rel.relation_id">
                 <div class="d-flex align-items-center gap-2 ms-2 mb-1 small">
-                  <span class="badge"
-                        :class="docStatusClass(rel.document.status ? rel.document.status.code : '')"
+                  <span class="badge" :class="rel.badge_class"
                         x-text="rel.document.status ? rel.document.status.label : '—'"></span>
                   <span x-text="rel.document.document_no"
                         :class="{'text-decoration-line-through text-muted': rel.status !== 'active'}"></span>
