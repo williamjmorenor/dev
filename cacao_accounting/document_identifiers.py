@@ -8,7 +8,15 @@ from __future__ import annotations
 from datetime import date
 from typing import cast
 
-from cacao_accounting.database import AccountingPeriod, NamingSeries, Sequence, SeriesSequenceMap, database
+from cacao_accounting.database import (
+    AccountingPeriod,
+    ExternalCounter,
+    ExternalCounterAuditLog,
+    NamingSeries,
+    Sequence,
+    SeriesSequenceMap,
+    database,
+)
 from cacao_accounting.database.helpers import generate_identifier, get_active_naming_series
 
 
@@ -47,8 +55,47 @@ def validate_accounting_period(company: str | None, posting_date: date) -> None:
         raise IdentifierConfigurationError("No puede registrar documentos en un periodo contable cerrado.")
 
 
+def enforce_single_default_series(entity_type: str, company: str | None, exclude_id: str | None = None) -> None:
+    """Garantiza que solo exista una serie predeterminada activa por entity_type + company.
+
+    Desmarca como predeterminadas las demas series para la misma combinacion
+    entity_type + company antes de marcar la nueva como predeterminada.
+
+    Args:
+        entity_type: Tipo de entidad (ej: 'sales_invoice')
+        company: Codigo de compania o None para series globales
+        exclude_id: ID de la serie que se quiere mantener como predeterminada (se excluye del reset)
+    """
+    from sqlalchemy import or_
+
+    query = database.select(NamingSeries).filter(
+        NamingSeries.entity_type == entity_type,
+        NamingSeries.is_default.is_(True),
+    )
+
+    if company:
+        query = query.filter(or_(NamingSeries.company == company, NamingSeries.company.is_(None)))
+    else:
+        query = query.filter(NamingSeries.company.is_(None))
+
+    existing_defaults = database.session.execute(query).scalars().all()
+    for series in existing_defaults:
+        if series.id != exclude_id:
+            series.is_default = False
+
+    database.session.flush()
+
+
 def _pick_naming_series(entity_type: str, company: str, naming_series_id: str | None) -> NamingSeries:
-    """Selecciona la serie activa por doctype y compania."""
+    """Selecciona la serie activa por doctype y compania.
+
+    Orden de preferencia:
+    1. Serie explicitamente solicitada (naming_series_id)
+    2. Serie marcada como predeterminada para la compania
+    3. Primera serie activa de la compania (orden alfabetico)
+    4. Primera serie global activa
+    5. Serie creada automaticamente por bootstrap
+    """
 
     if naming_series_id:
         selected = database.session.get(NamingSeries, naming_series_id)
@@ -63,6 +110,11 @@ def _pick_naming_series(entity_type: str, company: str, naming_series_id: str | 
     candidates = get_active_naming_series(entity_type=entity_type, company=company)
     if not candidates:
         return _create_default_series(entity_type=entity_type, company=company)
+
+    # Prefer the series marked as default for this company
+    default_matches = [s for s in candidates if s.is_default and s.company == company]
+    if default_matches:
+        return default_matches[0]
 
     exact_company_matches = [series for series in candidates if series.company == company]
     if exact_company_matches:
@@ -93,7 +145,11 @@ def _default_entity_code(entity_type: str) -> str:
 
 
 def _create_default_series(entity_type: str, company: str) -> NamingSeries:
-    """Crea una serie y secuencia por defecto para compania + doctype."""
+    """Crea una serie y secuencia por defecto para compania + doctype.
+
+    La serie creada automaticamente se marca como predeterminada (is_default=True)
+    ya que es la primera y unica para esta combinacion.
+    """
 
     code = _default_entity_code(entity_type)
     sequence = Sequence(
@@ -112,6 +168,7 @@ def _create_default_series(entity_type: str, company: str) -> NamingSeries:
         company=company,
         prefix_template=f"*COMP*-{code}-*YYYY*-*MM*-",
         is_active=True,
+        is_default=True,
     )
     database.session.add(naming_series)
     database.session.flush()
@@ -180,3 +237,100 @@ def assign_document_identifier(
     setattr(document, "posting_date", posting_date)
     setattr(document, "naming_series_id", naming_series.id)
     setattr(document, "document_no", identifier)
+
+
+# -------------------------------------------------------------------------------------
+# External Counter Services
+# -------------------------------------------------------------------------------------
+
+
+def suggest_next_external_number(external_counter_id: str) -> str:
+    """Devuelve el siguiente numero externo sugerido para un contador externo.
+
+    Args:
+        external_counter_id: ID del ExternalCounter
+
+    Returns:
+        Cadena con el numero sugerido (prefijo + numero formateado con padding)
+
+    Raises:
+        IdentifierConfigurationError: Si el contador no existe o esta inactivo
+    """
+    counter = database.session.get(ExternalCounter, external_counter_id)
+    if not counter:
+        raise IdentifierConfigurationError("El contador externo no existe.")
+    if not counter.is_active:
+        raise IdentifierConfigurationError("El contador externo esta inactivo.")
+    return counter.next_suggested_formatted
+
+
+def record_external_number_used(
+    *,
+    external_counter_id: str,
+    number_used: int,
+    changed_by: str | None = None,
+) -> None:
+    """Registra el uso de un numero externo incrementando last_used si corresponde.
+
+    Actualiza last_used solo si number_used es mayor al valor actual.
+
+    Args:
+        external_counter_id: ID del ExternalCounter
+        number_used: Numero externo utilizado en el documento
+        changed_by: ID del usuario que realiza el registro
+    """
+    counter = database.session.get(ExternalCounter, external_counter_id)
+    if not counter:
+        raise IdentifierConfigurationError("El contador externo no existe.")
+    if not counter.is_active:
+        raise IdentifierConfigurationError("El contador externo esta inactivo.")
+
+    if number_used > (counter.last_used or 0):
+        counter.last_used = number_used
+        database.session.flush()
+
+
+def adjust_external_counter(
+    *,
+    external_counter_id: str,
+    new_last_used: int,
+    reason: str,
+    changed_by: str | None = None,
+) -> None:
+    """Ajusta el ultimo numero usado de un contador externo con auditoria obligatoria.
+
+    Esta operacion exige un motivo explicito. Cada ajuste queda registrado
+    en ExternalCounterAuditLog con el valor anterior, el nuevo valor, el usuario
+    y la fecha del cambio.
+
+    Args:
+        external_counter_id: ID del ExternalCounter a ajustar
+        new_last_used: Nuevo valor para last_used
+        reason: Motivo obligatorio del ajuste (no puede estar vacio)
+        changed_by: ID del usuario que realiza el ajuste
+
+    Raises:
+        IdentifierConfigurationError: Si el contador no existe, esta inactivo
+                                      o el motivo esta vacio
+    """
+    if not reason or not reason.strip():
+        raise IdentifierConfigurationError("Debe indicar el motivo del ajuste del contador externo.")
+
+    counter = database.session.get(ExternalCounter, external_counter_id)
+    if not counter:
+        raise IdentifierConfigurationError("El contador externo no existe.")
+    if not counter.is_active:
+        raise IdentifierConfigurationError("El contador externo esta inactivo.")
+
+    previous_value = counter.last_used or 0
+
+    audit_entry = ExternalCounterAuditLog(
+        external_counter_id=counter.id,
+        previous_value=previous_value,
+        new_value=new_last_used,
+        reason=reason.strip(),
+        changed_by=changed_by,
+    )
+    database.session.add(audit_entry)
+    counter.last_used = new_last_used
+    database.session.flush()

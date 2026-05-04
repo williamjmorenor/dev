@@ -473,6 +473,9 @@ class NamingSeries(database.Model, BaseTabla):  # type: ignore[name-defined]
     *YYYY*, *YY*, *MMM*, *MM*, *DD*, *COMP*
 
     Ejemplo: CHOCO-SI-*YYYY*-*MMM*-
+
+    Regla de negocio: como maximo una serie puede ser predeterminada (is_default=True)
+    por combinacion de entity_type + company. Para series globales, company=NULL.
     """
 
     __tablename__ = "naming_series"
@@ -482,6 +485,8 @@ class NamingSeries(database.Model, BaseTabla):  # type: ignore[name-defined]
     company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=True)
     prefix_template = database.Column(database.String(100), nullable=False)
     is_active = database.Column(database.Boolean(), default=True, nullable=False)
+    # Solo una serie activa puede ser predeterminada por entity_type + company.
+    is_default = database.Column(database.Boolean(), default=False, nullable=False, index=True)
 
 
 class Sequence(database.Model, BaseTabla):  # type: ignore[name-defined]
@@ -531,6 +536,62 @@ class GeneratedIdentifierLog(database.Model, BaseTabla):  # type: ignore[name-de
     generated_at = database.Column(database.DateTime, default=database.func.now(), nullable=False)
     company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=True, index=True)
     posting_date = database.Column(database.Date(), nullable=True)
+
+
+class ExternalCounter(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Contador externo para numeraciones fuera del control directo del sistema.
+
+    Representa numeraciones fisicas, fiscales o bancarias: chequeras, resoluciones
+    fiscales, recibos preimpresos, etc.
+
+    El sistema sugiere el siguiente numero pero el usuario conserva control
+    operativo. Toda modificacion del ultimo numero usado queda auditada en
+    ExternalCounterAuditLog.
+    """
+
+    __tablename__ = "external_counter"
+    company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=False, index=True)
+    name = database.Column(database.String(100), nullable=False)
+    # Tipo: checkbook, fiscal, receipt, bank_transfer, other
+    counter_type = database.Column(database.String(50), nullable=True)
+    prefix = database.Column(database.String(30), nullable=True)
+    last_used = database.Column(database.Integer(), default=0, nullable=False)
+    padding = database.Column(database.Integer(), default=5, nullable=False)
+    is_active = database.Column(database.Boolean(), default=True, nullable=False)
+    description = database.Column(database.Text(), nullable=True)
+    # Relacion opcional con una NamingSeries interna
+    naming_series_id = database.Column(database.String(26), database.ForeignKey("naming_series.id"), nullable=True)
+
+    @property
+    def next_suggested(self) -> int:
+        """Devuelve el siguiente numero externo sugerido."""
+        return (self.last_used or 0) + 1
+
+    @property
+    def next_suggested_formatted(self) -> str:
+        """Devuelve el siguiente numero externo formateado con padding y prefijo."""
+        val = self.next_suggested
+        prefix = self.prefix or ""
+        return f"{prefix}{str(val).zfill(self.padding or 5)}"
+
+
+class ExternalCounterAuditLog(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Bitacora de auditoria obligatoria de cambios en contadores externos.
+
+    Registra cada ajuste al campo last_used de ExternalCounter.
+    El motivo es obligatorio para garantizar trazabilidad operativa completa.
+    """
+
+    __tablename__ = "external_counter_audit_log"
+    external_counter_id = database.Column(
+        database.String(26), database.ForeignKey("external_counter.id"), nullable=False, index=True
+    )
+    previous_value = database.Column(database.Integer(), nullable=False)
+    new_value = database.Column(database.Integer(), nullable=False)
+    # Motivo obligatorio por politica de negocio
+    reason = database.Column(database.Text(), nullable=False)
+    changed_by = database.Column(database.String(26), nullable=True)
+    changed_at = database.Column(database.DateTime, default=database.func.now(), nullable=False)
 
 
 # <---------------------------------------------------------------------------------------------> #

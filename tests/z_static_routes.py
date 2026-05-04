@@ -774,4 +774,37 @@ static_rutes = [
             ),
         ],
     ),
+    # ── Series de Numeracion (NamingSeries) ───────────────────────────────
+    Route(
+        url="/accounting/naming-series/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: contabilidad/naming_series_lista.html".encode("utf-8"),
+            "Series de Numeracion".encode("utf-8"),
+            "Nueva Serie".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/accounting/naming-series/new",
+        text=[
+            "Nueva Serie de Numeracion".encode("utf-8"),
+            "Tipo de Documento".encode("utf-8"),
+            "Plantilla de Prefijo".encode("utf-8"),
+        ],
+    ),
+    # ── Contadores Externos (ExternalCounter) ─────────────────────────────
+    Route(
+        url="/accounting/external-counter/list",
+        text=[
+            "La Plantilla fue renderizada correctamente: contabilidad/external_counter_lista.html".encode("utf-8"),
+            "Contadores Externos".encode("utf-8"),
+            "Nuevo Contador".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/accounting/external-counter/new",
+        text=[
+            "Nuevo Contador Externo".encode("utf-8"),
+            "Compania".encode("utf-8"),
+        ],
+    ),
 ]
