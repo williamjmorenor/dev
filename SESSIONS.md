@@ -1,5 +1,47 @@
 # SESSIONS
 
+## 2026-05-04 (diagnóstico del proyecto)
+
+### Peticion del usuario
+Analizar la definición de módulos del sistema (directorio `modulos/`) y generar dos documentos:
+- `ESTADO_ACTUAL.md`: qué implementa el proyecto, dónde, qué hace cada módulo, los más relevantes y qué archivos requieren atención.
+- `PENDIENTE.md`: todo lo pendiente para completar los módulos indicados.
+
+### Plan implementado
+1. Leer todos los archivos de definición de módulos en `modulos/` (contabilidad, compras, ventas, inventario, relaciones, setup) y archivos de contexto.
+2. Inspeccionar el código fuente: modelos en `database/__init__.py`, rutas en cada módulo, templates, API, document_flow.
+3. Revisar `FIXME.md` y `SESSIONS.md` anteriores para contexto de problemas conocidos.
+4. Crear `ESTADO_ACTUAL.md` contestando: qué implementa, dónde, qué hace cada módulo, los más relevantes y archivos que requieren atención.
+5. Crear `PENDIENTE.md` con todos los pendientes organizados en 17 bloques por prioridad.
+
+### Resumen tecnico de cambios
+- Creado `ESTADO_ACTUAL.md` (~250 líneas): diagnóstico completo del estado actual del proyecto.
+  - Inventario de lo que implementa el proyecto (multi-compañía, multi-ledger, multimoneda, S2P, O2C, R2R).
+  - Tabla por módulo: modelos DB, rutas CRUD, posting/servicios, reportes.
+  - Archivos que requieren atención urgente y prioritaria.
+- Creado `PENDIENTE.md` (~400 líneas): roadmap de pendientes dividido en 17 bloques.
+  - Bloque 1: Posting Contable (core crítico — ningún documento genera GLEntry al submit).
+  - Bloque 2: AR/AP, saldos outstanding, pagos y anticipos.
+  - Bloque 3: Documentos de corrección (notas crédito/débito, devoluciones, reversión).
+  - Bloques 4-17: formularios, inventario, GI/IR, impuestos, precios, multi-ledger, dimensiones, cierre, reportes, setup/admin.
+
+### Hallazgos clave
+- El modelo de base de datos es completo (~90 tablas en 2041 líneas).
+- Ningún documento operativo genera `GLEntry` al ser confirmado (submit). Este es el gap más crítico.
+- El módulo de ventas no tiene ruta de lista ni creación de nota de crédito de cliente.
+- El formulario de proveedor nuevo es no funcional (documentado en FIXME).
+- `StockEntry` no genera `StockLedgerEntry` ni actualiza `StockBin` al hacer submit.
+- La reconciliación bancaria, cierre de período y revalorización cambiaria tienen modelos pero sin UI ni servicio.
+
+### Verificacion ejecutada
+- Inspección completa de: modelos DB, rutas de todos los módulos, templates, API endpoints.
+- Revisión de FIXME.md, SESSIONS.md previos, y todos los archivos de definición de módulos.
+
+### Notas para siguiente iteracion
+1. Priorizar implementación de posting contable (Bloque 1 de PENDIENTE.md).
+2. Corregir formularios documentados como no funcionales en FIXME.md.
+3. Implementar nota de crédito de venta (gap crítico en módulo ventas).
+
 ## 2026-05-04
 
 ### Peticion del usuario
