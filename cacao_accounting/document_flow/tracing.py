@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from cacao_accounting.database import DocumentRelation, database
-from cacao_accounting.document_flow.registry import normalize_doctype
+from cacao_accounting.document_flow.registry import DOCUMENT_TYPES, normalize_doctype
 from cacao_accounting.document_flow.repository import get_document
 from cacao_accounting.document_flow.status import document_status_payload
 
@@ -69,3 +69,115 @@ def _relation_payload(relation: DocumentRelation, upstream: bool) -> dict[str, A
         "uom": relation.uom,
         "document": _document_payload(related_type, related_id),
     }
+
+
+def _group_key(doctype: str) -> str:
+    """Devuelve el modulo al que pertenece un tipo documental."""
+
+    spec = DOCUMENT_TYPES.get(doctype)
+    return spec.module_label if spec else "General"
+
+
+def _doctype_label(doctype: str) -> str:
+    """Devuelve la etiqueta legible de un tipo documental."""
+
+    spec = DOCUMENT_TYPES.get(doctype)
+    return spec.label if spec and spec.label else doctype
+
+
+def _doctype_list_endpoint(doctype: str) -> str | None:
+    """Devuelve el endpoint de lista de un tipo documental registrado."""
+
+    spec = DOCUMENT_TYPES.get(doctype)
+    return spec.list_endpoint if spec else None
+
+
+def document_flow_summary(document_type: str, document_id: str) -> dict[str, Any]:
+    """Devuelve un resumen agrupado de documentos relacionados con contadores.
+
+    Agrupa las relaciones upstream (origen) y downstream (destino) por tipo
+    documental, calculando contadores activos e historicos para el panel de
+    trazabilidad en la vista de detalle.
+    """
+
+    doctype = normalize_doctype(document_type)
+
+    upstream_rows: list[DocumentRelation] = (
+        database.session.execute(
+            database.select(DocumentRelation)
+            .filter_by(target_type=doctype, target_id=document_id)
+            .order_by(DocumentRelation.created)
+        )
+        .scalars()
+        .all()
+    )
+    downstream_rows: list[DocumentRelation] = (
+        database.session.execute(
+            database.select(DocumentRelation)
+            .filter_by(source_type=doctype, source_id=document_id)
+            .order_by(DocumentRelation.created)
+        )
+        .scalars()
+        .all()
+    )
+
+    upstream_groups = _build_groups(upstream_rows, use_source=True, current_id=document_id, current_type=doctype)
+    downstream_groups = _build_groups(downstream_rows, use_source=False, current_id=document_id, current_type=doctype)
+
+    spec = DOCUMENT_TYPES.get(doctype)
+    create_actions = []
+    if spec:
+        create_actions = [
+            {"label": action.label, "target_type": action.target_type, "endpoint": action.endpoint}
+            for action in spec.create_actions
+        ]
+
+    return {
+        "document_type": doctype,
+        "document_id": document_id,
+        "upstream": upstream_groups,
+        "downstream": downstream_groups,
+        "create_actions": create_actions,
+    }
+
+
+def _build_groups(
+    rows: list[DocumentRelation],
+    use_source: bool,
+    current_id: str,
+    current_type: str,
+) -> list[dict[str, Any]]:
+    """Agrupa relaciones por tipo documental con contadores y documentos."""
+
+    groups: dict[str, dict[str, Any]] = {}
+    for relation in rows:
+        related_type = relation.source_type if use_source else relation.target_type
+        related_id = relation.source_id if use_source else relation.target_id
+        is_active = relation.status == "active"
+
+        if related_type not in groups:
+            groups[related_type] = {
+                "doctype": related_type,
+                "label": _doctype_label(related_type),
+                "module": _group_key(related_type),
+                "list_endpoint": _doctype_list_endpoint(related_type),
+                "active_count": 0,
+                "historical_count": 0,
+                "documents": [],
+            }
+
+        if is_active:
+            groups[related_type]["active_count"] += 1
+        else:
+            groups[related_type]["historical_count"] += 1
+
+        groups[related_type]["documents"].append(
+            {
+                "relation_id": relation.id,
+                "relation_type": relation.relation_type,
+                "status": relation.status,
+                "document": _document_payload(related_type, related_id),
+            }
+        )
+
+    return list(groups.values())

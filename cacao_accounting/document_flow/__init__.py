@@ -16,6 +16,7 @@ from cacao_accounting.document_flow.service import (
     revert_relations_for_target,
 )
 from cacao_accounting.document_flow.status import calculate_document_status
+from cacao_accounting.document_flow.tracing import document_flow_summary
 
 __all__ = [
     "DocumentFlowError",
@@ -24,6 +25,7 @@ __all__ = [
     "close_line_balance",
     "create_target_document",
     "create_document_relation",
+    "document_flow_summary",
     "get_document_flow_items",
     "get_pending_lines",
     "list_source_documents",

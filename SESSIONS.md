@@ -356,3 +356,45 @@ Implementar el framework transversal de flujo documental definido en `requerimie
 ### Pendientes documentados
 1. Evolucionar el modal `Actualizar Elementos` para seleccionar documentos fuente desde `/api/document-flow/source-documents` sin depender de una fuente preseleccionada por URL.
 2. Agregar vistas dedicadas para explorar el arbol completo de trazabilidad devuelto por `/api/document-flow/tree`.
+
+## 2026-05-04 (framework de trazabilidad - panel UI y API de resumen)
+
+### Peticion del usuario
+Implementar el framework de trazabilidad de documentos descrito en `requerimiento.md`, que incluye panel colapsable con documentos relacionados agrupados por tipo, contadores activos/historicos, badges de estado, navegacion a listas filtradas y acciones de creacion de documentos relacionados.
+
+### Plan implementado
+1. Agregar funcion `document_flow_summary()` en `tracing.py` que devuelve upstream y downstream agrupados por tipo documental, con contadores activos/historicos, label, modulo y endpoint de lista.
+2. Exportar `document_flow_summary` desde `document_flow/__init__.py`.
+3. Agregar endpoint REST `GET /api/document-flow/summary?document_type=&document_id=` en `api/__init__.py`.
+4. Agregar vista HTML `GET /document-flow/list/<doctype>?related_doctype=&related_id=` en `api/__init__.py` que muestra documentos del tipo solicitado relacionados al documento origen.
+5. Crear plantilla `cacao_accounting/templates/document_flow_related_list.html` para la vista de lista filtrada, con breadcrumb, indicador de filtro activo y boton para quitar filtro.
+6. Reemplazar el macro `document_flow_trace` en `macros.html` con un panel colapsable completo usando Alpine.js que:
+   - Carga el resumen via `/api/document-flow/summary` al abrir.
+   - Muestra estado del documento actual con badge.
+   - Lista acciones de creacion de documentos relacionados.
+   - Agrupa documentos origen (upstream) y destino (downstream) por tipo con contadores activos/historicos.
+   - Muestra badge de estado calculado por cada documento relacionado.
+   - Proporciona enlace "Ver lista" que navega a `/document-flow/list/<doctype>` con filtro por documento actual.
+   - Marca relaciones historicas (revertidas/cerradas) con tachado visual.
+7. Agregar 4 pruebas unitarias en `tests/test_05document_flow.py` cubriendo: resumen con relaciones activas, conteo de historicos post-reversion, relaciones upstream desde recibo, y exposicion de create_actions.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/document_flow/tracing.py`: nueva funcion `document_flow_summary()` con helpers `_group_key`, `_doctype_label`, `_doctype_list_endpoint` y `_build_groups`.
+- `cacao_accounting/document_flow/__init__.py`: exportacion de `document_flow_summary`.
+- `cacao_accounting/api/__init__.py`: nuevo endpoint `/api/document-flow/summary`, nueva vista HTML `/document-flow/list/<doctype>`, importaciones adicionales (`render_template`, `DOCUMENT_TYPES`, `normalize_doctype`, `get_document`).
+- `cacao_accounting/templates/macros.html`: macro `document_flow_trace` completamente reescrito con Alpine.js, panel colapsable, agrupaciones, contadores, badges y navegacion.
+- `cacao_accounting/templates/document_flow_related_list.html`: nueva plantilla para lista de documentos filtrada por relacion documental.
+- `tests/test_05document_flow.py`: 4 nuevas pruebas para `document_flow_summary`.
+
+### Verificacion ejecutada
+- `python -m compileall cacao_accounting/ -q` -> passed
+- `python -m flake8 cacao_accounting/document_flow/tracing.py cacao_accounting/document_flow/__init__.py cacao_accounting/api/__init__.py tests/test_05document_flow.py --max-line-length=130` -> passed
+- `python -m ruff check cacao_accounting/document_flow/ cacao_accounting/api/__init__.py tests/test_05document_flow.py` -> passed
+- `pytest tests/test_05document_flow.py -q` -> 9 passed
+- `pytest tests/ -q` -> 266 passed
+
+### Pendientes documentados
+1. Actualizar el modal `Actualizar Elementos` para seleccionar multiples documentos fuente via `/api/document-flow/source-documents` dinamicamente.
+2. Implementar arbol grafico de trazabilidad directa e indirecta basado en `/api/document-flow/tree` (vista de diagrama de flujo completo).
+3. Constructor de filtros avanzados por campos del encabezado en listas de documentos (filtros personalizados por campo/valor/operador).
+4. Soporte de filtros relacionales en los listados propios de cada modulo (compras, ventas, bancos, inventario) sin requerir la vista generica de flujo.
