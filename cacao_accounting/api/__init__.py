@@ -11,7 +11,7 @@ from functools import wraps
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
-from flask import Blueprint, abort, current_app, jsonify, request
+from flask import Blueprint, abort, current_app, jsonify, render_template, request
 from flask_login import current_user, login_required
 from jwt import decode
 
@@ -23,10 +23,13 @@ from cacao_accounting.document_flow import (
     close_document_balances,
     close_line_balance,
     create_target_document,
+    document_flow_summary,
     get_document_flow_items,
     get_pending_lines,
     list_source_documents,
 )
+from cacao_accounting.document_flow.registry import DOCUMENT_TYPES, normalize_doctype
+from cacao_accounting.document_flow.repository import get_document
 from cacao_accounting.document_flow.service import get_source_items
 from cacao_accounting.document_flow.status import document_status_payload
 from cacao_accounting.document_flow.tracing import document_flow_tree
@@ -281,9 +284,86 @@ def api_document_flow_tree():
     return jsonify(document_flow_tree(document_type, document_id))
 
 
+@api.route("/api/document-flow/summary")
+@login_required
+def api_document_flow_summary():
+    """Devuelve resumen agrupado por tipo documental de relaciones de un documento."""
+
+    document_type = request.args.get("document_type", "")
+    document_id = request.args.get("document_id", "")
+    if not document_type or not document_id:
+        abort(400)
+    return jsonify(document_flow_summary(document_type, document_id))
+
+
 def _source_items_or_abort(source_type: str, source_id: str):
     """Helper para endpoints legacy de items por documento."""
     try:
         return get_source_items(source_type, source_id, request.args.get("target_type"))
     except DocumentFlowError as exc:
         abort(exc.status_code)
+
+
+@api.route("/document-flow/list/<doctype>")
+@login_required
+def document_flow_related_list(doctype: str):
+    """Muestra una lista de documentos filtrada por relacion documental."""
+
+    from cacao_accounting.database import DocumentRelation, database
+
+    doctype_key = normalize_doctype(doctype)
+    spec = DOCUMENT_TYPES.get(doctype_key)
+    if not spec:
+        abort(404)
+
+    related_doctype = normalize_doctype(request.args.get("related_doctype", ""))
+    related_id = request.args.get("related_id", "")
+
+    related_doc = get_document(related_doctype, related_id) if related_doctype and related_id else None
+    related_no = getattr(related_doc, "document_no", related_id) if related_doc else related_id
+
+    related_spec = DOCUMENT_TYPES.get(related_doctype, None)
+    related_label = related_spec.label if related_spec and related_spec.label else related_doctype
+
+    target_ids: list[str] = []
+    if related_doctype and related_id:
+        rows_as_target = (
+            database.session.execute(
+                database.select(DocumentRelation.target_id)
+                .filter_by(source_type=related_doctype, source_id=related_id, target_type=doctype_key)
+                .distinct()
+            )
+            .scalars()
+            .all()
+        )
+        rows_as_source = (
+            database.session.execute(
+                database.select(DocumentRelation.source_id)
+                .filter_by(target_type=related_doctype, target_id=related_id, source_type=doctype_key)
+                .distinct()
+            )
+            .scalars()
+            .all()
+        )
+        target_ids = list(set(rows_as_target) | set(rows_as_source))
+
+    documents = []
+    if target_ids:
+        pk_col = getattr(spec.header_model, "id", None)
+        if pk_col is not None:
+            documents = (
+                database.session.execute(database.select(spec.header_model).where(pk_col.in_(target_ids)))
+                .scalars()
+                .all()
+            )
+
+    return render_template(
+        "document_flow_related_list.html",
+        spec=spec,
+        documents=documents,
+        related_doctype=related_doctype,
+        related_id=related_id,
+        related_no=related_no,
+        related_label=related_label,
+        titulo=f"Documentos relacionados — {spec.label}",
+    )

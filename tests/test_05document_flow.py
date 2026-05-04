@@ -274,3 +274,151 @@ def test_document_status_uses_single_operational_badge(app_ctx):
     completed_status = calculate_document_status("purchase_order", "PO-001")
     assert completed_status.label == "Completado"
     assert completed_status.badge_class == "text-bg-success"
+
+
+def test_document_flow_summary_returns_grouped_relations(app_ctx):
+    """document_flow_summary agrupa upstream/downstream por tipo documental."""
+
+    from cacao_accounting.database import PurchaseReceipt, PurchaseReceiptItem, database
+    from cacao_accounting.document_flow import create_document_relation
+    from cacao_accounting.document_flow.tracing import document_flow_summary
+
+    order_item = _seed_purchase_order(app_ctx)
+    receipt = PurchaseReceipt(id="PR-SUM-001", company="cacao", posting_date=date(2026, 5, 4), docstatus=1)
+    receipt_item = PurchaseReceiptItem(
+        purchase_receipt_id="PR-SUM-001",
+        item_code="ART-001",
+        item_name="Chocolate",
+        qty=Decimal("5"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("25"),
+    )
+    database.session.add_all([receipt, receipt_item])
+    database.session.flush()
+
+    create_document_relation(
+        source_type="purchase_order",
+        source_id="PO-001",
+        source_item_id=order_item.id,
+        target_type="purchase_receipt",
+        target_id="PR-SUM-001",
+        target_item_id=receipt_item.id,
+        qty=Decimal("5"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("25"),
+    )
+
+    summary = document_flow_summary("purchase_order", "PO-001")
+
+    assert summary["document_type"] == "purchase_order"
+    assert summary["document_id"] == "PO-001"
+    assert len(summary["downstream"]) == 1
+    group = summary["downstream"][0]
+    assert group["doctype"] == "purchase_receipt"
+    assert group["active_count"] == 1
+    assert group["historical_count"] == 0
+    assert len(group["documents"]) == 1
+    assert group["documents"][0]["document"]["document_id"] == "PR-SUM-001"
+
+
+def test_document_flow_summary_counts_historical_after_revert(app_ctx):
+    """document_flow_summary distingue relaciones activas e historicas."""
+
+    from cacao_accounting.database import PurchaseReceipt, PurchaseReceiptItem, database
+    from cacao_accounting.document_flow import create_document_relation, revert_relations_for_target
+    from cacao_accounting.document_flow.tracing import document_flow_summary
+
+    order_item = _seed_purchase_order(app_ctx)
+    receipt = PurchaseReceipt(id="PR-SUM-002", company="cacao", posting_date=date(2026, 5, 4), docstatus=1)
+    receipt_item = PurchaseReceiptItem(
+        purchase_receipt_id="PR-SUM-002",
+        item_code="ART-001",
+        item_name="Chocolate",
+        qty=Decimal("3"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("15"),
+    )
+    database.session.add_all([receipt, receipt_item])
+    database.session.flush()
+
+    create_document_relation(
+        source_type="purchase_order",
+        source_id="PO-001",
+        source_item_id=order_item.id,
+        target_type="purchase_receipt",
+        target_id="PR-SUM-002",
+        target_item_id=receipt_item.id,
+        qty=Decimal("3"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("15"),
+    )
+
+    receipt.docstatus = 2
+    revert_relations_for_target("purchase_receipt", "PR-SUM-002")
+
+    summary = document_flow_summary("purchase_order", "PO-001")
+
+    assert len(summary["downstream"]) == 1
+    group = summary["downstream"][0]
+    assert group["active_count"] == 0
+    assert group["historical_count"] == 1
+
+
+def test_document_flow_summary_upstream_from_receipt(app_ctx):
+    """document_flow_summary incluye documentos upstream para un recibo."""
+
+    from cacao_accounting.database import PurchaseReceipt, PurchaseReceiptItem, database
+    from cacao_accounting.document_flow import create_document_relation
+    from cacao_accounting.document_flow.tracing import document_flow_summary
+
+    order_item = _seed_purchase_order(app_ctx)
+    receipt = PurchaseReceipt(id="PR-SUM-003", company="cacao", posting_date=date(2026, 5, 4), docstatus=1)
+    receipt_item = PurchaseReceiptItem(
+        purchase_receipt_id="PR-SUM-003",
+        item_code="ART-001",
+        item_name="Chocolate",
+        qty=Decimal("5"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("25"),
+    )
+    database.session.add_all([receipt, receipt_item])
+    database.session.flush()
+
+    create_document_relation(
+        source_type="purchase_order",
+        source_id="PO-001",
+        source_item_id=order_item.id,
+        target_type="purchase_receipt",
+        target_id="PR-SUM-003",
+        target_item_id=receipt_item.id,
+        qty=Decimal("5"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("25"),
+    )
+
+    summary = document_flow_summary("purchase_receipt", "PR-SUM-003")
+
+    assert len(summary["upstream"]) == 1
+    group = summary["upstream"][0]
+    assert group["doctype"] == "purchase_order"
+    assert group["label"] == "Orden de Compra"
+    assert group["active_count"] == 1
+
+
+def test_document_flow_summary_includes_create_actions(app_ctx):
+    """document_flow_summary expone acciones de creacion del tipo documental."""
+
+    from cacao_accounting.document_flow.tracing import document_flow_summary
+
+    _seed_purchase_order(app_ctx)
+    summary = document_flow_summary("purchase_order", "PO-001")
+
+    action_targets = [a["target_type"] for a in summary["create_actions"]]
+    assert "purchase_receipt" in action_targets
+    assert "purchase_invoice" in action_targets
