@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import cast
 
@@ -12,8 +13,10 @@ from cacao_accounting.database import (
     AccountingPeriod,
     ExternalCounter,
     ExternalCounterAuditLog,
+    ExternalNumberUsage,
     NamingSeries,
     Sequence,
+    SeriesExternalCounterMap,
     SeriesSequenceMap,
     database,
 )
@@ -22,6 +25,15 @@ from cacao_accounting.database.helpers import generate_identifier, get_active_na
 
 class IdentifierConfigurationError(ValueError):
     """Error controlado para configuraciones de series e identificadores."""
+
+
+class ExternalNumberDuplicateError(IdentifierConfigurationError):
+    """Error al intentar usar un numero externo ya registrado en el mismo contador."""
+
+
+# -------------------------------------------------------------------------------------
+# Parsing y validaciones de datos de entrada
+# -------------------------------------------------------------------------------------
 
 
 def parse_posting_date(posting_date_raw: date | str | None) -> date:
@@ -84,6 +96,11 @@ def enforce_single_default_series(entity_type: str, company: str | None, exclude
             series.is_default = False
 
     database.session.flush()
+
+
+# -------------------------------------------------------------------------------------
+# Seleccion de series internas
+# -------------------------------------------------------------------------------------
 
 
 def _pick_naming_series(entity_type: str, company: str, naming_series_id: str | None) -> NamingSeries:
@@ -204,20 +221,151 @@ def _pick_sequence_id(naming_series_id: str) -> str:
     return mapping.sequence_id
 
 
+# -------------------------------------------------------------------------------------
+# Seleccion de contadores externos (GAP 4 & GAP 5)
+# -------------------------------------------------------------------------------------
+
+
+def _condition_matches(condition_json: str | None, context: dict) -> bool:
+    """Evalua si condition_json es compatible con el contexto dado.
+
+    Una condicion nula/vacia siempre coincide (es el contador predeterminado).
+    Una condicion no nula solo coincide si TODOS sus pares clave:valor
+    estan presentes en el contexto con el mismo valor.
+
+    Args:
+        condition_json: JSON serializado de condiciones (puede ser None)
+        context: Diccionario de contexto del documento (payment_method, bank_account_id, etc.)
+
+    Returns:
+        True si la condicion aplica para el contexto dado.
+    """
+    if not condition_json:
+        return True
+    try:
+        conditions = json.loads(condition_json)
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return all(context.get(k) == v for k, v in conditions.items())
+
+
+def _resolve_external_counter(
+    naming_series_id: str,
+    context: dict | None = None,
+    explicit_counter_id: str | None = None,
+) -> ExternalCounter | None:
+    """Resuelve el contador externo mas apropiado para una serie dada.
+
+    Orden de resolucion:
+    1. Si explicit_counter_id se provee, usarlo directamente (validando que exista y este activo).
+    2. Buscar en SeriesExternalCounterMap para la serie:
+       a. Filtrar candidatos con condicion que coincida con el contexto.
+       b. Priorizar por numero de condiciones coincidentes (mas especifico primero).
+       c. Fallback: entry sin condicion (condition_json IS NULL).
+    3. Si no hay mapeo, retornar None (sin contador externo).
+
+    Args:
+        naming_series_id: ID de la NamingSeries activa
+        context: Contexto del documento (payment_method, bank_account_id, etc.)
+        explicit_counter_id: ID de ExternalCounter explicitamente seleccionado
+
+    Returns:
+        ExternalCounter seleccionado o None si no aplica contador externo.
+    """
+    if explicit_counter_id:
+        counter = database.session.get(ExternalCounter, explicit_counter_id)
+        if not counter:
+            raise IdentifierConfigurationError("El contador externo indicado no existe.")
+        if not counter.is_active:
+            raise IdentifierConfigurationError("El contador externo indicado esta inactivo.")
+        return counter
+
+    ctx = context or {}
+
+    mappings = (
+        database.session.execute(
+            database.select(SeriesExternalCounterMap)
+            .filter_by(naming_series_id=naming_series_id)
+            .order_by(SeriesExternalCounterMap.priority.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+    if not mappings:
+        return None
+
+    # Separar candidatos con condicion y sin condicion
+    matched_with_condition: list[tuple[SeriesExternalCounterMap, int]] = []
+    fallback: SeriesExternalCounterMap | None = None
+
+    for mapping in mappings:
+        counter = database.session.get(ExternalCounter, mapping.external_counter_id)
+        if not counter or not counter.is_active:
+            continue
+        if not mapping.condition_json:
+            if fallback is None:
+                fallback = mapping
+        elif _condition_matches(mapping.condition_json, ctx):
+            try:
+                num_conditions = len(json.loads(mapping.condition_json))
+            except (json.JSONDecodeError, ValueError):
+                num_conditions = 0
+            matched_with_condition.append((mapping, num_conditions))
+
+    # Priorizar el candidato con mas condiciones coincidentes (mas especifico)
+    if matched_with_condition:
+        best = sorted(matched_with_condition, key=lambda x: -x[1])[0][0]
+        return database.session.get(ExternalCounter, best.external_counter_id)
+
+    if fallback:
+        return database.session.get(ExternalCounter, fallback.external_counter_id)
+
+    return None
+
+
+# -------------------------------------------------------------------------------------
+# Asignacion de identificador completo (interno + externo)
+# -------------------------------------------------------------------------------------
+
+
 def assign_document_identifier(
     *,
     document: object,
     entity_type: str,
     posting_date_raw: date | str | None,
     naming_series_id: str | None,
+    external_counter_id: str | None = None,
+    external_number: str | None = None,
+    external_context: dict | None = None,
 ) -> None:
-    """Asigna document_no y naming_series_id a un documento transaccional."""
+    """Asigna document_no, naming_series_id y (opcionalmente) external_number a un documento.
 
+    El flujo completo es:
+    1. Validar y normalizar posting_date.
+    2. Validar periodo contable no cerrado.
+    3. Seleccionar NamingSeries activa.
+    4. Generar identificador interno (document_no).
+    5. Resolver contador externo si aplica (serie tiene mapeo o se indica explicitamente).
+    6. Validar unicidad del numero externo.
+    7. Persistir external_counter_id + external_number en el documento.
+    8. Registrar uso en ExternalNumberUsage + actualizar last_used.
+
+    Args:
+        document: Objeto ORM con campos company, id, posting_date, document_no, etc.
+        entity_type: Tipo de entidad (ej: 'payment_entry')
+        posting_date_raw: Fecha de contabilizacion (date, str ISO o None)
+        naming_series_id: ID de NamingSeries explicitamente seleccionada (o None para autoseleccion)
+        external_counter_id: ID de ExternalCounter explicitamente seleccionado (o None)
+        external_number: Numero externo fisico a usar (o None para usar el sugerido por el contador)
+        external_context: Contexto adicional para seleccion contextual de contador (payment_method, etc.)
+    """
     posting_date = parse_posting_date(posting_date_raw)
     company = getattr(document, "company", None)
     validate_accounting_period(company=company, posting_date=posting_date)
     company_code = cast(str, company)
 
+    # 1. Identificador interno
     naming_series = _pick_naming_series(
         entity_type=entity_type,
         company=company_code,
@@ -238,9 +386,77 @@ def assign_document_identifier(
     setattr(document, "naming_series_id", naming_series.id)
     setattr(document, "document_no", identifier)
 
+    # 2. Identificador externo (opcional)
+    counter = _resolve_external_counter(
+        naming_series_id=naming_series.id,
+        context=external_context,
+        explicit_counter_id=external_counter_id,
+    )
+
+    if counter:
+        ext_num = external_number or counter.next_suggested_formatted
+        _validate_and_register_external_number(
+            counter=counter,
+            external_number=ext_num,
+            entity_type=entity_type,
+            entity_id=getattr(document, "id"),
+        )
+        setattr(document, "external_counter_id", counter.id)
+        setattr(document, "external_number", ext_num)
+
+
+def _validate_and_register_external_number(
+    *,
+    counter: ExternalCounter,
+    external_number: str,
+    entity_type: str,
+    entity_id: str,
+) -> None:
+    """Valida unicidad y registra el uso de un numero externo.
+
+    Raises:
+        ExternalNumberDuplicateError: Si el numero ya fue utilizado con este contador.
+    """
+    existing = database.session.execute(
+        database.select(ExternalNumberUsage).filter_by(
+            external_counter_id=counter.id,
+            external_number=external_number,
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        raise ExternalNumberDuplicateError(
+            f"El numero externo '{external_number}' ya fue utilizado en este contador "
+            f"por el documento {existing.entity_type}/{existing.entity_id}."
+        )
+
+    # Intentar extraer el valor numerico del numero externo (despues del prefijo)
+    prefix = counter.prefix or ""
+    prefix_len = len(prefix)
+    raw = external_number[prefix_len:]
+    try:
+        sequence_value = int(raw)
+    except ValueError:
+        sequence_value = None
+
+    usage = ExternalNumberUsage(
+        external_counter_id=counter.id,
+        external_number=external_number,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        sequence_value=sequence_value,
+    )
+    database.session.add(usage)
+
+    # Actualizar last_used si el valor numerico es mayor al actual
+    if sequence_value is not None and sequence_value > (counter.last_used or 0):
+        counter.last_used = sequence_value
+
+    database.session.flush()
+
 
 # -------------------------------------------------------------------------------------
-# External Counter Services
+# External Counter Services (ajuste manual con auditoria)
 # -------------------------------------------------------------------------------------
 
 

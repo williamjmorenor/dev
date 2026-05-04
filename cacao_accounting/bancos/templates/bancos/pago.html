@@ -28,6 +28,10 @@
     <dd class="col-sm-9">{{ registro.posting_date or "" }}</dd>
     <dt class="col-sm-3">Estado</dt>
     <dd class="col-sm-9">{{ registro.docstatus }}</dd>
+    {% if registro.external_number %}
+    <dt class="col-sm-3">Número Externo</dt>
+    <dd class="col-sm-9"><span class="badge bg-secondary">{{ registro.external_number }}</span></dd>
+    {% endif %}
   </dl>
 </div>
 

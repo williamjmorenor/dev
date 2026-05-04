@@ -337,5 +337,307 @@ class TestExternalCounter(unittest.TestCase):
         self.assertEqual(len(logs), 2)
 
 
+class TestSeriesExternalCounterMap(unittest.TestCase):
+    """Pruebas para SeriesExternalCounterMap — GAP 4 y GAP 5."""
+
+    def setUp(self) -> None:
+        self.app = create_app({**configuracion, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        from cacao_accounting.database import database
+
+        database.create_all()
+        self.db = database
+        self._add_entity()
+
+    def tearDown(self) -> None:
+        self.db.session.rollback()
+        self.ctx.pop()
+
+    def _add_entity(self, code: str = "ent") -> None:
+        from cacao_accounting.database import Entity
+
+        self.db.session.add(Entity(code=code, name=code, company_name=code, tax_id="J0002", currency="NIO"))
+        self.db.session.flush()
+
+    def _make_series(self, name: str = "PAY", entity_type: str = "payment_entry") -> object:
+        from cacao_accounting.database import NamingSeries, Sequence, SeriesSequenceMap
+
+        seq = Sequence(name=f"seq-{name}", current_value=0, increment=1, padding=5)
+        self.db.session.add(seq)
+        self.db.session.flush()
+        ns = NamingSeries(
+            name=name,
+            entity_type=entity_type,
+            company="ent",
+            prefix_template=f"ENT-{name}-*YYYY*-",
+            is_active=True,
+            is_default=True,
+        )
+        self.db.session.add(ns)
+        self.db.session.flush()
+        self.db.session.add(SeriesSequenceMap(naming_series_id=ns.id, sequence_id=seq.id, priority=0))
+        self.db.session.flush()
+        return ns
+
+    def _make_counter(self, name: str, counter_type: str = "checkbook", last_used: int = 0) -> object:
+        from cacao_accounting.database import ExternalCounter
+
+        c = ExternalCounter(
+            company="ent",
+            name=name,
+            counter_type=counter_type,
+            prefix="CHK-",
+            last_used=last_used,
+            padding=5,
+            is_active=True,
+        )
+        self.db.session.add(c)
+        self.db.session.flush()
+        return c
+
+    def test_series_external_counter_map_model(self) -> None:
+        """SeriesExternalCounterMap debe persistir correctamente."""
+        from cacao_accounting.database import SeriesExternalCounterMap
+
+        ns = self._make_series()
+        counter = self._make_counter("Chequera BANPRO")
+        mapping = SeriesExternalCounterMap(
+            naming_series_id=ns.id,  # type: ignore[union-attr]
+            external_counter_id=counter.id,  # type: ignore[union-attr]
+            priority=0,
+            condition_json='{"payment_method": "check"}',
+        )
+        self.db.session.add(mapping)
+        self.db.session.flush()
+
+        loaded = self.db.session.get(SeriesExternalCounterMap, mapping.id)
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded.naming_series_id, ns.id)  # type: ignore[union-attr]
+        self.assertEqual(loaded.external_counter_id, counter.id)  # type: ignore[union-attr]
+        self.assertIn("check", loaded.condition_json)  # type: ignore[union-attr]
+
+    def test_condition_matches_exact(self) -> None:
+        """_condition_matches debe devolver True cuando todas las condiciones coinciden."""
+        from cacao_accounting.document_identifiers import _condition_matches
+
+        cond = '{"payment_method": "check", "bank": "BANPRO"}'
+        ctx = {"payment_method": "check", "bank": "BANPRO", "extra": "ignored"}
+        self.assertTrue(_condition_matches(cond, ctx))
+
+    def test_condition_matches_partial_fail(self) -> None:
+        """_condition_matches debe devolver False si alguna condicion no coincide."""
+        from cacao_accounting.document_identifiers import _condition_matches
+
+        cond = '{"payment_method": "check", "bank": "BANPRO"}'
+        ctx = {"payment_method": "check", "bank": "BDF"}
+        self.assertFalse(_condition_matches(cond, ctx))
+
+    def test_condition_matches_none(self) -> None:
+        """_condition_matches con condicion None siempre es True (fallback)."""
+        from cacao_accounting.document_identifiers import _condition_matches
+
+        self.assertTrue(_condition_matches(None, {}))
+        self.assertTrue(_condition_matches(None, {"payment_method": "wire"}))
+
+    def test_resolve_external_counter_with_condition(self) -> None:
+        """_resolve_external_counter debe seleccionar el contador que cumple la condicion."""
+        from cacao_accounting.database import SeriesExternalCounterMap
+        from cacao_accounting.document_identifiers import _resolve_external_counter
+
+        ns = self._make_series()
+        counter_check = self._make_counter("Chequera BANPRO")
+        counter_wire = self._make_counter("Transferencias")
+
+        self.db.session.add(
+            SeriesExternalCounterMap(
+                naming_series_id=ns.id,  # type: ignore[union-attr]
+                external_counter_id=counter_check.id,  # type: ignore[union-attr]
+                priority=1,
+                condition_json='{"payment_method": "check"}',
+            )
+        )
+        self.db.session.add(
+            SeriesExternalCounterMap(
+                naming_series_id=ns.id,  # type: ignore[union-attr]
+                external_counter_id=counter_wire.id,  # type: ignore[union-attr]
+                priority=2,
+                condition_json=None,
+            )
+        )
+        self.db.session.flush()
+
+        resolved = _resolve_external_counter(
+            naming_series_id=ns.id,  # type: ignore[union-attr]
+            context={"payment_method": "check"},
+        )
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.id, counter_check.id)  # type: ignore[union-attr]
+
+    def test_resolve_external_counter_fallback_to_no_condition(self) -> None:
+        """_resolve_external_counter debe caer al contador sin condicion si ninguna coincide."""
+        from cacao_accounting.database import SeriesExternalCounterMap
+        from cacao_accounting.document_identifiers import _resolve_external_counter
+
+        ns = self._make_series()
+        counter_check = self._make_counter("Chequera BDF")
+        counter_default = self._make_counter("Predeterminado")
+
+        self.db.session.add(
+            SeriesExternalCounterMap(
+                naming_series_id=ns.id,  # type: ignore[union-attr]
+                external_counter_id=counter_check.id,  # type: ignore[union-attr]
+                priority=1,
+                condition_json='{"payment_method": "check"}',
+            )
+        )
+        self.db.session.add(
+            SeriesExternalCounterMap(
+                naming_series_id=ns.id,  # type: ignore[union-attr]
+                external_counter_id=counter_default.id,  # type: ignore[union-attr]
+                priority=0,
+                condition_json=None,
+            )
+        )
+        self.db.session.flush()
+
+        resolved = _resolve_external_counter(
+            naming_series_id=ns.id,  # type: ignore[union-attr]
+            context={"payment_method": "wire"},
+        )
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.id, counter_default.id)  # type: ignore[union-attr]
+
+    def test_resolve_external_counter_returns_none_if_no_mapping(self) -> None:
+        """_resolve_external_counter debe retornar None si no hay mapeos."""
+        from cacao_accounting.document_identifiers import _resolve_external_counter
+
+        ns = self._make_series()
+        resolved = _resolve_external_counter(naming_series_id=ns.id)  # type: ignore[union-attr]
+        self.assertIsNone(resolved)
+
+    def test_resolve_external_counter_explicit_id(self) -> None:
+        """_resolve_external_counter debe usar el counter explicitamente indicado."""
+        from cacao_accounting.document_identifiers import _resolve_external_counter
+
+        ns = self._make_series()
+        counter = self._make_counter("Chequera Explicita")
+        resolved = _resolve_external_counter(
+            naming_series_id=ns.id,  # type: ignore[union-attr]
+            explicit_counter_id=counter.id,  # type: ignore[union-attr]
+        )
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.id, counter.id)  # type: ignore[union-attr]
+
+
+class TestExternalNumberUsage(unittest.TestCase):
+    """Pruebas para ExternalNumberUsage — GAP 2 y GAP 3."""
+
+    def setUp(self) -> None:
+        self.app = create_app({**configuracion, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        from cacao_accounting.database import database
+
+        database.create_all()
+        self.db = database
+        self._add_entity()
+
+    def tearDown(self) -> None:
+        self.db.session.rollback()
+        self.ctx.pop()
+
+    def _add_entity(self, code: str = "ent") -> None:
+        from cacao_accounting.database import Entity
+
+        self.db.session.add(Entity(code=code, name=code, company_name=code, tax_id="J0003", currency="NIO"))
+        self.db.session.flush()
+
+    def _make_counter(self, last_used: int = 0) -> object:
+        from cacao_accounting.database import ExternalCounter
+
+        c = ExternalCounter(
+            company="ent",
+            name="Chequera Test",
+            counter_type="checkbook",
+            prefix="CHK-",
+            last_used=last_used,
+            padding=5,
+            is_active=True,
+        )
+        self.db.session.add(c)
+        self.db.session.flush()
+        return c
+
+    def test_external_number_usage_persists(self) -> None:
+        """ExternalNumberUsage debe persistir correctamente."""
+        from cacao_accounting.database import ExternalNumberUsage
+
+        counter = self._make_counter()
+        usage = ExternalNumberUsage(
+            external_counter_id=counter.id,  # type: ignore[union-attr]
+            external_number="CHK-00042",
+            entity_type="payment_entry",
+            entity_id="fake-id-001",
+            sequence_value=42,
+        )
+        self.db.session.add(usage)
+        self.db.session.flush()
+
+        loaded = self.db.session.get(ExternalNumberUsage, usage.id)
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded.external_number, "CHK-00042")
+        self.assertEqual(loaded.sequence_value, 42)
+
+    def test_validate_and_register_prevents_duplicate(self) -> None:
+        """_validate_and_register_external_number debe fallar ante numero duplicado."""
+        from cacao_accounting.database import ExternalCounter
+        from cacao_accounting.document_identifiers import (
+            ExternalNumberDuplicateError,
+            _validate_and_register_external_number,
+        )
+
+        counter = self._make_counter()
+        _validate_and_register_external_number(
+            counter=counter,  # type: ignore[arg-type]
+            external_number="CHK-00099",
+            entity_type="payment_entry",
+            entity_id="doc-001",
+        )
+        self.db.session.flush()
+
+        with self.assertRaises(ExternalNumberDuplicateError):
+            _validate_and_register_external_number(
+                counter=counter,  # type: ignore[arg-type]
+                external_number="CHK-00099",
+                entity_type="payment_entry",
+                entity_id="doc-002",
+            )
+
+    def test_validate_and_register_updates_last_used(self) -> None:
+        """_validate_and_register_external_number debe actualizar last_used."""
+        from cacao_accounting.database import ExternalCounter
+        from cacao_accounting.document_identifiers import _validate_and_register_external_number
+
+        counter = self._make_counter(last_used=100)
+        _validate_and_register_external_number(
+            counter=counter,  # type: ignore[arg-type]
+            external_number="CHK-00150",
+            entity_type="payment_entry",
+            entity_id="doc-003",
+        )
+        refreshed = self.db.session.get(ExternalCounter, counter.id)  # type: ignore[union-attr]
+        self.assertEqual(refreshed.last_used, 150)
+
+    def test_docbase_has_external_fields(self) -> None:
+        """PaymentEntry (DocBase) debe tener external_counter_id y external_number."""
+        from cacao_accounting.database import PaymentEntry
+
+        pe = PaymentEntry(payment_type="pay", docstatus=0)
+        # Verificar que los atributos existen en la clase (GAP 2)
+        self.assertTrue(hasattr(pe, "external_counter_id"))
+        self.assertTrue(hasattr(pe, "external_number"))
+
+
 if __name__ == "__main__":
     unittest.main()

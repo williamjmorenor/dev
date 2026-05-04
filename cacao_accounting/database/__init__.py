@@ -173,6 +173,13 @@ class DocBase(BaseTabla):
     # Human-readable identifier generated from NamingSeries + Sequence
     document_no = database.Column(database.String(100), nullable=True, index=True)
     naming_series_id = database.Column(database.String(26), database.ForeignKey("naming_series.id"), nullable=True)
+    # External counter support — llevar numeracion paralela externa (cheque, numero fiscal, etc.)
+    # external_counter_id: FK al ExternalCounter seleccionado para este documento
+    external_counter_id = database.Column(
+        database.String(26), database.ForeignKey("external_counter.id"), nullable=True, index=True
+    )
+    # external_number: numero fisico asignado (puede ser distinto del sugerido por el contador)
+    external_number = database.Column(database.String(100), nullable=True, index=True)
     # Multi-currency support
     transaction_currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
     base_currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
@@ -592,6 +599,57 @@ class ExternalCounterAuditLog(database.Model, BaseTabla):  # type: ignore[name-d
     reason = database.Column(database.Text(), nullable=False)
     changed_by = database.Column(database.String(26), nullable=True)
     changed_at = database.Column(database.DateTime, default=database.func.now(), nullable=False)
+
+
+class SeriesExternalCounterMap(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Mapa N:M entre series y contadores externos — un contador por tipo de operacion.
+
+    Permite que una misma serie tenga multiples contadores externos asociados,
+    seleccionados dinamicamente mediante condition_json.
+
+    Ejemplo: Serie PAY puede tener:
+    - Contador "Chequera BANPRO": condition_json = {"payment_method": "check", "bank": "BANPRO"}
+    - Contador "Chequera BDF":    condition_json = {"payment_method": "check", "bank": "BDF"}
+    - Sin condicion (prioridad 0): contador predeterminado para transferencias
+
+    El campo condition_json soporta claves arbitrarias del contexto del documento:
+    payment_method, bank_account_id, party_type, etc.
+    """
+
+    __tablename__ = "series_external_counter_map"
+    naming_series_id = database.Column(
+        database.String(26), database.ForeignKey("naming_series.id"), nullable=False, index=True
+    )
+    external_counter_id = database.Column(
+        database.String(26), database.ForeignKey("external_counter.id"), nullable=False, index=True
+    )
+    priority = database.Column(database.Integer(), default=0, nullable=False)
+    # JSON con condiciones para seleccion dinamica. Ejemplo:
+    # {"payment_method": "check", "bank_account_id": "abc123"}
+    condition_json = database.Column(database.Text(), nullable=True)
+
+
+class ExternalNumberUsage(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Registro de uso de numeros externos por documento.
+
+    Garantiza unicidad de (external_counter_id, external_number):
+    un mismo numero externo no puede asignarse dos veces al mismo contador.
+    Permite trazabilidad completa: saber que documento uso que cheque/numero fiscal.
+    """
+
+    __tablename__ = "external_number_usage"
+    __table_args__ = (UniqueConstraint("external_counter_id", "external_number", name="uq_external_number_per_counter"),)
+    external_counter_id = database.Column(
+        database.String(26), database.ForeignKey("external_counter.id"), nullable=False, index=True
+    )
+    # Numero externo como string para soportar prefijos alfanumericos
+    external_number = database.Column(database.String(100), nullable=False, index=True)
+    # Tipo y ID del documento que uso este numero
+    entity_type = database.Column(database.String(50), nullable=False, index=True)
+    entity_id = database.Column(database.String(26), nullable=False, index=True)
+    # Valor entero del numero para facilitar validaciones de rango
+    sequence_value = database.Column(database.Integer(), nullable=True)
+    recorded_at = database.Column(database.DateTime, default=database.func.now(), nullable=False)
 
 
 # <---------------------------------------------------------------------------------------------> #

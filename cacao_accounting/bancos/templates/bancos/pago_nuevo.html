@@ -76,6 +76,27 @@
         </div>
       </div>
     </div>
+    {# Sección de contador externo — cheque, número fiscal, recibo preimpreso #}
+    <div class="p-3 border-top">
+      <h6 class="text-muted mb-3"><i class="bi bi-123"></i> Numeración Externa (opcional)</h6>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="mb-3">
+            {{ form.external_counter_id.label(class="form-label") }}
+            {{ form.external_counter_id(class="form-select", id="external_counter_id") }}
+            <div class="form-text">Chequera, numeración fiscal o recibo preimpreso.</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            {{ form.external_number.label(class="form-label") }}
+            {{ form.external_number(class="form-control", id="external_number",
+               placeholder="Dejar vacío para usar el siguiente sugerido") }}
+            <div class="form-text">Si se omite, el sistema usa el siguiente número disponible del contador.</div>
+          </div>
+        </div>
+      </div>
+    </div>
     {% if facturas_origen %}
     <div class="p-3">
       <h6 class="text-muted mb-2"><i class="bi bi-link-45deg"></i> Documentos a Pagar</h6>
