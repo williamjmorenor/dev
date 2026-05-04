@@ -120,7 +120,6 @@ class TestNamingSeriesIsDefault(unittest.TestCase):
         self.db.session.add(SeriesSequenceMap(naming_series_id=ns_default.id, sequence_id=seq.id, priority=0))
         self.db.session.flush()
 
-        _ = date(2026, 1, 1)  # unused but kept for context
         selected = _pick_naming_series(entity_type="purchase_invoice", company="ent", naming_series_id=None)
         self.assertEqual(selected.id, ns_default.id)
 

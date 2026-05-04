@@ -10,7 +10,7 @@
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
-from flask import Blueprint, redirect, render_template, request
+from flask import Blueprint, flash, redirect, render_template, request
 from flask.helpers import url_for
 from flask_login import login_required
 
@@ -822,13 +822,17 @@ def naming_series_toggle_active(series_id: str):
 
     if serie.is_active:
         # Comprobar si la serie ya genero identificadores (no se puede eliminar, solo desactivar)
-        used_by_series = database.session.execute(
-            database.select(GeneratedIdentifierLog)
-            .join(SeriesSequenceMap, GeneratedIdentifierLog.sequence_id == SeriesSequenceMap.sequence_id)
-            .filter(SeriesSequenceMap.naming_series_id == series_id)
-            .limit(1)
-        ).scalar_one_or_none()
-        _ = used_by_series  # Serie utilizada — solo marcarla inactiva, nunca eliminar
+        series_has_generated_identifiers = (
+            database.session.execute(
+                database.select(GeneratedIdentifierLog)
+                .join(SeriesSequenceMap, GeneratedIdentifierLog.sequence_id == SeriesSequenceMap.sequence_id)
+                .filter(SeriesSequenceMap.naming_series_id == series_id)
+                .limit(1)
+            ).scalar_one_or_none()
+            is not None
+        )
+        # Serie utilizada — solo marcarla inactiva, nunca eliminar aunque no haya generado documentos
+        _ = series_has_generated_identifiers
         serie.is_active = False
         if serie.is_default:
             serie.is_default = False
@@ -949,8 +953,12 @@ def external_counter_adjust(counter_id: str):
                 changed_by=current_user.id if current_user.is_authenticated else None,
             )
             database.session.commit()
-        except IdentifierConfigurationError:
-            pass
+            flash("Contador externo ajustado correctamente.", "success")
+        except IdentifierConfigurationError as exc:
+            from cacao_accounting.logs import log
+
+            log.warning(f"Error al ajustar contador externo {counter_id}: {exc}")
+            flash(str(exc), "danger")
         return redirect(url_for("contabilidad.external_counter_list"))
 
     return render_template(
