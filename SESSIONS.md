@@ -39,7 +39,7 @@ Analizar la definición de módulos del sistema (directorio `modulos/`) y genera
 
 ### Notas para siguiente iteracion
 1. Priorizar implementación de posting contable (Bloque 1 de PENDIENTE.md).
-2. Corregir formularios documentados como infuncionales en FIXME.md.
+2. Corregir formularios documentados como no funcionales en FIXME.md.
 3. Implementar nota de crédito de venta (gap crítico en módulo ventas).
 
 ## 2026-05-04
