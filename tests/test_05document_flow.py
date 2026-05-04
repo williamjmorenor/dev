@@ -1,0 +1,120 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
+
+"""Pruebas del motor de relaciones documentales."""
+
+from datetime import date
+from decimal import Decimal
+
+import pytest
+
+from cacao_accounting import create_app
+from cacao_accounting.config import configuracion
+
+
+@pytest.fixture()
+def app_ctx():
+    """Aplicacion aislada con base SQLite en memoria."""
+
+    app = create_app({**configuracion, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+    with app.app_context():
+        from cacao_accounting.database import database
+
+        database.create_all()
+        yield app
+
+
+def _seed_purchase_order(app_ctx):
+    from cacao_accounting.database import Entity, Item, PurchaseOrder, PurchaseOrderItem, UOM, database
+
+    entity = Entity(code="cacao", name="Cacao", company_name="Cacao", tax_id="J0001", currency="NIO")
+    uom = UOM(code="UND", name="Unidad")
+    item = Item(code="ART-001", name="Chocolate", item_type="goods", is_stock_item=True, default_uom="UND")
+    order = PurchaseOrder(id="PO-001", company="cacao", posting_date=date(2026, 5, 3), docstatus=1)
+    order_item = PurchaseOrderItem(
+        purchase_order_id="PO-001",
+        item_code="ART-001",
+        item_name="Chocolate",
+        qty=Decimal("10"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("50"),
+    )
+    database.session.add_all([entity, uom, item, order, order_item])
+    database.session.flush()
+    return order_item
+
+
+def test_document_flow_tracks_partial_pending_qty(app_ctx):
+    from cacao_accounting.database import PurchaseReceipt, PurchaseReceiptItem, database
+    from cacao_accounting.document_flow import create_document_relation
+    from cacao_accounting.document_flow.service import get_source_items
+
+    order_item = _seed_purchase_order(app_ctx)
+    receipt = PurchaseReceipt(id="PR-001", company="cacao", posting_date=date(2026, 5, 4), docstatus=0)
+    receipt_item = PurchaseReceiptItem(
+        purchase_receipt_id="PR-001",
+        item_code="ART-001",
+        item_name="Chocolate",
+        qty=Decimal("4"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("20"),
+    )
+    database.session.add_all([receipt, receipt_item])
+    database.session.flush()
+
+    create_document_relation(
+        source_type="purchase_order",
+        source_id="PO-001",
+        source_item_id=order_item.id,
+        target_type="purchase_receipt",
+        target_id="PR-001",
+        target_item_id=receipt_item.id,
+        qty=Decimal("4"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("20"),
+    )
+
+    items = get_source_items("purchase_order", "PO-001", "purchase_receipt")
+
+    assert items[0]["source_qty"] == 10
+    assert items[0]["consumed_qty"] == 4
+    assert items[0]["pending_qty"] == 6
+    assert order_item.received_qty == Decimal("4")
+
+
+def test_document_flow_blocks_overconsumption(app_ctx):
+    from cacao_accounting.database import PurchaseReceipt, PurchaseReceiptItem, database
+    from cacao_accounting.document_flow import DocumentFlowError, create_document_relation
+
+    order_item = _seed_purchase_order(app_ctx)
+    receipt = PurchaseReceipt(id="PR-002", company="cacao", posting_date=date(2026, 5, 4), docstatus=0)
+    receipt_item = PurchaseReceiptItem(
+        purchase_receipt_id="PR-002",
+        item_code="ART-001",
+        item_name="Chocolate",
+        qty=Decimal("11"),
+        uom="UND",
+        rate=Decimal("5"),
+        amount=Decimal("55"),
+    )
+    database.session.add_all([receipt, receipt_item])
+    database.session.flush()
+
+    with pytest.raises(DocumentFlowError) as exc_info:
+        create_document_relation(
+            source_type="purchase_order",
+            source_id="PO-001",
+            source_item_id=order_item.id,
+            target_type="purchase_receipt",
+            target_id="PR-002",
+            target_item_id=receipt_item.id,
+            qty=Decimal("11"),
+            uom="UND",
+            rate=Decimal("5"),
+            amount=Decimal("55"),
+        )
+
+    assert exc_info.value.status_code == 409

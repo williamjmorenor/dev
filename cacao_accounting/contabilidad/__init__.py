@@ -312,8 +312,14 @@ def unidad(id_unidad):
 @modulo_activo("accounting")
 @login_required
 def eliminar_unidad(id_unidad):
-    """Elimina una entidad de la base de datos."""
-    return redirect("/app")
+    """Elimina una unidad de negocios de la base de datos."""
+    from cacao_accounting.database import Unit
+
+    unidad = database.session.execute(database.select(Unit).filter_by(code=id_unidad)).scalar_one_or_none()
+    if unidad:
+        database.session.delete(unidad)
+        database.session.commit()
+    return redirect(url_for("contabilidad.unidades"))
 
 
 @contabilidad.route("/unit/new", methods=["GET", "POST"])
@@ -323,14 +329,13 @@ def eliminar_unidad(id_unidad):
 def nueva_unidad():
     """Formulario para crear una nueva unidad de negocios."""
     from cacao_accounting.contabilidad.forms import FormularioUnidad
+    from cacao_accounting.database import Unit
 
     formulario = FormularioUnidad()
     formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
-    TITULO = "Crear Nueva Unidad de Negocios - " + APPNAME
+    TITULO = "Crear Nueva Unidad de Negocio - " + APPNAME
     if formulario.validate_on_submit() or request.method == "POST":
-        from cacao_accounting.database import Unidad
-
-        DATA = Unidad(
+        DATA = Unit(
             code=request.form.get("id", None),
             name=request.form.get("nombre", None),
             entity=request.form.get("entidad", None),
@@ -339,7 +344,7 @@ def nueva_unidad():
         database.session.add(DATA)
         database.session.commit()
 
-        return redirect("/unit/list")
+        return redirect(url_for("contabilidad.unidades"))
     return render_template(
         "contabilidad/unidad_crear.html",
         titulo=TITULO,
@@ -390,7 +395,13 @@ def libro(id_unidad):
 @login_required
 def eliminar_libro(id_unidad):
     """Elimina un libro de contabilidad de la base de datos."""
-    return redirect("/app")
+    from cacao_accounting.database import Book
+
+    libro = database.session.execute(database.select(Book).filter_by(code=id_unidad)).scalar_one_or_none()
+    if libro:
+        database.session.delete(libro)
+        database.session.commit()
+    return redirect(url_for("contabilidad.libros"))
 
 
 @contabilidad.route("/book/new", methods=["GET", "POST"])
@@ -400,14 +411,13 @@ def eliminar_libro(id_unidad):
 def nuevo_libro():
     """Formulario para crear un nuevo libro de contabilidad."""
     from cacao_accounting.contabilidad.forms import FormularioLibro
+    from cacao_accounting.database import Book
 
     formulario = FormularioLibro()
     formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
-    TITULO = "Crear Nuevo Libro de Contabilidad- " + APPNAME
+    TITULO = "Crear Nuevo Libro de Contabilidad - " + APPNAME
     if formulario.validate_on_submit() or request.method == "POST":
-        from cacao_accounting.database import Unidad
-
-        DATA = Unidad(
+        DATA = Book(
             code=request.form.get("id", None),
             name=request.form.get("nombre", None),
             entity=request.form.get("entidad", None),
@@ -416,7 +426,7 @@ def nuevo_libro():
         database.session.add(DATA)
         database.session.commit()
 
-        return redirect("/books/list")
+        return redirect(url_for("contabilidad.libros"))
     return render_template(
         "contabilidad/book_crear.html",
         titulo=TITULO,
@@ -589,22 +599,25 @@ def periodo_contable():
 @verifica_acceso("accounting")
 def nuevo_comprobante():
     """Nuevo comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_new"))
 
 
 @contabilidad.route("/journal/<identifier>")
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def ver_comprobante():
-    """Nuevo comprobante contable."""
+def ver_comprobante(identifier: str):
+    """Ver comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_list"))
 
 
 @contabilidad.route("/journal/edit/<identifier>", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def editar_comprobante():
+def editar_comprobante(identifier: str):
     """Editar comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_list"))
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #

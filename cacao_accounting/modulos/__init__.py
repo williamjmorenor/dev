@@ -35,7 +35,7 @@ contabilidad = {
 bancos = {
     "modulo": "cash",
     "estandar": True,
-    "habilitado": False,
+    "habilitado": True,
 }
 
 compras = {

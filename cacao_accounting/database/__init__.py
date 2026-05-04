@@ -54,7 +54,7 @@ STATUS: dict[str, StatusWeb] = {
     "open": StatusWeb(color="LimeGreen", leyenda="Abierto"),
     "active": StatusWeb(color="LightSeaGreen", leyenda="Activo"),
     "current": StatusWeb(color="DodgerBlue", leyenda="Actual"),
-    "canceled": StatusWeb(color="SlateGray", leyenda="Actual"),
+    "canceled": StatusWeb(color="SlateGray", leyenda="Cancelado"),
     "overdue": StatusWeb(color="OrangeRed", leyenda="Atrasado"),
     "closed": StatusWeb(color="Silver", leyenda="Cerrado"),
     "inactive": StatusWeb(color="LightSlateGray", leyenda="Inactivo"),
@@ -63,7 +63,7 @@ STATUS: dict[str, StatusWeb] = {
     "enabled": StatusWeb(color="PaleGreen", leyenda="Habilitado"),
     "paid": StatusWeb(color="SeaGreen", leyenda="Pagado"),
     "default": StatusWeb(color="Goldenrod", leyenda="Predeterminado"),
-    "applied": StatusWeb(color="Green", leyenda="Predeterminado"),
+    "applied": StatusWeb(color="Green", leyenda="Aplicado"),
 }
 
 # <---------------------------------------------------------------------------------------------> #
@@ -100,8 +100,8 @@ class CacaoConfig(database.Model):  # type: ignore[name-defined]
         index=True,
         default=obtiene_texto_unico_cuid2,
     )
-    key = database.Column(database.String(20), nullable=False, index=True)
-    value = database.Column(database.String(100), nullable=False, index=True)
+    key = database.Column(database.String(50), nullable=False, index=True)
+    value = database.Column(database.String(500), nullable=False, index=True)
 
 
 # <---------------------------------------------------------------------------------------------> #
@@ -119,14 +119,14 @@ class BaseTabla:
     )
     status = database.Column(database.String(50), nullable=True)
     created = database.Column(database.DateTime, default=database.func.now(), nullable=False)
-    created_by = database.Column(database.String(15), nullable=True)
+    created_by = database.Column(database.String(26), nullable=True)
     modified = database.Column(
         database.DateTime,
         default=database.func.now(),
         onupdate=database.func.now(),
         nullable=True,
     )
-    modified_by = database.Column(database.String(15), nullable=True)
+    modified_by = database.Column(database.String(26), nullable=True)
 
 
 class BaseTransaccion(BaseTabla):
@@ -152,7 +152,7 @@ class BaseTercero(BaseTabla):
 
     name = database.Column(database.String(150), nullable=False)
     comercial_name = database.Column(database.String(150), nullable=False)
-    clasification = database.Column(database.String(50), nullable=False)
+    classification = database.Column(database.String(50), nullable=False)
     group = database.Column(database.String(50), nullable=False)
     enabled = database.Column(database.Boolean(), nullable=True)
     id_ = database.Column(database.String(30), nullable=True)
@@ -170,13 +170,12 @@ class DocBase(BaseTabla):
     posting_date = database.Column(database.Date(), nullable=True, index=True)
     document_date = database.Column(database.Date(), nullable=True)
     company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=True, index=True)
+    # Human-readable identifier generated from NamingSeries + Sequence
+    document_no = database.Column(database.String(100), nullable=True, index=True)
+    naming_series_id = database.Column(database.String(26), database.ForeignKey("naming_series.id"), nullable=True)
     # Multi-currency support
-    transaction_currency = database.Column(
-        database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True
-    )
-    base_currency = database.Column(
-        database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True
-    )
+    transaction_currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
+    base_currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
     exchange_rate = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
     # Reversal support (never delete, always reverse)
     is_reversal = database.Column(database.Boolean(), default=False, nullable=False)
@@ -202,6 +201,8 @@ class Currency(database.Model, BaseTabla):  # type: ignore[name-defined]
 class ExchangeRate(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Tasa de conversión entre dos monedas distintas."""
 
+    __tablename__ = "exchange_rate"
+    __table_args__ = (UniqueConstraint("origin", "destination", "date", name="uq_exchange_rate_date"),)
     origin = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=False)
     destination = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=False)
     rate = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
@@ -290,11 +291,11 @@ Modulos = Modules
 class Entity(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Todas las transacciones se deben grabar a una entidad."""
 
-    __table_args__ = (database.UniqueConstraint("id", "company_name", name="entidad_unica"),)
+    __tablename__ = "entity"
     code = database.Column(database.String(10), unique=True, index=True)
     status = database.Column(database.String(50), nullable=True)
     company_name = database.Column(database.String(100), unique=True, nullable=False)
-    name = database.Column(database.String(50))
+    name = database.Column(database.String(100))
     tax_id = database.Column(database.String(50), unique=True, nullable=False)
     currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE))
     entity_type = database.Column(database.String(50))
@@ -306,7 +307,7 @@ class Entity(database.Model, BaseTabla):  # type: ignore[name-defined]
         "Organización sin Fines de Lucro",
         "Persona Natural",
     ]
-    e_mail = database.Column(database.String(50))
+    e_mail = database.Column(database.String(150))
     web = database.Column(database.String(50))
     phone1 = database.Column(database.String(50))
     phone2 = database.Column(database.String(50))
@@ -393,7 +394,7 @@ class FiscalYear(database.Model, BaseTabla):  # type: ignore[name-defined]
 class AccountingPeriod(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Todas las transaciones deben estar vinculadas a un periodo contable."""
 
-    entity = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE))
+    entity = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), index=True)
     fiscal_year_id = database.Column(database.String(26), database.ForeignKey("fiscal_year.id"), nullable=True)
     name = database.Column(database.String(50), nullable=False)
     status = database.Column(database.String(50))
@@ -417,7 +418,7 @@ class Accounts(database.Model, BaseTabla):  # type: ignore[name-defined]
     parent = database.Column(database.String(50), nullable=True)
     currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
     # Activo, Pasivo, Patrimonio, Ingresos, Gastos
-    clasification = database.Column(database.String(15), index=True)
+    classification = database.Column(database.String(50), index=True)
     # Efectivo, Cta. Bancaria, Inventario, Por Cobrar, Por Pagar
     type_ = database.Column(database.String(50))
     # receivable, payable, bank, cash, expense, income, asset, liability
@@ -460,7 +461,7 @@ class Serie(database.Model, BaseTabla):  # type: ignore[name-defined]
     entity = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE))
     doc = database.Column(database.String(25))
     enabled = database.Column(database.Boolean())
-    serie = database.Column(database.String(15))
+    serie = database.Column(database.String(30))
     current_value = database.Column(database.Integer(), default=0)
     default = database.Column(database.Boolean())
 
@@ -509,9 +510,7 @@ class SeriesSequenceMap(database.Model, BaseTabla):  # type: ignore[name-defined
     naming_series_id = database.Column(
         database.String(26), database.ForeignKey("naming_series.id"), nullable=False, index=True
     )
-    sequence_id = database.Column(
-        database.String(26), database.ForeignKey("sequence.id"), nullable=False, index=True
-    )
+    sequence_id = database.Column(database.String(26), database.ForeignKey("sequence.id"), nullable=False, index=True)
     priority = database.Column(database.Integer(), default=0, nullable=False)
     # Condicion JSON para seleccion dinamica (banco, metodo de pago, etc.)
     condition = database.Column(database.Text(), nullable=True)
@@ -550,7 +549,7 @@ class Party(database.Model, BaseTabla):  # type: ignore[name-defined]
     name = database.Column(database.String(150), nullable=False)
     comercial_name = database.Column(database.String(150), nullable=True)
     tax_id = database.Column(database.String(50), nullable=True, index=True)
-    clasification = database.Column(database.String(50), nullable=True)
+    classification = database.Column(database.String(50), nullable=True)
     is_active = database.Column(database.Boolean(), default=True, nullable=False)
 
 
@@ -600,6 +599,27 @@ class PartyAddress(database.Model, BaseTabla):  # type: ignore[name-defined]
     is_primary = database.Column(database.Boolean(), default=False, nullable=False)
 
 
+class PaymentTerms(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Condiciones de pago para terceros.
+
+    Define plazos, descuentos por pronto pago y politica de vencimiento.
+    """
+
+    __tablename__ = "payment_terms"
+    name = database.Column(database.String(100), nullable=False, unique=True)
+    description = database.Column(database.Text(), nullable=True)
+    # Days from posting_date until payment is due
+    due_days = database.Column(database.Integer(), default=0, nullable=False)
+    # Days from posting_date to qualify for early payment discount
+    discount_days = database.Column(database.Integer(), nullable=True)
+    # Percentage discount for early payment (e.g. 2.5 = 2.5%)
+    discount_percent = database.Column(database.Numeric(precision=5, scale=2), nullable=True)
+    is_active = database.Column(database.Boolean(), default=True, nullable=False)
+
+
+PAYMENT_TERMS_ID = "payment_terms.id"
+
+
 class CompanyParty(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Activa el uso de un tercero dentro de una compania."""
 
@@ -609,7 +629,7 @@ class CompanyParty(database.Model, BaseTabla):  # type: ignore[name-defined]
     party_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=False, index=True)
     is_active = database.Column(database.Boolean(), default=True, nullable=False)
     credit_limit = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
-    payment_terms = database.Column(database.String(50), nullable=True)
+    payment_terms_id = database.Column(database.String(26), database.ForeignKey(PAYMENT_TERMS_ID), nullable=True, index=True)
 
 
 # <---------------------------------------------------------------------------------------------> #
@@ -679,6 +699,7 @@ class Batch(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Lote de un item inventariable."""
 
     __tablename__ = "batch"
+    __table_args__ = (UniqueConstraint("item_code", "batch_no", name="uq_batch"),)
     item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
     batch_no = database.Column(database.String(100), nullable=False, index=True)
     expiry_date = database.Column(database.Date(), nullable=True)
@@ -715,9 +736,7 @@ class StockEntryItem(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Linea de una entrada de almacen."""
 
     __tablename__ = "stock_entry_item"
-    stock_entry_id = database.Column(
-        database.String(26), database.ForeignKey("stock_entry.id"), nullable=False, index=True
-    )
+    stock_entry_id = database.Column(database.String(26), database.ForeignKey("stock_entry.id"), nullable=False, index=True)
     item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
     source_warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True)
     target_warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True)
@@ -758,7 +777,7 @@ class StockLedgerEntry(database.Model):  # type: ignore[name-defined]
     serial_no = database.Column(database.String(100), nullable=True)
     is_cancelled = database.Column(database.Boolean(), default=False, nullable=False)
     created = database.Column(database.DateTime, default=database.func.now(), nullable=False)
-    created_by = database.Column(database.String(15), nullable=True)
+    created_by = database.Column(database.String(26), nullable=True)
 
 
 class StockBin(database.Model, BaseTabla):  # type: ignore[name-defined]
@@ -843,6 +862,105 @@ class PurchaseOrderItem(database.Model, BaseTabla):  # type: ignore[name-defined
     warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True)
 
 
+class PurchaseQuotation(database.Model, DocBase):  # type: ignore[name-defined]
+    """Solicitud de cotización de compra."""
+
+    __tablename__ = "purchase_quotation"
+    supplier_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
+    supplier_name = database.Column(database.String(200), nullable=True)
+    total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    grand_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    remarks = database.Column(database.Text(), nullable=True)
+
+
+class PurchaseQuotationItem(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Linea de una solicitud de cotización de compra."""
+
+    __tablename__ = "purchase_quotation_item"
+    purchase_quotation_id = database.Column(
+        database.String(26), database.ForeignKey("purchase_quotation.id"), nullable=False, index=True
+    )
+    item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
+    item_name = database.Column(database.String(200), nullable=True)
+    description = database.Column(database.Text(), nullable=True)
+    qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    uom = database.Column(database.String(20), database.ForeignKey(UOM_CODE), nullable=True)
+    qty_in_base_uom = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
+    rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True)
+
+
+class PurchaseRequest(database.Model, DocBase):  # type: ignore[name-defined]
+    """Solicitud de compra interna."""
+
+    __tablename__ = "purchase_request"
+    requested_by = database.Column(database.String(100), nullable=True)
+    department = database.Column(database.String(100), nullable=True)
+    total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    grand_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    remarks = database.Column(database.Text(), nullable=True)
+
+
+class PurchaseRequestItem(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Linea de una solicitud de compra."""
+
+    __tablename__ = "purchase_request_item"
+    purchase_request_id = database.Column(
+        database.String(26), database.ForeignKey("purchase_request.id"), nullable=False, index=True
+    )
+    item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
+    item_name = database.Column(database.String(200), nullable=True)
+    description = database.Column(database.Text(), nullable=True)
+    qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    uom = database.Column(database.String(20), database.ForeignKey(UOM_CODE), nullable=True)
+    qty_in_base_uom = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
+    rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_amount = database.Column(database.Numeric(20, scale=4), nullable=True)
+    warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True)
+
+
+class SupplierQuotation(database.Model, DocBase):  # type: ignore[name-defined]
+    """Cotización de proveedor derivada de una solicitud de cotización."""
+
+    __tablename__ = "supplier_quotation"
+    supplier_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
+    supplier_name = database.Column(database.String(200), nullable=True)
+    purchase_quotation_id = database.Column(
+        database.String(26), database.ForeignKey("purchase_quotation.id"), nullable=True, index=True
+    )
+    total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    grand_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    remarks = database.Column(database.Text(), nullable=True)
+
+
+class SupplierQuotationItem(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Linea de una cotización de proveedor."""
+
+    __tablename__ = "supplier_quotation_item"
+    supplier_quotation_id = database.Column(
+        database.String(26), database.ForeignKey("supplier_quotation.id"), nullable=False, index=True
+    )
+    item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
+    item_name = database.Column(database.String(200), nullable=True)
+    description = database.Column(database.Text(), nullable=True)
+    qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    uom = database.Column(database.String(20), database.ForeignKey(UOM_CODE), nullable=True)
+    qty_in_base_uom = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
+    rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_rate = database.Column(database.Numeric(20, scale=4), nullable=True)
+    base_amount = database.Column(database.Numeric(20, scale=4), nullable=True)
+    warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True)
+
+
 class PurchaseReceipt(database.Model, DocBase):  # type: ignore[name-defined]
     """Recepcion de compra."""
 
@@ -886,6 +1004,7 @@ class PurchaseInvoice(database.Model, DocBase):  # type: ignore[name-defined]
     supplier_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
     supplier_name = database.Column(database.String(200), nullable=True)
     supplier_invoice_no = database.Column(database.String(50), nullable=True)
+    document_type = database.Column(database.String(50), nullable=False, default="purchase_invoice")
     is_return = database.Column(database.Boolean(), default=False, nullable=False)
     purchase_order_id = database.Column(
         database.String(26), database.ForeignKey("purchase_order.id"), nullable=True, index=True
@@ -932,6 +1051,9 @@ class SalesOrder(database.Model, DocBase):  # type: ignore[name-defined]
     __tablename__ = "sales_order"
     customer_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
     customer_name = database.Column(database.String(200), nullable=True)
+    sales_quotation_id = database.Column(
+        database.String(26), database.ForeignKey("sales_quotation.id"), nullable=True, index=True
+    )
     is_pos = database.Column(database.Boolean(), default=False, nullable=False)
     total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
@@ -943,13 +1065,77 @@ class SalesOrder(database.Model, DocBase):  # type: ignore[name-defined]
     remarks = database.Column(database.Text(), nullable=True)
 
 
+class SalesRequest(database.Model, DocBase):  # type: ignore[name-defined]
+    """Pedido de venta interno."""
+
+    __tablename__ = "sales_request"
+    customer_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
+    customer_name = database.Column(database.String(200), nullable=True)
+    total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    grand_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    remarks = database.Column(database.Text(), nullable=True)
+
+
+class SalesRequestItem(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Linea de pedido de venta."""
+
+    __tablename__ = "sales_request_item"
+    sales_request_id = database.Column(
+        database.String(26), database.ForeignKey("sales_request.id"), nullable=False, index=True
+    )
+    item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
+    item_name = database.Column(database.String(200), nullable=True)
+    description = database.Column(database.Text(), nullable=True)
+    qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    uom = database.Column(database.String(20), database.ForeignKey(UOM_CODE), nullable=True)
+    qty_in_base_uom = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
+    rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True)
+
+
+class SalesQuotation(database.Model, DocBase):  # type: ignore[name-defined]
+    """Cotización de venta."""
+
+    __tablename__ = "sales_quotation"
+    customer_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
+    customer_name = database.Column(database.String(200), nullable=True)
+    sales_request_id = database.Column(database.String(26), database.ForeignKey("sales_request.id"), nullable=True, index=True)
+    total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    grand_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    remarks = database.Column(database.Text(), nullable=True)
+
+
+class SalesQuotationItem(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Linea de cotización de venta."""
+
+    __tablename__ = "sales_quotation_item"
+    sales_quotation_id = database.Column(
+        database.String(26), database.ForeignKey("sales_quotation.id"), nullable=False, index=True
+    )
+    item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
+    item_name = database.Column(database.String(200), nullable=True)
+    description = database.Column(database.Text(), nullable=True)
+    qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    uom = database.Column(database.String(20), database.ForeignKey(UOM_CODE), nullable=True)
+    qty_in_base_uom = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
+    rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    base_amount = database.Column(database.Numeric(20, scale=4), nullable=True)
+    discount_percentage = database.Column(database.Numeric(precision=10, scale=4), nullable=True)
+    discount_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True)
+
+
 class SalesOrderItem(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Linea de orden de venta."""
 
     __tablename__ = "sales_order_item"
-    sales_order_id = database.Column(
-        database.String(26), database.ForeignKey("sales_order.id"), nullable=False, index=True
-    )
+    sales_order_id = database.Column(database.String(26), database.ForeignKey("sales_order.id"), nullable=False, index=True)
     item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
     item_name = database.Column(database.String(200), nullable=True)
     qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
@@ -971,9 +1157,7 @@ class DeliveryNote(database.Model, DocBase):  # type: ignore[name-defined]
     __tablename__ = "delivery_note"
     customer_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
     customer_name = database.Column(database.String(200), nullable=True)
-    sales_order_id = database.Column(
-        database.String(26), database.ForeignKey("sales_order.id"), nullable=True, index=True
-    )
+    sales_order_id = database.Column(database.String(26), database.ForeignKey("sales_order.id"), nullable=True, index=True)
     is_return = database.Column(database.Boolean(), default=False, nullable=False)
     shipping_address_id = database.Column(database.String(26), database.ForeignKey("address.id"), nullable=True)
     contact_id = database.Column(database.String(26), database.ForeignKey("contact.id"), nullable=True)
@@ -1007,14 +1191,11 @@ class SalesInvoice(database.Model, DocBase):  # type: ignore[name-defined]
     __tablename__ = "sales_invoice"
     customer_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
     customer_name = database.Column(database.String(200), nullable=True)
+    document_type = database.Column(database.String(50), nullable=False, default="sales_invoice")
     is_pos = database.Column(database.Boolean(), default=False, nullable=False)
     is_return = database.Column(database.Boolean(), default=False, nullable=False)
-    sales_order_id = database.Column(
-        database.String(26), database.ForeignKey("sales_order.id"), nullable=True, index=True
-    )
-    delivery_note_id = database.Column(
-        database.String(26), database.ForeignKey("delivery_note.id"), nullable=True, index=True
-    )
+    sales_order_id = database.Column(database.String(26), database.ForeignKey("sales_order.id"), nullable=True, index=True)
+    delivery_note_id = database.Column(database.String(26), database.ForeignKey("delivery_note.id"), nullable=True, index=True)
     total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     tax_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
@@ -1086,9 +1267,7 @@ class PaymentEntry(database.Model, DocBase):  # type: ignore[name-defined]
     party_type = database.Column(database.String(20), nullable=True, index=True)
     party_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
     party_name = database.Column(database.String(200), nullable=True)
-    bank_account_id = database.Column(
-        database.String(26), database.ForeignKey("bank_account.id"), nullable=True, index=True
-    )
+    bank_account_id = database.Column(database.String(26), database.ForeignKey("bank_account.id"), nullable=True, index=True)
     paid_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     base_paid_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     received_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
@@ -1103,9 +1282,7 @@ class PaymentReference(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Aplicacion de pagos a documentos — soporta pagos parciales."""
 
     __tablename__ = "payment_reference"
-    payment_id = database.Column(
-        database.String(26), database.ForeignKey("payment_entry.id"), nullable=False, index=True
-    )
+    payment_id = database.Column(database.String(26), database.ForeignKey("payment_entry.id"), nullable=False, index=True)
     reference_type = database.Column(database.String(50), nullable=False, index=True)
     reference_id = database.Column(database.String(26), nullable=False, index=True)
     total_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
@@ -1114,22 +1291,52 @@ class PaymentReference(database.Model, BaseTabla):  # type: ignore[name-defined]
     allocation_date = database.Column(database.Date(), nullable=True, index=True)
 
 
+class DocumentRelation(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Relacion generica entre documentos y sus lineas.
+
+    Guarda la trazabilidad source row -> target row para parcialidades y flujos
+    documentales sin acoplar tablas entre modulos.
+    """
+
+    __tablename__ = "document_relation"
+    __table_args__ = (
+        database.Index("ix_document_relation_source", "source_type", "source_id", "source_item_id"),
+        database.Index("ix_document_relation_target", "target_type", "target_id", "target_item_id"),
+        UniqueConstraint(
+            "source_type",
+            "source_id",
+            "source_item_id",
+            "target_type",
+            "target_id",
+            "target_item_id",
+            name="uq_document_relation_line",
+        ),
+    )
+    source_type = database.Column(database.String(50), nullable=False, index=True)
+    source_id = database.Column(database.String(26), nullable=False, index=True)
+    source_item_id = database.Column(database.String(26), nullable=False, index=True)
+    target_type = database.Column(database.String(50), nullable=False, index=True)
+    target_id = database.Column(database.String(26), nullable=False, index=True)
+    target_item_id = database.Column(database.String(26), nullable=False, index=True)
+    qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    uom = database.Column(database.String(20), database.ForeignKey(UOM_CODE), nullable=True)
+    rate = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    relation_type = database.Column(database.String(50), nullable=False, index=True)
+
+
 class BankTransaction(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Transaccion bancaria importada o ingresada manualmente."""
 
     __tablename__ = "bank_transaction"
-    bank_account_id = database.Column(
-        database.String(26), database.ForeignKey("bank_account.id"), nullable=False, index=True
-    )
+    bank_account_id = database.Column(database.String(26), database.ForeignKey("bank_account.id"), nullable=False, index=True)
     posting_date = database.Column(database.Date(), nullable=False, index=True)
     deposit = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     withdrawal = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     description = database.Column(database.Text(), nullable=True)
     reference_number = database.Column(database.String(100), nullable=True)
     is_reconciled = database.Column(database.Boolean(), default=False, nullable=False)
-    payment_entry_id = database.Column(
-        database.String(26), database.ForeignKey("payment_entry.id"), nullable=True, index=True
-    )
+    payment_entry_id = database.Column(database.String(26), database.ForeignKey("payment_entry.id"), nullable=True, index=True)
 
 
 # <---------------------------------------------------------------------------------------------> #
@@ -1170,7 +1377,8 @@ class GLBase:
     currency_id = database.Column(database.String(200))
     exchange_rate = database.Column(database.DECIMAL())
     value_default = database.Column(database.DECIMAL())
-    meno = database.Column(database.String(100))
+    meno = database.Column(database.String(100))  # kept for legacy compatibility
+    memo = database.Column(database.String(500), nullable=True)
     reference = database.Column(database.String(50))
     line_meno = database.Column(database.String(50))
     internal_reference = database.Column(database.String(50))
@@ -1250,17 +1458,17 @@ class GLEntry(database.Model):  # type: ignore[name-defined]
     # Unidad de negocio como dimension analitica (sucursal, oficina, punto de venta)
     unit_code = database.Column(database.String(10), database.ForeignKey("unit.code"), nullable=True)
     project_code = database.Column(database.String(10), database.ForeignKey("project.code"), nullable=True)
-    remarks = database.Column(database.String(200), nullable=True)
+    remarks = database.Column(database.String(500), nullable=True)
     is_cancelled = database.Column(database.Boolean(), default=False, nullable=False)
     created = database.Column(database.DateTime, default=database.func.now(), nullable=False)
-    created_by = database.Column(database.String(15), nullable=True)
+    created_by = database.Column(database.String(26), nullable=True)
     modified = database.Column(
         database.DateTime,
         default=database.func.now(),
         onupdate=database.func.now(),
         nullable=True,
     )
-    modified_by = database.Column(database.String(15), nullable=True)
+    modified_by = database.Column(database.String(26), nullable=True)
 
 
 # <---------------------------------------------------------------------------------------------> #
@@ -1372,9 +1580,7 @@ class TaxTemplateItem(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Linea de plantilla de impuestos."""
 
     __tablename__ = "tax_template_item"
-    tax_template_id = database.Column(
-        database.String(26), database.ForeignKey("tax_template.id"), nullable=False, index=True
-    )
+    tax_template_id = database.Column(database.String(26), database.ForeignKey("tax_template.id"), nullable=False, index=True)
     tax_id = database.Column(database.String(26), database.ForeignKey("tax.id"), nullable=False, index=True)
     sequence = database.Column(database.Integer(), nullable=True)
     is_inclusive = database.Column(database.Boolean(), default=False, nullable=False)
@@ -1400,9 +1606,7 @@ class ItemPrice(database.Model, BaseTabla):  # type: ignore[name-defined]
 
     __tablename__ = "item_price"
     item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
-    price_list_id = database.Column(
-        database.String(26), database.ForeignKey("price_list.id"), nullable=False, index=True
-    )
+    price_list_id = database.Column(database.String(26), database.ForeignKey("price_list.id"), nullable=False, index=True)
     uom = database.Column(database.String(20), database.ForeignKey(UOM_CODE), nullable=True)
     price = database.Column(database.Numeric(precision=20, scale=4), nullable=False)
     min_qty = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
@@ -1489,9 +1693,7 @@ class PeriodCloseRun(database.Model, BaseTabla):  # type: ignore[name-defined]
 
     __tablename__ = "period_close_run"
     company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=False, index=True)
-    period_id = database.Column(
-        database.String(26), database.ForeignKey("accounting_period.id"), nullable=False, index=True
-    )
+    period_id = database.Column(database.String(26), database.ForeignKey("accounting_period.id"), nullable=False, index=True)
     # open, in_progress, closed
     run_status = database.Column(database.String(20), nullable=False)
     closed_by = database.Column(database.String(15), nullable=True)
@@ -1502,9 +1704,7 @@ class PeriodCloseCheck(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Verificacion realizada durante el cierre de periodo."""
 
     __tablename__ = "period_close_check"
-    close_run_id = database.Column(
-        database.String(26), database.ForeignKey("period_close_run.id"), nullable=False, index=True
-    )
+    close_run_id = database.Column(database.String(26), database.ForeignKey("period_close_run.id"), nullable=False, index=True)
     check_type = database.Column(database.String(50), nullable=False)
     check_status = database.Column(database.String(20), nullable=False)
     message = database.Column(database.Text(), nullable=True)
@@ -1557,9 +1757,7 @@ class WorkflowState(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Estado en un flujo de trabajo."""
 
     __tablename__ = "workflow_state"
-    workflow_id = database.Column(
-        database.String(26), database.ForeignKey("workflow.id"), nullable=False, index=True
-    )
+    workflow_id = database.Column(database.String(26), database.ForeignKey("workflow.id"), nullable=False, index=True)
     name = database.Column(database.String(50), nullable=False)
     is_initial = database.Column(database.Boolean(), default=False, nullable=False)
     is_final = database.Column(database.Boolean(), default=False, nullable=False)
@@ -1569,12 +1767,8 @@ class WorkflowTransition(database.Model, BaseTabla):  # type: ignore[name-define
     """Transicion entre estados de un flujo de trabajo."""
 
     __tablename__ = "workflow_transition"
-    from_state_id = database.Column(
-        database.String(26), database.ForeignKey("workflow_state.id"), nullable=False, index=True
-    )
-    to_state_id = database.Column(
-        database.String(26), database.ForeignKey("workflow_state.id"), nullable=False, index=True
-    )
+    from_state_id = database.Column(database.String(26), database.ForeignKey("workflow_state.id"), nullable=False, index=True)
+    to_state_id = database.Column(database.String(26), database.ForeignKey("workflow_state.id"), nullable=False, index=True)
     action_name = database.Column(database.String(100), nullable=False)
     role_required = database.Column(database.String(50), nullable=True)
 
@@ -1583,9 +1777,7 @@ class WorkflowInstance(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Instancia de un flujo de trabajo activo en un registro."""
 
     __tablename__ = "workflow_instance"
-    workflow_id = database.Column(
-        database.String(26), database.ForeignKey("workflow.id"), nullable=False, index=True
-    )
+    workflow_id = database.Column(database.String(26), database.ForeignKey("workflow.id"), nullable=False, index=True)
     reference_type = database.Column(database.String(50), nullable=False, index=True)
     reference_id = database.Column(database.String(26), nullable=False, index=True)
     current_state_id = database.Column(database.String(26), database.ForeignKey("workflow_state.id"), nullable=True)

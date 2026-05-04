@@ -67,6 +67,10 @@ def command() -> None:  # pragma: no cover
 def iniciar_extenciones(app: Flask | None = None) -> None:
     """Inicializa extenciones."""
     if app and isinstance(app, Flask):
+        from flask_wtf.csrf import CSRFProtect
+
+        csrf = CSRFProtect()
+        csrf.init_app(app)
         # alembic.init_app(app)
         database.init_app(app)
         administrador_sesion.init_app(app)
