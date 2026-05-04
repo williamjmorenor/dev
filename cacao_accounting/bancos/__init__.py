@@ -289,7 +289,7 @@ def bancos_pago_nuevo():
     """Formulario para crear un nuevo pago."""
     from cacao_accounting.bancos.forms import FormularioPago
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
-    from cacao_accounting.database import Party
+    from cacao_accounting.database import ExternalCounter, Party
 
     formulario = FormularioPago()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
@@ -304,6 +304,15 @@ def bancos_pago_nuevo():
     formulario.party_id.choices = [("", "")] + [
         (str(p[0].id), p[0].name) for p in database.session.execute(database.select(Party)).all()
     ]
+    # Contadores externos activos para la compania seleccionada
+    counters_query = database.select(ExternalCounter).filter_by(is_active=True)
+    if selected_company:
+        counters_query = counters_query.filter_by(company=selected_company)
+    active_counters = database.session.execute(counters_query).scalars().all()
+    formulario.external_counter_id.choices = [("", "— Sin contador externo —")] + [
+        (str(c.id), f"{c.name} (siguiente: {c.next_suggested_formatted})") for c in active_counters
+    ]
+
     from_purchase_invoice_ids = request.values.getlist("from_purchase_invoice")
     from_sales_invoice_ids = request.values.getlist("from_sales_invoice")
     facturas_origen = _payment_source_rows(from_purchase_invoice_ids, from_sales_invoice_ids)
@@ -346,11 +355,19 @@ def bancos_pago_nuevo():
                 payment.received_amount = amount
             database.session.add(payment)
             database.session.flush()
+            # Contexto para seleccion contextual del contador externo
+            ext_context = {
+                "payment_type": payment_type,
+                "bank_account_id": request.form.get("bank_account_id") or None,
+            }
             assign_document_identifier(
                 document=payment,
                 entity_type="payment_entry",
                 posting_date_raw=request.form.get("posting_date"),
                 naming_series_id=request.form.get("naming_series") or None,
+                external_counter_id=request.form.get("external_counter_id") or None,
+                external_number=request.form.get("external_number") or None,
+                external_context=ext_context,
             )
             allocated = _save_payment_references(payment)
             if amount == 0 and allocated:

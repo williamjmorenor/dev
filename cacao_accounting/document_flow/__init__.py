@@ -5,14 +5,28 @@
 
 from cacao_accounting.document_flow.service import (
     DocumentFlowError,
+    close_document_balances,
+    close_line_balance,
+    create_target_document,
     create_document_relation,
     get_document_flow_items,
+    get_pending_lines,
+    list_source_documents,
     refresh_source_caches_for_target,
+    revert_relations_for_target,
 )
+from cacao_accounting.document_flow.status import calculate_document_status
 
 __all__ = [
     "DocumentFlowError",
+    "calculate_document_status",
+    "close_document_balances",
+    "close_line_balance",
+    "create_target_document",
     "create_document_relation",
     "get_document_flow_items",
+    "get_pending_lines",
+    "list_source_documents",
     "refresh_source_caches_for_target",
+    "revert_relations_for_target",
 ]

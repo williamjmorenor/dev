@@ -26,6 +26,7 @@
     <thead>
       <tr>
         <th scope="col">Propósito</th>
+        <th scope="col">Estado</th>
         <th scope="col">Fecha</th>
         <th scope="col">Total</th>
       </tr>
@@ -34,6 +35,7 @@
       {% for item in consulta.items -%}
       <tr>
         <td>{{ item.purpose }}</td>
+        <td>{{ macros.document_status_for("stock_entry", item) }}</td>
         <td>{{ item.posting_date or "" }}</td>
         <td>{{ item.total_amount or "" }}</td>
       </tr>

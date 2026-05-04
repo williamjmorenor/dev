@@ -218,3 +218,141 @@ Finalizar los alcances propuestos en la bitácora del día, estabilizando series
 1. No se modificó `cacao_accounting/contabilidad/gl/templates/gl_new.html` por instrucción explícita del usuario.
 2. El backend de comprobantes contables manuales/GL requiere una iteración dedicada para persistencia real de cabecera, líneas, validación debe/haber y contabilización en `GLEntry`.
 3. La contabilización automática de pagos e inventario hacia `GLEntry` queda pendiente para una etapa posterior de motor contable.
+
+## 2026-05-04 (auditoria series e identificadores)
+
+### Peticion del usuario
+Realizar una auditoria a la implementacion de series e identificadores en el sistema e implementar un framework robusto que soporte series globales, por compania, series internas controladas por el sistema y series externas (chequeras, numeracion fiscal, recibos preimpresos) con auditoria obligatoria de cambios.
+
+### Plan implementado
+1. Agregar el campo `is_default` al modelo `NamingSeries` para cumplir la regla de "maximo una serie predeterminada activa por entity_type + company".
+2. Agregar el modelo `ExternalCounter` para representar contadores externos (chequeras, numeracion fiscal, recibos preimpresos, etc.).
+3. Agregar el modelo `ExternalCounterAuditLog` para la bitacora obligatoria de ajustes del ultimo numero usado.
+4. Actualizar `document_identifiers.py` con:
+   - `enforce_single_default_series()` — garantiza unicidad de serie predeterminada.
+   - `_pick_naming_series()` — prioriza serie con `is_default=True` por compania.
+   - `_create_default_series()` — ya establece `is_default=True` al crear serie automatica.
+   - `suggest_next_external_number()` — devuelve el siguiente numero externo sugerido.
+   - `record_external_number_used()` — actualiza `last_used` si aplica.
+   - `adjust_external_counter()` — ajusta `last_used` con auditoria obligatoria (motivo requerido).
+5. Actualizar `contabilidad/forms.py` con nuevos formularios:
+   - `FormularioNamingSeries`, `FormularioSecuencia`, `FormularioExternalCounter`, `FormularioAjusteContadorExterno`.
+6. Agregar rutas CRUD en `contabilidad/__init__.py`:
+   - `/naming-series/list`, `/naming-series/new`, `/naming-series/<id>/toggle-default`, `/naming-series/<id>/toggle-active`.
+   - `/external-counter/list`, `/external-counter/new`, `/external-counter/<id>/adjust`, `/external-counter/<id>/audit-log`.
+7. Crear plantillas HTML para todas las nuevas vistas.
+8. Actualizar `admin.html` para incluir enlaces directos a series de numeracion y contadores externos.
+9. Agregar rutas nuevas a `z_static_routes.py` para cobertura en `test_01vistas.py`.
+10. Crear `tests/test_07series_audit.py` con 15 pruebas unitarias cubiertas:
+    - is_default en NamingSeries.
+    - enforce_single_default_series.
+    - _pick_naming_series prefiere is_default.
+    - ExternalCounter.next_suggested y next_suggested_formatted.
+    - suggest_next_external_number y validaciones de inactivo.
+    - adjust_external_counter: actualiza last_used, crea auditoria, requiere motivo no vacio.
+    - record_external_number_used: incrementa solo si corresponde.
+    - Multiples ajustes generan multiples entradas de auditoria.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/database/__init__.py`: campo `is_default` en `NamingSeries`, nuevos modelos `ExternalCounter` y `ExternalCounterAuditLog`.
+- `cacao_accounting/document_identifiers.py`: servicios de contadores externos y logica de predeterminado.
+- `cacao_accounting/contabilidad/forms.py`: nuevos formularios de serie, secuencia y contador externo.
+- `cacao_accounting/contabilidad/__init__.py`: rutas CRUD para NamingSeries y ExternalCounter.
+- `cacao_accounting/contabilidad/templates/contabilidad/`: 5 nuevas plantillas HTML.
+- `cacao_accounting/admin/templates/admin.html`: enlaces a series e identificadores.
+- `tests/test_07series_audit.py`: 15 pruebas nuevas.
+- `tests/z_static_routes.py`: 4 nuevas rutas de cobertura estatica.
+
+### Verificacion ejecutada
+- `python3 -m compileall cacao_accounting/` -> passed
+- `python3 -m flake8 cacao_accounting/ --max-line-length=130` -> passed
+- `python3 -m ruff check cacao_accounting/` -> passed
+- `python3 -m black --check cacao_accounting/ tests/` -> passed
+- `python3 -m mypy cacao_accounting/ --ignore-missing-imports` -> passed
+- `pytest tests/test_07series_audit.py -v` -> 15 passed
+- `pytest tests/ -q --slow=True` -> 236 passed (2 fallos preexistentes sin relacion con estos cambios)
+
+### Pendientes documentados
+1. Implementar enlace de ExternalCounter con documentos transaccionales (ej: al crear un pago, seleccionar el cheque del contador externo).
+2. Mostrar en el formulario de pago el siguiente numero de cheque sugerido al seleccionar una chequera.
+3. El backend de comprobantes contables manuales/GL requiere una iteracion dedicada.
+
+## 2026-05-04 (correccion series e identificadores)
+
+### Peticion del usuario
+Analizar `git diff --cached` contra `requerimiento.md`, corregir gaps de la implementacion actual, evitar mutaciones accidentales por rutas GET y actualizar la bitacora de desarrollo.
+
+### Plan implementado
+1. Corregir `FormularioAjusteContadorExterno.new_last_used` para aceptar `0` usando `InputRequired()` y `NumberRange(min=0)`.
+2. Convertir las rutas mutantes `/naming-series/<id>/toggle-default` y `/naming-series/<id>/toggle-active` a POST-only.
+3. Reemplazar enlaces GET de acciones en la lista de series por formularios POST con CSRF.
+4. Corregir la regla de predeterminadas para que una serie por compania no desmarque la predeterminada global.
+5. Ajustar la seleccion de series para respetar predeterminada por compania, fallback por compania y predeterminada global.
+6. Crear `Sequence` y `SeriesSequenceMap` al crear `NamingSeries` desde la UI.
+7. Crear `SeriesExternalCounterMap` al crear un `ExternalCounter` asociado a una serie interna.
+8. Validar que los contadores externos pertenezcan a la misma compania del documento.
+9. Endurecer condiciones JSON de contadores externos para rechazar JSON valido que no sea objeto.
+10. Ampliar pruebas de regresion de series, contadores externos, rutas POST-only y validacion cross-company.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/forms.py`: validadores para aceptar cero y campos de secuencia en `FormularioNamingSeries`.
+- `cacao_accounting/contabilidad/__init__.py`: rutas mutantes POST-only; alta de series crea secuencia/mapa; alta de contador crea mapa externo.
+- `cacao_accounting/contabilidad/templates/contabilidad/naming_series_lista.html`: acciones POST con CSRF y columnas de contador interno/externo.
+- `cacao_accounting/contabilidad/templates/contabilidad/naming_series_nueva.html`: captura de valor inicial, incremento, padding y politica de reinicio.
+- `cacao_accounting/document_identifiers.py`: seleccion de defaults corregida, validacion cross-company y condiciones JSON robustas.
+- `tests/test_07series_audit.py`: cobertura ampliada a 36 pruebas.
+
+### Verificacion ejecutada
+- `python -m compileall cacao_accounting tests` -> passed
+- `black --check cacao_accounting tests` -> passed
+- `ruff check cacao_accounting tests` -> passed
+- `flake8 cacao_accounting tests` -> passed
+- `mypy cacao_accounting` -> passed
+- `pytest -q tests/test_04database_schema.py tests/test_06transaction_closure.py tests/test_07series_audit.py` -> 232 passed
+- `pytest -q tests/test_01vistas.py tests/test_02forms.py tests/test_03webactions.py --slow=True` -> 16 passed, 2 failed preexistentes/no relacionados:
+  - `tests/test_01vistas.py::test_visit_views` espera `Nueva Moneda` en `/accounting/currency/list`, pero la vista paginada actual no lo muestra en la primera pagina.
+  - `tests/test_03webactions.py::test_inventory_stock_entry_routes` espera `/buying/purchase-receipt/REC-DEMO-0000001`, pero el dataset slow actual responde 404.
+
+### Pendientes documentados
+1. Revisar la cobertura slow preexistente de moneda y recepcion demo para decidir si se corrige el dato de prueba o el assert.
+2. Implementar UI dedicada para condiciones (`condition_json`) de `SeriesExternalCounterMap` si se requieren mapas externos dinamicos por banco/metodo.
+
+## 2026-05-04 (flujo documental y estados)
+
+### Peticion del usuario
+Implementar el framework transversal de flujo documental definido en `requerimiento.md`, incluyendo trazabilidad por linea, saldos pendientes, creacion de documentos relacionados, reversión al cancelar, cierre manual y un estado unico calculado con badge informativo en listas y detalles.
+
+### Plan implementado
+1. Extender `DocumentRelation` para conservar historial de relaciones activas/revertidas sin eliminar trazabilidad.
+2. Agregar `DocumentLineFlowState` como cache auditable de cantidades fuente, procesadas, cerradas y pendientes por linea + tipo destino.
+3. Ampliar `document_flow` con registro de flujos de compras, ventas, inventario y pagos.
+4. Agregar servicios para recalcular saldos, cerrar lineas/documentos, revertir relaciones al cancelar y crear documentos destino desde lineas fuente.
+5. Crear un servicio central de estados documentales con estado unico calculado y tonos de badge.
+6. Publicar APIs transversales para documentos fuente, lineas pendientes, creacion de destino, cierre de saldos, estado calculado y arbol de trazabilidad.
+7. Integrar badges calculados en listas y vistas de detalle de compras, ventas, inventario y bancos/pagos.
+8. Corregir dos brechas detectadas por la bateria slow: texto esperado `Nueva Moneda` en lista de monedas y campo `is_return` faltante en `FormularioFacturaVenta`.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/database/__init__.py`: nuevos campos de historial en `DocumentRelation` y nuevo modelo `DocumentLineFlowState`.
+- `cacao_accounting/document_flow/registry.py`: registro ampliado de documentos y flujos permitidos.
+- `cacao_accounting/document_flow/service.py`: cierre manual, reversión, lineas pendientes, documentos fuente y creacion generica de documentos destino.
+- `cacao_accounting/document_flow/status.py`: calculo centralizado de estados como `Pendiente Recibir`, `Recibido Parcialmente`, `Pendiente Facturar`, `Completado`, `Pagado` y `Cancelado`.
+- `cacao_accounting/document_flow/tracing.py`: arbol upstream/downstream para trazabilidad documental.
+- `cacao_accounting/api/__init__.py`: endpoints `/api/document-flow/*` nuevos.
+- `cacao_accounting/templates/macros.html`: macros `document_status_badge`, `document_status_for` y `document_flow_trace`.
+- Templates de compras, ventas, inventario y bancos: badge informativo en listas y badge + texto completo en detalles.
+- `tests/test_05document_flow.py`: cobertura de saldos parciales, sobreconsumo, reversión al cancelar, cierre manual y estados/badges calculados.
+
+### Verificacion ejecutada
+- `python -m compileall cacao_accounting tests` -> passed
+- `black --check cacao_accounting tests` -> passed
+- `ruff check cacao_accounting tests` -> passed
+- `flake8 cacao_accounting tests` -> passed
+- `mypy cacao_accounting` -> passed
+- `pytest -q` -> 262 passed
+- `pytest -q tests/test_01vistas.py --slow=True` -> 1 passed
+- `pytest -q tests/test_03webactions.py --slow=True` -> 16 passed
+
+### Pendientes documentados
+1. Evolucionar el modal `Actualizar Elementos` para seleccionar documentos fuente desde `/api/document-flow/source-documents` sin depender de una fuente preseleccionada por URL.
+2. Agregar vistas dedicadas para explorar el arbol completo de trazabilidad devuelto por `/api/document-flow/tree`.

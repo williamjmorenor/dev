@@ -18,8 +18,18 @@ from jwt import decode
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
-from cacao_accounting.document_flow import DocumentFlowError, get_document_flow_items
+from cacao_accounting.document_flow import (
+    DocumentFlowError,
+    close_document_balances,
+    close_line_balance,
+    create_target_document,
+    get_document_flow_items,
+    get_pending_lines,
+    list_source_documents,
+)
 from cacao_accounting.document_flow.service import get_source_items
+from cacao_accounting.document_flow.status import document_status_payload
+from cacao_accounting.document_flow.tracing import document_flow_tree
 
 api = Blueprint("api", __name__, template_folder="templates")
 
@@ -156,6 +166,119 @@ def api_document_flow_items():
     except DocumentFlowError as exc:
         abort(exc.status_code)
     return jsonify({"target_type": target_type, "items": items})
+
+
+@api.route("/api/document-flow/source-documents")
+@login_required
+def api_document_flow_source_documents():
+    """Devuelve documentos fuente disponibles para un tipo destino."""
+
+    target_type = request.args.get("target_document_type") or request.args.get("target_type") or ""
+    company = request.args.get("company") or request.args.get("company_id")
+    if not target_type:
+        abort(400)
+    try:
+        sources = list_source_documents(target_type, company)
+    except (DocumentFlowError, KeyError):
+        abort(400)
+    return jsonify({"target_type": target_type, "source_documents": sources})
+
+
+@api.route("/api/document-flow/pending-lines")
+@login_required
+def api_document_flow_pending_lines():
+    """Devuelve lineas pendientes desde uno o varios documentos fuente."""
+
+    source_type = request.args.get("source_document_type") or request.args.get("source_type") or ""
+    target_type = request.args.get("target_document_type") or request.args.get("target_type") or ""
+    source_ids = request.args.getlist("source_document_ids[]") or request.args.getlist("source_document_ids")
+    source_ids = source_ids or request.args.getlist("source_id")
+    company = request.args.get("company") or request.args.get("company_id")
+    if not source_type or not target_type or not source_ids:
+        abort(400)
+    try:
+        lines = get_pending_lines(
+            source_document_type=source_type,
+            source_document_ids=source_ids,
+            target_document_type=target_type,
+            company=company,
+        )
+    except DocumentFlowError as exc:
+        abort(exc.status_code)
+    return jsonify({"target_type": target_type, "items": lines})
+
+
+@api.route("/api/document-flow/create-target", methods=["POST"])
+@login_required
+def api_document_flow_create_target():
+    """Crea un documento destino desde lineas fuente seleccionadas."""
+
+    try:
+        payload = request.get_json(silent=True) or {}
+        result = create_target_document(payload)
+    except DocumentFlowError as exc:
+        abort(exc.status_code)
+    except KeyError:
+        abort(400)
+    return jsonify(result), 201
+
+
+@api.route("/api/document-flow/close-line", methods=["POST"])
+@login_required
+def api_document_flow_close_line():
+    """Cierra manualmente el saldo de una linea fuente."""
+
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        state = close_line_balance(
+            source_type=str(payload.get("source_document_type") or payload.get("source_type") or ""),
+            source_id=str(payload.get("source_document_id") or payload.get("source_id") or ""),
+            source_item_id=str(payload.get("source_row_id") or payload.get("source_item_id") or ""),
+            target_type=str(payload.get("target_document_type") or payload.get("target_type") or ""),
+            qty=payload.get("qty"),
+            reason=str(payload.get("reason") or ""),
+        )
+    except DocumentFlowError as exc:
+        abort(exc.status_code)
+    return jsonify({"state": state})
+
+
+@api.route("/api/document-flow/close-document", methods=["POST"])
+@login_required
+def api_document_flow_close_document():
+    """Cierra saldos pendientes de un documento fuente completo."""
+
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        states = close_document_balances(
+            source_type=str(payload.get("source_document_type") or payload.get("source_type") or ""),
+            source_id=str(payload.get("source_document_id") or payload.get("source_id") or ""),
+            target_type=str(payload.get("target_document_type") or payload.get("target_type") or ""),
+            reason=str(payload.get("reason") or ""),
+        )
+    except DocumentFlowError as exc:
+        abort(exc.status_code)
+    return jsonify({"states": states})
+
+
+@api.route("/api/document-flow/recalculate-status/<document_type>/<document_id>", methods=["POST"])
+@login_required
+def api_document_flow_recalculate_status(document_type: str, document_id: str):
+    """Devuelve el estado documental calculado."""
+
+    return jsonify({"status": document_status_payload(document_type, document_id)})
+
+
+@api.route("/api/document-flow/tree")
+@login_required
+def api_document_flow_tree():
+    """Devuelve trazabilidad upstream/downstream de un documento."""
+
+    document_type = request.args.get("document_type", "")
+    document_id = request.args.get("document_id", "")
+    if not document_type or not document_id:
+        abort(400)
+    return jsonify(document_flow_tree(document_type, document_id))
 
 
 def _source_items_or_abort(source_type: str, source_id: str):

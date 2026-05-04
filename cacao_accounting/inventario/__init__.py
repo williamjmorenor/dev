@@ -11,6 +11,7 @@ from flask_login import login_required
 
 from cacao_accounting.database import Item, StockEntry, StockEntryItem, UOM, Warehouse, database
 from cacao_accounting.database.helpers import get_active_naming_series
+from cacao_accounting.document_flow import revert_relations_for_target
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
@@ -470,6 +471,7 @@ def inventario_entrada_cancel(entry_id: str):
     if registro.docstatus != 1:
         abort(400)
     registro.docstatus = 2
+    revert_relations_for_target("stock_entry", entry_id)
     database.session.commit()
     flash("Entrada de almacén cancelada.", "warning")
     return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))

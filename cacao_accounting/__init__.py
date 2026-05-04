@@ -151,6 +151,9 @@ def actualiza_variables_globales_jinja(app: Flask | None = None) -> None:
             app.jinja_env.globals.update(id_modulo=obtener_id_modulo_por_nombre)
             app.jinja_env.globals.update(usuario=current_user)
             app.jinja_env.globals.update(entidades_creadas=entidades_creadas)
+            from cacao_accounting.document_flow.status import calculate_document_status
+
+            app.jinja_env.globals.update(document_status_info=calculate_document_status)
             # now available globally in templates
             app.jinja_env.globals.update(now=datetime.now)
             if PRERELEASE:

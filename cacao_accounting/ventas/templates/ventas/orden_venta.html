@@ -19,7 +19,7 @@
   <div class="ca-card-header">
     <h5 class="ca-card-title">
       <i class="bi bi-cart-check"></i> {{ registro.document_no or registro.id }}
-      {{ macros.docstatus_badge(registro.docstatus) }}
+      {{ macros.document_status_for("sales_order", registro, detail=True) }}
     </h5>
     <div class="d-flex gap-2 flex-wrap">
       {{ macros.workflow_buttons(
@@ -43,7 +43,7 @@
           <tr><td style="color:#64748b;">Número de Documento</td><td>{{ registro.document_no or "" }}</td></tr>
           <tr><td style="color:#64748b;">Compañía</td><td>{{ registro.company or "" }}</td></tr>
           <tr><td style="color:#64748b;">Fecha</td><td>{{ registro.posting_date or "" }}</td></tr>
-          <tr><td style="color:#64748b;">Estado</td><td>{{ macros.docstatus_badge(registro.docstatus) }}</td></tr>
+          <tr><td style="color:#64748b;">Estado</td><td>{{ macros.document_status_for("sales_order", registro, detail=True) }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -63,5 +63,6 @@
 </div>
 
 {{ macros.lineas_tabla_lectura(items) }}
+{{ macros.document_flow_trace("sales_order", registro) }}
 
 {% endblock %}

@@ -17,7 +17,10 @@
 
 <div class="ca-card" style="max-width:860px;">
   <div class="ca-card-header">
-    <h5 class="ca-card-title"><i class="bi bi-file-earmark-text"></i> Solicitud de Compra</h5>
+    <h5 class="ca-card-title">
+      <i class="bi bi-file-earmark-text"></i> Solicitud de Compra
+      {{ macros.document_status_for("purchase_request", registro, detail=True) }}
+    </h5>
   </div>
   <div class="row g-3 p-3">
     <div class="col-md-6">
@@ -41,5 +44,7 @@
   </div>
   {{ macros.lineas_tabla_lectura(items) }}
 </div>
+
+{{ macros.document_flow_trace("purchase_request", registro) }}
 
 {% endblock %}

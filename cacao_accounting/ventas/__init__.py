@@ -26,7 +26,12 @@ from cacao_accounting.database import (
 )
 from cacao_accounting.database.helpers import get_active_naming_series
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
-from cacao_accounting.document_flow import DocumentFlowError, create_document_relation, refresh_source_caches_for_target
+from cacao_accounting.document_flow import (
+    DocumentFlowError,
+    create_document_relation,
+    refresh_source_caches_for_target,
+    revert_relations_for_target,
+)
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
 
@@ -691,6 +696,7 @@ def ventas_orden_venta_cancel(order_id: str):
     if registro.docstatus != 1:
         abort(400)
     registro.docstatus = 2
+    revert_relations_for_target("sales_order", order_id)
     database.session.commit()
     flash("Orden de venta cancelada.", "warning")
     return redirect(url_for("ventas.ventas_orden_venta", order_id=order_id))
@@ -815,6 +821,7 @@ def ventas_entrega_cancel(note_id: str):
     if registro.docstatus != 1:
         abort(400)
     registro.docstatus = 2
+    revert_relations_for_target("delivery_note", note_id)
     refresh_source_caches_for_target("delivery_note", note_id)
     database.session.commit()
     flash("Nota de entrega cancelada.", "warning")
@@ -971,6 +978,7 @@ def ventas_factura_venta_cancel(invoice_id: str):
     if registro.docstatus != 1:
         abort(400)
     registro.docstatus = 2
+    revert_relations_for_target("sales_invoice", invoice_id)
     refresh_source_caches_for_target("sales_invoice", invoice_id)
     database.session.commit()
     flash("Factura de venta cancelada.", "warning")

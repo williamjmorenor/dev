@@ -17,7 +17,10 @@
 
 <div class="ca-card" style="max-width:860px;">
   <div class="ca-card-header d-flex align-items-center justify-content-between">
-    <h5 class="ca-card-title"><i class="bi bi-file-earmark-text"></i> Solicitud de Cotización</h5>
+    <h5 class="ca-card-title">
+      <i class="bi bi-file-earmark-text"></i> Solicitud de Cotización
+      {{ macros.document_status_for("purchase_quotation", registro, detail=True) }}
+    </h5>
     <div class="d-flex gap-2">
       <a href="{{ url_for('compras.compras_cotizacion_proveedor_nueva', from_rfq=registro.id) }}" class="btn btn-sm btn-primary">
         <i class="bi bi-file-earmark-plus me-1"></i>Crear Cotización de Proveedor
@@ -71,5 +74,7 @@
     </tbody>
   </table>
 </div>
+
+{{ macros.document_flow_trace("purchase_quotation", registro) }}
 
 {% endblock %}

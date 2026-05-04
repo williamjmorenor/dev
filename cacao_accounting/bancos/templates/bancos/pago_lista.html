@@ -26,6 +26,7 @@
     <thead>
       <tr>
         <th scope="col">Tipo</th>
+        <th scope="col">Estado</th>
         <th scope="col">Tercero</th>
         <th scope="col">Monto</th>
       </tr>
@@ -34,6 +35,7 @@
       {% for item in consulta.items -%}
       <tr>
         <td>{{ item.payment_type }}</td>
+        <td>{{ macros.document_status_for("payment_entry", item) }}</td>
         <td>{{ item.party_name or "" }}</td>
         <td>{{ item.paid_amount or "" }}</td>
       </tr>
