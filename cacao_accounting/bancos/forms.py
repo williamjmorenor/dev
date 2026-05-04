@@ -5,7 +5,7 @@
 
 from flask_wtf import FlaskForm
 from wtforms import SelectField, StringField, TextAreaField
-from wtforms.validators import DataRequired
+from wtforms.validators import DataRequired, Optional
 
 
 class FormularioBanco(FlaskForm):
@@ -41,3 +41,14 @@ class FormularioPago(FlaskForm):
     party_id = SelectField("Tercero", choices=[])
     paid_amount = StringField("Monto Pagado")
     remarks = TextAreaField("Observaciones")
+    # Contador externo — opcional. Si se selecciona, se asigna el numero externo al pago.
+    external_counter_id = SelectField(
+        "Contador Externo (Cheque / Numero Fiscal)",
+        choices=[],
+        validators=[Optional()],
+    )
+    # Numero externo: si se deja vacio, el sistema usa el siguiente sugerido por el contador.
+    external_number = StringField(
+        "Numero Externo",
+        validators=[Optional()],
+    )

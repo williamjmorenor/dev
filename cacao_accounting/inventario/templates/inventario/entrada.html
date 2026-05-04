@@ -17,7 +17,10 @@
 
 <div class="ca-card">
   <div class="ca-card-header">
-    <h5 class="ca-card-title"><i class="bi bi-archive"></i> {{ registro.document_no or registro.id }}</h5>
+    <h5 class="ca-card-title">
+      <i class="bi bi-archive"></i> {{ registro.document_no or registro.id }}
+      {{ macros.document_status_for("stock_entry", registro, detail=True) }}
+    </h5>
     <div class="d-flex gap-2">
       {{ macros.workflow_buttons(
           registro.docstatus,
@@ -34,7 +37,7 @@
     <dt class="col-sm-3">Fecha</dt>
     <dd class="col-sm-9">{{ registro.posting_date or "" }}</dd>
     <dt class="col-sm-3">Estado</dt>
-    <dd class="col-sm-9">{{ registro.docstatus }}</dd>
+    <dd class="col-sm-9">{{ macros.document_status_for("stock_entry", registro, detail=True) }}</dd>
   </dl>
 </div>
 
@@ -74,5 +77,7 @@
     </table>
   </div>
 </div>
+
+{{ macros.document_flow_trace("stock_entry", registro) }}
 
 {% endblock %}

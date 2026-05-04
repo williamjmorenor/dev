@@ -243,6 +243,31 @@
   {% endif %}
 {% endmacro %}
 
+{# ─── Calculated Document Status Badge ────────────────────────── #}
+{% macro document_status_badge(status_info, detail=False) %}
+  <span class="badge {{ status_info.badge_class }}" title="{{ status_info.full_label }}">
+    <i class="bi {{ status_info.icon }} me-1"></i>{{ status_info.label }}
+  </span>
+  {% if detail %}
+    <span class="ms-2 text-muted small">{{ status_info.full_label }}</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro document_status_for(document_type, document, detail=False) %}
+  {{ document_status_badge(document_status_info(document_type, document), detail=detail) }}
+{% endmacro %}
+
+{% macro document_flow_trace(document_type, document) %}
+<div class="ca-card mt-3">
+  <div class="ca-card-header">
+    <h6 class="ca-card-title mb-0"><i class="bi bi-diagram-3 me-1"></i>Flujo documental</h6>
+  </div>
+  <div class="p-3 text-muted small">
+    {{ document_status_for(document_type, document, detail=True) }}
+  </div>
+</div>
+{% endmacro %}
+
 {# ─── Workflow Buttons (Submit / Cancel) ──────────────────────── #}
 {% macro workflow_buttons(docstatus, submit_url, cancel_url) %}
   {% if docstatus == 0 %}

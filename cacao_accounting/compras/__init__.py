@@ -37,7 +37,12 @@ from cacao_accounting.database import (
 )
 from cacao_accounting.database.helpers import get_active_naming_series
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
-from cacao_accounting.document_flow import DocumentFlowError, create_document_relation, refresh_source_caches_for_target
+from cacao_accounting.document_flow import (
+    DocumentFlowError,
+    create_document_relation,
+    refresh_source_caches_for_target,
+    revert_relations_for_target,
+)
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
 
@@ -883,6 +888,7 @@ def compras_orden_compra_cancel(order_id: str):
     if registro.docstatus != 1:
         abort(400)
     registro.docstatus = 2
+    revert_relations_for_target("purchase_order", order_id)
     database.session.commit()
     flash("Orden de compra cancelada.", "warning")
     return redirect(url_for("compras.compras_orden_compra", order_id=order_id))
@@ -1007,6 +1013,7 @@ def compras_recepcion_cancel(receipt_id: str):
     if registro.docstatus != 1:
         abort(400)
     registro.docstatus = 2
+    revert_relations_for_target("purchase_receipt", receipt_id)
     refresh_source_caches_for_target("purchase_receipt", receipt_id)
     database.session.commit()
     flash("Recepción de compra cancelada.", "warning")
@@ -1173,6 +1180,7 @@ def compras_factura_compra_cancel(invoice_id: str):
     if registro.docstatus != 1:
         abort(400)
     registro.docstatus = 2
+    revert_relations_for_target("purchase_invoice", invoice_id)
     refresh_source_caches_for_target("purchase_invoice", invoice_id)
     database.session.commit()
     flash("Factura de compra cancelada.", "warning")

@@ -17,7 +17,10 @@
 
 <div class="ca-card" style="max-width:960px;">
   <div class="ca-card-header">
-    <h5 class="ca-card-title"><i class="bi bi-cart-plus"></i> {{ registro.document_no or registro.id }}</h5>
+    <h5 class="ca-card-title">
+      <i class="bi bi-cart-plus"></i> {{ registro.document_no or registro.id }}
+      {{ macros.document_status_for("sales_request", registro, detail=True) }}
+    </h5>
   </div>
   <div class="row g-3 p-3">
     <div class="col-md-6">
@@ -46,5 +49,6 @@
 </div>
 
 {{ macros.lineas_tabla_lectura(items) }}
+{{ macros.document_flow_trace("sales_request", registro) }}
 
 {% endblock %}

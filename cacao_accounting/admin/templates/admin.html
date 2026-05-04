@@ -27,6 +27,15 @@
   </div>
 
   <div class="ca-module-card">
+    <h5><i class="bi bi-hash"></i> Series e Identificadores</h5>
+    <ul class="ca-module-links">
+      <li><a href="{{ url_for('contabilidad.naming_series_list') }}">Series de Numeracion</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>
+      <li><a href="{{ url_for('contabilidad.external_counter_list') }}">Contadores Externos</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>
+      <li><a href="{{ url_for('contabilidad.series') }}">Series Legado</a><span class="ca-status-dot ca-status-disabled" title="Legado"></span></li>
+    </ul>
+  </div>
+
+  <div class="ca-module-card">
     <h5><i class="bi bi-card-list"></i> Registros</h5>
     <ul class="ca-module-links">
       <li><a href="#">Auditoría del Sistema</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>

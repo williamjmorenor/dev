@@ -4,7 +4,7 @@
 """Formularios web del modulo de ventas."""
 
 from flask_wtf import FlaskForm
-from wtforms import SelectField, StringField, TextAreaField
+from wtforms import BooleanField, SelectField, StringField, TextAreaField
 from wtforms.validators import DataRequired
 
 
@@ -54,6 +54,7 @@ class FormularioFacturaVenta(FlaskForm):
     company = SelectField("Compañía", choices=[])
     naming_series = SelectField("Serie", choices=[])
     posting_date = StringField("Fecha de Publicación")
+    is_return = BooleanField("Es devolución")
     remarks = TextAreaField("Observaciones")
 
 
