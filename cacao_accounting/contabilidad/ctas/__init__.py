@@ -52,7 +52,7 @@ def cargar_catalogos(catalogo, entidad):
             name=cuenta["nombre"],
             group=cuenta["grupo"],
             parent=cuenta["padre"],
-            clasification=cuenta["rubro"],
+            classification=cuenta["rubro"],
             status="active",
         )
         database.session.add(registro)

@@ -15,12 +15,29 @@ from cacao_accounting.auth import proteger_passwd as _pg
 from cacao_accounting.database import (
     AccountingPeriod,
     Accounts,
+    Bank,
     CostCenter,
+    DeliveryNote,
+    DeliveryNoteItem,
     Entity,
     ExchangeRate,
+    Item,
+    Party,
     Project,
+    PurchaseInvoice,
+    PurchaseInvoiceItem,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseReceipt,
+    PurchaseReceiptItem,
+    SalesInvoice,
+    SalesInvoiceItem,
+    SalesOrder,
+    SalesOrderItem,
     Serie,
+    UOM,
     Unit,
+    Warehouse,
 )
 
 # ---------------------------------------------------------------------------------------
@@ -447,5 +464,200 @@ PERIODOS = (
         enabled=False,
         start=date(year=(int(datetime.now().year) - 1), month=1, day=1),
         end=date(year=(int(datetime.now().year) - 1), month=12, day=31),
+    ),
+)
+
+BANCOS = (
+    Bank(name="Banco Nacional de Desarrollo", swift_code="BNDENI2N", is_active=True),
+    Bank(name="Banco de América Central", swift_code="BANCNI2N", is_active=True),
+)
+
+TERCEROS = (
+    Party(
+        party_type="supplier",
+        name="Proveedor Demo SA",
+        comercial_name="Demo Proveedor",
+        tax_id="P001",
+        is_active=True,
+    ),
+    Party(
+        party_type="customer",
+        name="Cliente Demo SA",
+        comercial_name="Demo Cliente",
+        tax_id="C001",
+        is_active=True,
+    ),
+)
+
+UNIDADES_MEDIDA = (
+    UOM(code="UND", name="Unidad", is_active=True),
+    UOM(code="KG", name="Kilogramo", is_active=True),
+    UOM(code="LT", name="Litro", is_active=True),
+    UOM(code="MT", name="Metro", is_active=True),
+)
+
+ARTICULOS = (
+    Item(
+        code="ART-001",
+        name="Chocolate 100g",
+        item_type="goods",
+        is_stock_item=True,
+        default_uom="UND",
+        is_active=True,
+    ),
+    Item(
+        code="SRV-001",
+        name="Servicio de Entrega",
+        item_type="service",
+        is_stock_item=False,
+        default_uom="UND",
+        is_active=True,
+    ),
+)
+
+BODEGAS = (
+    Warehouse(code="PRINCIPAL", name="Bodega Principal", company="cacao", is_active=True),
+    Warehouse(code="SUCURSAL", name="Bodega Sucursal", company="cacao", is_active=True),
+)
+
+# Pre-built transactional documents with predictable IDs used in tests.
+PURCHASE_ORDER_ID = "POR-DEMO-0000001"
+PURCHASE_RECEIPT_ID = "REC-DEMO-0000001"
+PURCHASE_INVOICE_ID = "FCC-DEMO-0000001"
+SALES_ORDER_ID = "SOV-DEMO-0000001"
+DELIVERY_NOTE_ID = "ENT-DEMO-0000001"
+SALES_INVOICE_ID = "FCV-DEMO-0000001"
+
+DOCUMENTOS = (
+    PurchaseOrder(
+        id=PURCHASE_ORDER_ID,
+        document_no="POR-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 15),
+        docstatus=1,
+        remarks="Orden de compra de demostración",
+    ),
+    PurchaseReceipt(
+        id=PURCHASE_RECEIPT_ID,
+        document_no="REC-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 20),
+        purchase_order_id=PURCHASE_ORDER_ID,
+        docstatus=1,
+        remarks="Recepción de demostración",
+    ),
+    SalesOrder(
+        id=SALES_ORDER_ID,
+        document_no="SOV-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 15),
+        docstatus=1,
+        remarks="Orden de venta de demostración",
+    ),
+    DeliveryNote(
+        id=DELIVERY_NOTE_ID,
+        document_no="ENT-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 22),
+        sales_order_id=SALES_ORDER_ID,
+        docstatus=1,
+        remarks="Nota de entrega de demostración",
+    ),
+    PurchaseInvoice(
+        id=PURCHASE_INVOICE_ID,
+        document_no="FCC-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 25),
+        purchase_order_id=PURCHASE_ORDER_ID,
+        purchase_receipt_id=PURCHASE_RECEIPT_ID,
+        grand_total=50.00,
+        outstanding_amount=50.00,
+        docstatus=1,
+        remarks="Factura de compra de demostración",
+    ),
+    SalesInvoice(
+        id=SALES_INVOICE_ID,
+        document_no="FCV-DEMO-2025-001",
+        company="cacao",
+        posting_date=date(2025, 1, 25),
+        sales_order_id=SALES_ORDER_ID,
+        delivery_note_id=DELIVERY_NOTE_ID,
+        grand_total=40.00,
+        outstanding_amount=40.00,
+        docstatus=1,
+        remarks="Factura de venta de demostración",
+    ),
+)
+
+ITEMS_ORDEN_COMPRA = (
+    PurchaseOrderItem(
+        purchase_order_id=PURCHASE_ORDER_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=10,
+        uom="UND",
+        rate=5.00,
+        amount=50.00,
+    ),
+)
+
+ITEMS_ORDEN_VENTA = (
+    SalesOrderItem(
+        sales_order_id=SALES_ORDER_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=5,
+        uom="UND",
+        rate=8.00,
+        amount=40.00,
+    ),
+)
+
+ITEMS_RECEPCION = (
+    PurchaseReceiptItem(
+        purchase_receipt_id=PURCHASE_RECEIPT_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=10,
+        uom="UND",
+        rate=5.00,
+        amount=50.00,
+        warehouse="PRINCIPAL",
+    ),
+)
+
+ITEMS_FACTURA_COMPRA = (
+    PurchaseInvoiceItem(
+        purchase_invoice_id=PURCHASE_INVOICE_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=10,
+        uom="UND",
+        rate=5.00,
+        amount=50.00,
+    ),
+)
+
+ITEMS_ENTREGA = (
+    DeliveryNoteItem(
+        delivery_note_id=DELIVERY_NOTE_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=5,
+        uom="UND",
+        rate=8.00,
+        amount=40.00,
+    ),
+)
+
+ITEMS_FACTURA_VENTA = (
+    SalesInvoiceItem(
+        sales_invoice_id=SALES_INVOICE_ID,
+        item_code="ART-001",
+        item_name="Chocolate 100g",
+        qty=5,
+        uom="UND",
+        rate=8.00,
+        amount=40.00,
     ),
 )
