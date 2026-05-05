@@ -10,8 +10,11 @@
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
-from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from decimal import Decimal
+from datetime import date
+
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 from sqlalchemy import delete
 
 # ---------------------------------------------------------------------------------------
@@ -26,10 +29,52 @@ from cacao_accounting.auth.forms import (
     UserRoleForm,
 )
 from cacao_accounting.decorators import modulo_activo
-from cacao_accounting.database import Modules, Roles, RolesAccess, RolesUser, User, database
+from cacao_accounting.database import (
+    ItemPrice,
+    Modules,
+    PriceList,
+    Roles,
+    RolesAccess,
+    RolesUser,
+    Tax,
+    TaxTemplate,
+    TaxTemplateItem,
+    User,
+    database,
+)
+from cacao_accounting.document_flow.status import _
 from cacao_accounting.modulos import listado_modulos, obtener_modulos_disponibles, sincronizar_modulos
 
 admin = Blueprint("admin", __name__, template_folder="templates")
+
+
+def _require_system_admin() -> None:
+    """Restringe configuracion global al administrador del sistema."""
+
+    if not current_user or not current_user.is_authenticated:
+        abort(403)
+    if getattr(current_user, "classification", None) == "admin":
+        return
+    admin_role = database.session.execute(database.select(Roles).filter_by(name="admin")).scalar_one_or_none()
+    if (
+        admin_role
+        and database.session.execute(
+            database.select(RolesUser).filter_by(user_id=current_user.id, role_id=admin_role.id)
+        ).scalar_one_or_none()
+    ):
+        return
+    abort(403)
+
+
+def _decimal_form(name: str, default: str = "0") -> Decimal:
+    value = request.form.get(name)
+    decimal_text = value if value not in (None, "") else default
+    return Decimal(str(decimal_text))
+
+
+def _date_form(name: str) -> date | None:
+    value = request.form.get(name)
+    return date.fromisoformat(value) if value else None
 
 
 @admin.route("/admin")
@@ -94,6 +139,143 @@ def lista_modulos():
     return render_template(
         "admin/modulos.html",
         modulos=modulos_por_tipo,
+    )
+
+
+@admin.route("/settings/taxes", methods=["GET", "POST"])
+@login_required
+@modulo_activo("admin")
+def lista_impuestos():
+    """Administra impuestos y cargos de compra/venta."""
+
+    _require_system_admin()
+    if request.method == "POST":
+        tax = Tax(
+            name=request.form.get("name") or "",
+            rate=_decimal_form("rate"),
+            tax_type=request.form.get("tax_type") or "percentage",
+            applies_to=request.form.get("applies_to") or "both",
+            account_id=request.form.get("account_id") or None,
+            is_charge=bool(request.form.get("is_charge")),
+            is_capitalizable=bool(request.form.get("is_capitalizable")),
+            is_active=bool(request.form.get("is_active", "1")),
+        )
+        database.session.add(tax)
+        database.session.commit()
+        flash(_("Impuesto o cargo creado correctamente."), "success")
+        return redirect(url_for("admin.lista_impuestos"))
+    taxes = database.session.execute(database.select(Tax).order_by(Tax.name)).scalars().all()
+    return render_template("admin/taxes.html", taxes=taxes, titulo=_("Impuestos y Cargos"))
+
+
+@admin.route("/settings/tax-templates", methods=["GET", "POST"])
+@login_required
+@modulo_activo("admin")
+def lista_plantillas_impuesto():
+    """Administra plantillas de impuestos."""
+
+    _require_system_admin()
+    if request.method == "POST":
+        template = TaxTemplate(
+            name=request.form.get("name") or "",
+            company=request.form.get("company") or None,
+            template_type=request.form.get("template_type") or "selling",
+            currency=request.form.get("currency") or None,
+            is_active=bool(request.form.get("is_active", "1")),
+        )
+        database.session.add(template)
+        database.session.commit()
+        flash(_("Plantilla de impuestos creada correctamente."), "success")
+        return redirect(url_for("admin.lista_plantillas_impuesto"))
+    templates = database.session.execute(database.select(TaxTemplate).order_by(TaxTemplate.name)).scalars().all()
+    return render_template("admin/tax_templates.html", templates=templates, titulo=_("Plantillas de Impuestos"))
+
+
+@admin.route("/settings/tax-templates/<template_id>/items", methods=["GET", "POST"])
+@login_required
+@modulo_activo("admin")
+def items_plantilla_impuesto(template_id: str):
+    """Administra lineas de una plantilla de impuestos."""
+
+    _require_system_admin()
+    template = database.session.get(TaxTemplate, template_id)
+    if not template:
+        abort(404)
+    if request.method == "POST":
+        item = TaxTemplateItem(
+            tax_template_id=template.id,
+            tax_id=request.form.get("tax_id") or "",
+            sequence=int(request.form.get("sequence") or 10),
+            calculation_base=request.form.get("calculation_base") or "net_document",
+            behavior=request.form.get("behavior") or "additive",
+            is_inclusive=bool(request.form.get("is_inclusive")),
+        )
+        database.session.add(item)
+        database.session.commit()
+        flash(_("Linea de impuesto agregada correctamente."), "success")
+        return redirect(url_for("admin.items_plantilla_impuesto", template_id=template.id))
+    items = (
+        database.session.execute(
+            database.select(TaxTemplateItem).filter_by(tax_template_id=template.id).order_by(TaxTemplateItem.sequence)
+        )
+        .scalars()
+        .all()
+    )
+    taxes = database.session.execute(database.select(Tax).filter_by(is_active=True).order_by(Tax.name)).scalars().all()
+    return render_template("admin/tax_template_items.html", template=template, items=items, taxes=taxes)
+
+
+@admin.route("/settings/price-lists", methods=["GET", "POST"])
+@login_required
+@modulo_activo("admin")
+def lista_precios():
+    """Administra listas de precios."""
+
+    _require_system_admin()
+    if request.method == "POST":
+        price_list = PriceList(
+            name=request.form.get("name") or "",
+            currency=request.form.get("currency") or None,
+            company=request.form.get("company") or None,
+            is_buying=bool(request.form.get("is_buying")),
+            is_selling=bool(request.form.get("is_selling", "1")),
+            is_active=bool(request.form.get("is_active", "1")),
+        )
+        database.session.add(price_list)
+        database.session.commit()
+        flash(_("Lista de precios creada correctamente."), "success")
+        return redirect(url_for("admin.lista_precios"))
+    price_lists = database.session.execute(database.select(PriceList).order_by(PriceList.name)).scalars().all()
+    return render_template("admin/price_lists.html", price_lists=price_lists, titulo=_("Listas de Precios"))
+
+
+@admin.route("/settings/item-prices", methods=["GET", "POST"])
+@login_required
+@modulo_activo("admin")
+def precios_item():
+    """Administra precios por item."""
+
+    _require_system_admin()
+    if request.method == "POST":
+        item_price = ItemPrice(
+            item_code=request.form.get("item_code") or "",
+            price_list_id=request.form.get("price_list_id") or "",
+            uom=request.form.get("uom") or None,
+            price=_decimal_form("price"),
+            min_qty=_decimal_form("min_qty", "0"),
+            valid_from=_date_form("valid_from"),
+            valid_upto=_date_form("valid_upto"),
+        )
+        database.session.add(item_price)
+        database.session.commit()
+        flash(_("Precio de item creado correctamente."), "success")
+        return redirect(url_for("admin.precios_item"))
+    item_prices = database.session.execute(database.select(ItemPrice).order_by(ItemPrice.item_code)).scalars().all()
+    price_lists = (
+        database.session.execute(database.select(PriceList).filter_by(is_active=True).order_by(PriceList.name)).scalars().all()
+    )
+    return render_template(
+        "admin/item_prices.html", item_prices=item_prices, price_lists=price_lists, titulo=_("Precios por Item")
     )
 
 
@@ -424,7 +606,7 @@ def rol_permisos(role_id: str):
         ("validate", "Validar"),
     ]
     permisos_existentes = {
-        perm.module_id: {accion: getattr(perm, accion, False) for accion, _ in acciones}
+        perm.module_id: {accion: getattr(perm, accion, False) for accion, _label in acciones}
         for perm in _obtener_permisos_por_rol(role_id)
     }
 
@@ -432,9 +614,9 @@ def rol_permisos(role_id: str):
         database.session.execute(database.delete(RolesAccess).where(RolesAccess.rol_id == role_id))
         for modulo in modulos:
             permiso_kwargs = {"rol_id": role_id, "module_id": modulo.id}
-            for accion, _ in acciones:
+            for accion, _label in acciones:
                 permiso_kwargs[accion] = request.form.get(f"perm_{modulo.id}_{accion}") == "on"
-            if any(permiso_kwargs[action] for action, _ in acciones):
+            if any(permiso_kwargs[action] for action, _label in acciones):
                 database.session.add(RolesAccess(**permiso_kwargs))
         database.session.commit()
         flash("Permisos del rol actualizados correctamente.", "success")

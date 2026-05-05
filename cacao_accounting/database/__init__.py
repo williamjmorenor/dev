@@ -1120,6 +1120,7 @@ class PurchaseInvoice(database.Model, DocBase):  # type: ignore[name-defined]
     purchase_receipt_id = database.Column(
         database.String(26), database.ForeignKey("purchase_receipt.id"), nullable=True, index=True
     )
+    tax_template_id = database.Column(database.String(26), database.ForeignKey("tax_template.id"), nullable=True, index=True)
     total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     tax_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
@@ -1304,6 +1305,7 @@ class SalesInvoice(database.Model, DocBase):  # type: ignore[name-defined]
     is_return = database.Column(database.Boolean(), default=False, nullable=False)
     sales_order_id = database.Column(database.String(26), database.ForeignKey("sales_order.id"), nullable=True, index=True)
     delivery_note_id = database.Column(database.String(26), database.ForeignKey("delivery_note.id"), nullable=True, index=True)
+    tax_template_id = database.Column(database.String(26), database.ForeignKey("tax_template.id"), nullable=True, index=True)
     total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     base_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     tax_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
@@ -1721,6 +1723,9 @@ class CompanyDefaultAccount(database.Model, BaseTabla):  # type: ignore[name-def
     default_inventory = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
     # GR/IR: cuenta intermedia recepcion vs facturacion
     gr_ir_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    customer_advance_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    supplier_advance_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    bank_difference_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
 
 
 # <---------------------------------------------------------------------------------------------> #
@@ -1734,7 +1739,11 @@ class Tax(database.Model, BaseTabla):  # type: ignore[name-defined]
     rate = database.Column(database.Numeric(precision=10, scale=4), nullable=True)
     # percentage, fixed
     tax_type = database.Column(database.String(20), nullable=False)
+    # purchase, sales, both
+    applies_to = database.Column(database.String(20), default="both", nullable=False, index=True)
     account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    is_charge = database.Column(database.Boolean(), default=False, nullable=False)
+    is_capitalizable = database.Column(database.Boolean(), default=False, nullable=False)
     is_active = database.Column(database.Boolean(), default=True, nullable=False)
 
 
@@ -1744,6 +1753,9 @@ class TaxTemplate(database.Model, BaseTabla):  # type: ignore[name-defined]
     __tablename__ = "tax_template"
     name = database.Column(database.String(100), nullable=False)
     company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=True)
+    # buying, selling
+    template_type = database.Column(database.String(20), default="selling", nullable=False, index=True)
+    currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
     is_active = database.Column(database.Boolean(), default=True, nullable=False)
 
 
@@ -1754,6 +1766,10 @@ class TaxTemplateItem(database.Model, BaseTabla):  # type: ignore[name-defined]
     tax_template_id = database.Column(database.String(26), database.ForeignKey("tax_template.id"), nullable=False, index=True)
     tax_id = database.Column(database.String(26), database.ForeignKey("tax.id"), nullable=False, index=True)
     sequence = database.Column(database.Integer(), nullable=True)
+    # net_line, net_document, previous_total
+    calculation_base = database.Column(database.String(30), default="net_document", nullable=False)
+    # additive, deductive
+    behavior = database.Column(database.String(20), default="additive", nullable=False)
     is_inclusive = database.Column(database.Boolean(), default=False, nullable=False)
 
 
@@ -1785,6 +1801,20 @@ class ItemPrice(database.Model, BaseTabla):  # type: ignore[name-defined]
     valid_upto = database.Column(database.Date(), nullable=True)
 
 
+class BankMatchingRule(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Regla configurable para matching de extractos bancarios."""
+
+    __tablename__ = "bank_matching_rule"
+    company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=False, index=True)
+    bank_account_id = database.Column(database.String(26), database.ForeignKey("bank_account.id"), nullable=True, index=True)
+    name = database.Column(database.String(100), nullable=False)
+    days_tolerance = database.Column(database.Integer(), default=7, nullable=False)
+    amount_tolerance = database.Column(database.Numeric(precision=20, scale=4), default=0, nullable=False)
+    reference_contains = database.Column(database.String(100), nullable=True)
+    priority = database.Column(database.Integer(), default=100, nullable=False, index=True)
+    is_active = database.Column(database.Boolean(), default=True, nullable=False, index=True)
+
+
 # <---------------------------------------------------------------------------------------------> #
 # Reconciliation — Conciliacion de cuentas (AR, AP, Bancos).
 # <---------------------------------------------------------------------------------------------> #
@@ -1803,12 +1833,24 @@ class ReconciliationItem(database.Model, BaseTabla):  # type: ignore[name-define
     """Linea de conciliacion."""
 
     __tablename__ = "reconciliation_item"
+    __table_args__ = (
+        database.Index("ix_reconciliation_item_source", "source_type", "source_id"),
+        database.Index("ix_reconciliation_item_target", "target_type", "target_id"),
+    )
     reconciliation_id = database.Column(
         database.String(26), database.ForeignKey("reconciliation.id"), nullable=False, index=True
     )
     reference_type = database.Column(database.String(50), nullable=False)
     reference_id = database.Column(database.String(26), nullable=False, index=True)
     amount = database.Column(database.Numeric(precision=20, scale=4), nullable=False)
+    allocated_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
+    reconciliation_date = database.Column(database.Date(), nullable=True, index=True)
+    # draft, partial, reconciled, cancelled
+    status = database.Column(database.String(20), default="reconciled", nullable=False, index=True)
+    source_type = database.Column(database.String(50), nullable=True, index=True)
+    source_id = database.Column(database.String(26), nullable=True, index=True)
+    target_type = database.Column(database.String(50), nullable=True, index=True)
+    target_id = database.Column(database.String(26), nullable=True, index=True)
 
 
 # <---------------------------------------------------------------------------------------------> #
@@ -1828,6 +1870,39 @@ class GRIRReconciliation(database.Model, BaseTabla):  # type: ignore[name-define
     )
     matched_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     matched_date = database.Column(database.Date(), nullable=True)
+    # reconciled, partial, cancelled
+    status = database.Column(database.String(20), default="reconciled", nullable=False, index=True)
+
+
+class GRIRReconciliationItem(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Detalle de conciliacion GR/IR por linea de recepcion y factura."""
+
+    __tablename__ = "gr_ir_reconciliation_item"
+    __table_args__ = (
+        database.Index("ix_gr_ir_item_receipt_item", "purchase_receipt_item_id"),
+        database.Index("ix_gr_ir_item_invoice_item", "purchase_invoice_item_id"),
+    )
+    gr_ir_reconciliation_id = database.Column(
+        database.String(26), database.ForeignKey("gr_ir_reconciliation.id"), nullable=False, index=True
+    )
+    purchase_receipt_item_id = database.Column(
+        database.String(26), database.ForeignKey("purchase_receipt_item.id"), nullable=False, index=True
+    )
+    purchase_invoice_item_id = database.Column(
+        database.String(26), database.ForeignKey("purchase_invoice_item.id"), nullable=False, index=True
+    )
+    item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
+    warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=True, index=True)
+    uom = database.Column(database.String(20), database.ForeignKey(UOM_CODE), nullable=True)
+    received_qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    invoiced_qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    matched_qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False)
+    received_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=False)
+    invoiced_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=False)
+    matched_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=False)
+    price_difference = database.Column(database.Numeric(precision=20, scale=4), nullable=False, default=0)
+    # partial, reconciled, cancelled
+    status = database.Column(database.String(20), default="reconciled", nullable=False, index=True)
 
 
 # <---------------------------------------------------------------------------------------------> #
