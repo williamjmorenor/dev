@@ -360,10 +360,12 @@ def _evaluate_matching_result(
 
 
 def reconcile_purchase_invoice(purchase_invoice_id: str) -> PurchaseReconciliationResult:
-    """Concilia una factura de compra contra su recepcion por lineas.
+    """Concilia una factura de compra segun la configuracion de matching de la compania.
 
-    Utiliza la configuracion de matching de la compania (2-way o 3-way)
-    y respeta las tolerancias configuradas.
+    - **3-way**: OC → Recepcion → Factura (requiere `purchase_receipt_id` en la factura).
+    - **2-way**: OC → Factura (requiere `purchase_order_id` en la factura; valida cantidades contra la OC).
+
+    En ambos casos respeta las tolerancias configuradas y emite eventos economicos.
     """
     duplicate = database.session.execute(
         select(PurchaseReconciliation.id)
@@ -375,8 +377,25 @@ def reconcile_purchase_invoice(purchase_invoice_id: str) -> PurchaseReconciliati
         raise PurchaseReconciliationError("La factura de compra ya tiene una conciliacion activa.")
 
     invoice = database.session.get(PurchaseInvoice, purchase_invoice_id)
-    if not invoice or not invoice.purchase_receipt_id:
-        raise PurchaseReconciliationError("La factura de compra no referencia una recepcion.")
+    if not invoice:
+        raise PurchaseReconciliationError("La factura de compra no existe.")
+
+    config = get_matching_config(str(invoice.company))
+
+    if config.matching_type == MatchingType.TWO_WAY:
+        return _reconcile_two_way(invoice, config)
+    return _reconcile_three_way(invoice, config)
+
+
+# ---------------------------------------------------------------------------
+# Implementaciones internas de matching
+# ---------------------------------------------------------------------------
+
+
+def _reconcile_three_way(invoice: PurchaseInvoice, config: MatchingConfig) -> PurchaseReconciliationResult:
+    """Matching 3-way: compara Recepcion vs Factura validando cantidades recibidas."""
+    if not invoice.purchase_receipt_id:
+        raise PurchaseReconciliationError("Matching 3-way requiere que la factura referencie una recepcion de compra.")
     receipt = database.session.get(PurchaseReceipt, invoice.purchase_receipt_id)
     if not receipt:
         raise PurchaseReconciliationError("La recepcion de compra referenciada no existe.")
@@ -385,18 +404,17 @@ def reconcile_purchase_invoice(purchase_invoice_id: str) -> PurchaseReconciliati
     if getattr(receipt, "docstatus", 0) != 1:
         raise PurchaseReconciliationError("La recepcion de compra debe estar aprobada.")
 
-    config = get_matching_config(str(invoice.company))
-
     receipt_items = _receipt_items(receipt.id)
     invoice_items = _invoice_items(invoice.id)
     if not receipt_items or not invoice_items:
-        raise PurchaseReconciliationError("La conciliacion requiere lineas de recepcion y factura.")
+        raise PurchaseReconciliationError("La conciliacion 3-way requiere lineas de recepcion y factura.")
 
     reconciliation = PurchaseReconciliation(
         company=invoice.company,
+        purchase_order_id=getattr(invoice, "purchase_order_id", None),
         purchase_receipt_id=receipt.id,
         purchase_invoice_id=invoice.id,
-        matching_type=config.matching_type,
+        matching_type=MatchingType.THREE_WAY,
         matched_amount=Decimal("0"),
         matched_date=invoice.posting_date,
         status="pending_invoice",
@@ -454,9 +472,140 @@ def reconcile_purchase_invoice(purchase_invoice_id: str) -> PurchaseReconciliati
         total_invoiced_qty += invoice_qty
         total_received_qty += receipt_qty
 
-    matching_result = _evaluate_matching_result(
+    return _finalize_reconciliation(
+        reconciliation,
+        invoice,
+        config,
+        total_qty,
+        total_amount,
+        total_difference,
         total_invoiced_qty,
         total_received_qty,
+        receipt_id=receipt.id,
+    )
+
+
+def _reconcile_two_way(invoice: PurchaseInvoice, config: MatchingConfig) -> PurchaseReconciliationResult:
+    """Matching 2-way: compara OC vs Factura, sin requerir recepcion previa.
+
+    Valida que las cantidades facturadas no superen las ordenadas en la OC.
+    """
+    from cacao_accounting.database import PurchaseOrder, PurchaseOrderItem
+
+    purchase_order_id = getattr(invoice, "purchase_order_id", None)
+    if not purchase_order_id:
+        raise PurchaseReconciliationError("Matching 2-way requiere que la factura referencie una orden de compra.")
+    order = database.session.get(PurchaseOrder, purchase_order_id)
+    if not order:
+        raise PurchaseReconciliationError("La orden de compra referenciada no existe.")
+    if getattr(order, "company", None) != invoice.company:
+        raise PurchaseReconciliationError("La factura y la orden de compra deben pertenecer a la misma compania.")
+    if getattr(order, "docstatus", 0) != 1:
+        raise PurchaseReconciliationError("La orden de compra debe estar aprobada para el matching 2-way.")
+
+    order_items = list(
+        database.session.execute(select(PurchaseOrderItem).filter_by(purchase_order_id=purchase_order_id)).scalars().all()
+    )
+    invoice_items = _invoice_items(invoice.id)
+    if not order_items or not invoice_items:
+        raise PurchaseReconciliationError("La conciliacion 2-way requiere lineas de OC y factura.")
+
+    reconciliation = PurchaseReconciliation(
+        company=invoice.company,
+        purchase_order_id=purchase_order_id,
+        purchase_receipt_id=None,
+        purchase_invoice_id=invoice.id,
+        matching_type=MatchingType.TWO_WAY,
+        matched_amount=Decimal("0"),
+        matched_date=invoice.posting_date,
+        status="pending_invoice",
+    )
+    database.session.add(reconciliation)
+    database.session.flush()
+
+    total_qty = Decimal("0")
+    total_amount = Decimal("0")
+    total_difference = Decimal("0")
+    total_invoiced_qty = Decimal("0")
+    total_ordered_qty = Decimal("0")
+
+    for invoice_item in invoice_items:
+        # Find matching order line by item_code + uom
+        order_candidates = [oi for oi in order_items if oi.item_code == invoice_item.item_code and oi.uom == invoice_item.uom]
+        if not order_candidates:
+            raise PurchaseReconciliationError(f"No existe linea de OC compatible para el item {invoice_item.item_code}.")
+        order_item = order_candidates[0]
+
+        invoice_qty = _line_qty(invoice_item)
+        ordered_qty = _line_qty(order_item)
+        if invoice_qty <= 0:
+            raise PurchaseReconciliationError("La cantidad facturada debe ser positiva.")
+        if invoice_qty > ordered_qty:
+            raise PurchaseReconciliationError(
+                f"La cantidad facturada ({invoice_qty}) supera la ordenada ({ordered_qty}) para {invoice_item.item_code}."
+            )
+
+        order_rate = _line_rate(order_item)
+        invoice_rate = _line_rate(invoice_item)
+        matched_amount = invoice_qty * order_rate
+        invoiced_amount = invoice_qty * invoice_rate
+        price_difference = invoiced_amount - matched_amount
+
+        if price_difference != 0 and not config.allow_price_difference:
+            raise PurchaseReconciliationError("La diferencia de precio requiere cuenta de ajuste configurada.")
+
+        database.session.add(
+            PurchaseReconciliationItem(
+                purchase_reconciliation_id=reconciliation.id,
+                purchase_receipt_item_id=order_item.id,  # references OC line in 2-way
+                purchase_invoice_item_id=invoice_item.id,
+                item_code=invoice_item.item_code,
+                warehouse=None,
+                uom=invoice_item.uom,
+                received_qty=ordered_qty,  # "received" = ordered in 2-way context
+                invoiced_qty=invoice_qty,
+                matched_qty=invoice_qty,
+                received_amount=invoice_qty * order_rate,
+                invoiced_amount=invoiced_amount,
+                matched_amount=matched_amount,
+                price_difference=price_difference,
+                status="reconciled",
+            )
+        )
+        total_qty += invoice_qty
+        total_amount += matched_amount
+        total_difference += price_difference
+        total_invoiced_qty += invoice_qty
+        total_ordered_qty += ordered_qty
+
+    return _finalize_reconciliation(
+        reconciliation,
+        invoice,
+        config,
+        total_qty,
+        total_amount,
+        total_difference,
+        total_invoiced_qty,
+        total_ordered_qty,
+        receipt_id=None,
+    )
+
+
+def _finalize_reconciliation(
+    reconciliation: PurchaseReconciliation,
+    invoice: PurchaseInvoice,
+    config: MatchingConfig,
+    total_qty: Decimal,
+    total_amount: Decimal,
+    total_difference: Decimal,
+    total_invoiced_qty: Decimal,
+    total_reference_qty: Decimal,
+    receipt_id: str | None,
+) -> PurchaseReconciliationResult:
+    """Evalua el resultado del matching y emite el evento economico correspondiente."""
+    matching_result = _evaluate_matching_result(
+        total_invoiced_qty,
+        total_reference_qty,
         total_difference,
         total_amount + total_difference,
         config,
@@ -481,13 +630,13 @@ def reconcile_purchase_invoice(purchase_invoice_id: str) -> PurchaseReconciliati
         document_type="purchase_reconciliation",
         document_id=reconciliation.id,
         payload={
-            "purchase_invoice_id": purchase_invoice_id,
-            "purchase_receipt_id": receipt.id,
+            "purchase_invoice_id": invoice.id,
+            "purchase_receipt_id": receipt_id,
             "matched_qty": str(total_qty),
             "matched_amount": str(total_amount),
             "price_difference": str(total_difference),
             "matching_result": matching_result,
-            "matching_type": config.matching_type,
+            "matching_type": reconciliation.matching_type,
         },
     )
 
@@ -568,3 +717,128 @@ def get_purchase_reconciliation_pending(company: str, as_of_date: date | None = 
             )
         )
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Cancelacion de recepcion — evento inverso
+# ---------------------------------------------------------------------------
+
+
+def emit_goods_received_cancelled(purchase_receipt_id: str, company: str) -> None:
+    """Emite un evento GOODS_RECEIVED_CANCELLED cuando se anula una recepcion.
+
+    Debe ser llamado desde la capa de posting al cancelar un PurchaseReceipt.
+    Tambien cancela las conciliaciones 3-way que dependian de esa recepcion.
+    """
+    affected = (
+        database.session.execute(
+            select(PurchaseReconciliation)
+            .filter_by(purchase_receipt_id=purchase_receipt_id)
+            .where(PurchaseReconciliation.status != "cancelled")
+        )
+        .scalars()
+        .all()
+    )
+    for reconciliation in affected:
+        reconciliation.status = "cancelled"
+        for item in (
+            database.session.execute(
+                select(PurchaseReconciliationItem).filter_by(purchase_reconciliation_id=reconciliation.id)
+            )
+            .scalars()
+            .all()
+        ):
+            item.status = "cancelled"
+        emit_economic_event(
+            event_type=EventType.MATCH_CANCELLED,
+            company=company,
+            document_type="purchase_reconciliation",
+            document_id=reconciliation.id,
+            payload={"reason": "purchase_receipt_cancelled", "purchase_receipt_id": purchase_receipt_id},
+        )
+
+    emit_economic_event(
+        event_type="GOODS_RECEIVED_CANCELLED",
+        company=company,
+        document_type="purchase_receipt",
+        document_id=purchase_receipt_id,
+        payload={"purchase_receipt_id": purchase_receipt_id},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Reconstruccion de estado desde eventos (criterio de aceptacion #3)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ReconciliationStateSnapshot:
+    """Estado de una conciliacion reconstruido desde el log de eventos."""
+
+    document_id: str
+    document_type: str
+    company: str
+    current_status: str
+    events: list[dict[str, Any]]
+
+
+def reconstruct_reconciliation_state(company: str, document_id: str) -> ReconciliationStateSnapshot:
+    """Reconstruye el estado de una conciliacion desde el log de eventos inmutable.
+
+    Permite auditar y verificar que el estado actual de PurchaseReconciliation
+    es coherente con la secuencia historica de eventos economicos.
+    """
+    events_raw = (
+        database.session.execute(
+            select(PurchaseEconomicEvent)
+            .filter_by(company=company, document_id=document_id)
+            .order_by(PurchaseEconomicEvent.id)  # ULID IDs are time-sortable
+        )
+        .scalars()
+        .all()
+    )
+
+    import json as _json
+
+    events_list: list[dict[str, Any]] = [
+        {
+            "id": ev.id,
+            "event_type": ev.event_type,
+            "document_type": ev.document_type,
+            "document_id": ev.document_id,
+            "payload": _json.loads(ev.payload) if ev.payload else {},
+            "processing_status": ev.processing_status,
+            "created_at": str(getattr(ev, "created_at", "")),
+        }
+        for ev in events_raw
+    ]
+
+    # Derive current status by replaying events in order
+    derived_status = "unknown"
+    for ev in events_list:
+        match ev["event_type"]:
+            case EventType.MATCH_COMPLETED:
+                payload = ev.get("payload", {})
+                derived_status = payload.get("matching_result", "reconciled")
+                if derived_status == MatchingResult.MATCH_OK:
+                    derived_status = "reconciled"
+                elif derived_status == MatchingResult.MATCH_PARTIAL:
+                    derived_status = "partial"
+            case EventType.MATCH_FAILED:
+                derived_status = "disputed"
+            case EventType.MATCH_CANCELLED | "GOODS_RECEIVED_CANCELLED":
+                derived_status = "cancelled"
+
+    return ReconciliationStateSnapshot(
+        document_id=document_id,
+        document_type="purchase_reconciliation",
+        company=company,
+        current_status=derived_status,
+        events=events_list,
+    )
+
+
+def get_events_for_document(company: str, document_id: str) -> list[dict[str, Any]]:
+    """Devuelve todos los eventos economicos de un documento ordenados cronologicamente."""
+    snapshot = reconstruct_reconciliation_state(company, document_id)
+    return snapshot.events

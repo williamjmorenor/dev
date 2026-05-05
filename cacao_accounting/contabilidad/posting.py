@@ -1722,6 +1722,11 @@ def cancel_document(document: Any) -> list[GLEntry]:
             stock_reversals.append(_create_stock_reversal(document, movement))
         database.session.add_all(stock_reversals)
 
+    if isinstance(document, PurchaseReceipt):
+        from cacao_accounting.compras.purchase_reconciliation_service import emit_goods_received_cancelled
+
+        emit_goods_received_cancelled(voucher_id, company)
+
     if isinstance(document, PurchaseInvoice) and getattr(document, "purchase_receipt_id", None):
         from cacao_accounting.compras.purchase_reconciliation_service import cancel_purchase_reconciliation
 

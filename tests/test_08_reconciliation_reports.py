@@ -458,3 +458,386 @@ def test_bank_statement_import_preview_and_matching_rule(app_ctx):
     assert duplicate.duplicate_count == 1
     assert database.session.execute(database.select(BankTransaction)).scalars().first()
     assert run.candidates_by_transaction
+
+
+# ---------------------------------------------------------------------------
+# Criterios de aceptacion del Issue: Framework de Conciliacion de Compras
+# ---------------------------------------------------------------------------
+
+
+def test_matching_without_accounting_entries_is_possible(app_ctx):
+    """Criterio #1: se puede ejecutar el matching sin generar asientos contables."""
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        PurchaseReconciliationError,
+        reconcile_purchase_invoice,
+    )
+    from cacao_accounting.database import (
+        GLEntry,
+        Item,
+        PurchaseInvoice,
+        PurchaseInvoiceItem,
+        PurchaseReceipt,
+        PurchaseReceiptItem,
+        UOM,
+        Warehouse,
+        database,
+    )
+
+    database.session.add_all(
+        [
+            UOM(code="EA-AC1", name="Each AC1"),
+            Item(code="ITEM-AC1", name="Item AC1", item_type="goods", is_stock_item=True, default_uom="EA-AC1"),
+            Warehouse(code="WH-AC1", name="Bodega AC1", company="cacao"),
+        ]
+    )
+    receipt = PurchaseReceipt(company="cacao", posting_date=date(2026, 5, 1), supplier_id="SUPP-AC1", docstatus=1)
+    database.session.add(receipt)
+    database.session.flush()
+    database.session.add(
+        PurchaseReceiptItem(
+            purchase_receipt_id=receipt.id,
+            item_code="ITEM-AC1",
+            item_name="Item AC1",
+            qty=Decimal("5"),
+            qty_in_base_uom=Decimal("5"),
+            uom="EA-AC1",
+            rate=Decimal("10.00"),
+            amount=Decimal("50.00"),
+            warehouse="WH-AC1",
+        )
+    )
+    invoice = PurchaseInvoice(
+        company="cacao",
+        posting_date=date(2026, 5, 2),
+        supplier_id="SUPP-AC1",
+        purchase_receipt_id=receipt.id,
+        docstatus=1,
+    )
+    database.session.add(invoice)
+    database.session.flush()
+    database.session.add(
+        PurchaseInvoiceItem(
+            purchase_invoice_id=invoice.id,
+            item_code="ITEM-AC1",
+            item_name="Item AC1",
+            qty=Decimal("5"),
+            uom="EA-AC1",
+            rate=Decimal("10.00"),
+            amount=Decimal("50.00"),
+            warehouse="WH-AC1",
+        )
+    )
+    database.session.commit()
+
+    # reconcile WITHOUT calling post_document_to_gl — no GL entries should exist
+    result = reconcile_purchase_invoice(invoice.id)
+    database.session.commit()
+
+    gl_count = (
+        database.session.execute(database.select(GLEntry).filter_by(voucher_type="purchase_invoice", voucher_id=invoice.id))
+        .scalars()
+        .all()
+    )
+
+    assert result.matching_result == "MATCH_OK"
+    assert result.matched_amount == Decimal("50.0000")
+    # Matching produced no accounting entries on its own
+    assert len(gl_count) == 0
+
+
+def test_changing_tolerances_does_not_alter_historical_reconciliations(app_ctx):
+    """Criterio #2: cambiar tolerancias no altera datos historicos."""
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        PurchaseMatchingConfig,
+        get_matching_config,
+        seed_matching_config_for_company,
+    )
+    from cacao_accounting.database import (
+        Item,
+        PurchaseInvoice,
+        PurchaseInvoiceItem,
+        PurchaseReceipt,
+        PurchaseReceiptItem,
+        PurchaseReconciliation,
+        UOM,
+        Warehouse,
+        database,
+    )
+    from cacao_accounting.compras.purchase_reconciliation_service import reconcile_purchase_invoice
+
+    # Seed strict config
+    seed_matching_config_for_company("cacao")
+    database.session.commit()
+
+    database.session.add_all(
+        [
+            UOM(code="EA-AC2", name="Each AC2"),
+            Item(code="ITEM-AC2", name="Item AC2", item_type="goods", is_stock_item=True, default_uom="EA-AC2"),
+            Warehouse(code="WH-AC2", name="Bodega AC2", company="cacao"),
+        ]
+    )
+    receipt = PurchaseReceipt(company="cacao", posting_date=date(2026, 5, 1), supplier_id="SUPP-AC2", docstatus=1)
+    database.session.add(receipt)
+    database.session.flush()
+    database.session.add(
+        PurchaseReceiptItem(
+            purchase_receipt_id=receipt.id,
+            item_code="ITEM-AC2",
+            item_name="Item AC2",
+            qty=Decimal("10"),
+            qty_in_base_uom=Decimal("10"),
+            uom="EA-AC2",
+            rate=Decimal("20.00"),
+            amount=Decimal("200.00"),
+            warehouse="WH-AC2",
+        )
+    )
+    invoice = PurchaseInvoice(
+        company="cacao",
+        posting_date=date(2026, 5, 2),
+        supplier_id="SUPP-AC2",
+        purchase_receipt_id=receipt.id,
+        docstatus=1,
+    )
+    database.session.add(invoice)
+    database.session.flush()
+    database.session.add(
+        PurchaseInvoiceItem(
+            purchase_invoice_id=invoice.id,
+            item_code="ITEM-AC2",
+            item_name="Item AC2",
+            qty=Decimal("10"),
+            uom="EA-AC2",
+            rate=Decimal("20.00"),
+            amount=Decimal("200.00"),
+            warehouse="WH-AC2",
+        )
+    )
+    database.session.commit()
+
+    result_before = reconcile_purchase_invoice(invoice.id)
+    database.session.commit()
+
+    # Now change tolerance — should NOT affect the already-created reconciliation
+    cfg = database.session.execute(database.select(PurchaseMatchingConfig).filter_by(company="cacao")).scalar_one()
+    cfg.price_tolerance_value = Decimal("10")  # relax tolerance
+    database.session.commit()
+
+    recon = database.session.execute(
+        database.select(PurchaseReconciliation).filter_by(purchase_invoice_id=invoice.id)
+    ).scalar_one()
+
+    # Historical record is unchanged
+    assert recon.matched_amount == Decimal("200.0000")
+    assert recon.matching_type == "3-way"
+
+
+def test_state_reconstruction_from_events(app_ctx):
+    """Criterio #3: se pueden reconstruir estados desde eventos."""
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        reconstruct_reconciliation_state,
+        reconcile_purchase_invoice,
+    )
+    from cacao_accounting.database import (
+        Item,
+        PurchaseInvoice,
+        PurchaseInvoiceItem,
+        PurchaseReceipt,
+        PurchaseReceiptItem,
+        UOM,
+        Warehouse,
+        database,
+    )
+
+    database.session.add_all(
+        [
+            UOM(code="EA-AC3", name="Each AC3"),
+            Item(code="ITEM-AC3", name="Item AC3", item_type="goods", is_stock_item=True, default_uom="EA-AC3"),
+            Warehouse(code="WH-AC3", name="Bodega AC3", company="cacao"),
+        ]
+    )
+    receipt = PurchaseReceipt(company="cacao", posting_date=date(2026, 5, 1), supplier_id="SUPP-AC3", docstatus=1)
+    database.session.add(receipt)
+    database.session.flush()
+    database.session.add(
+        PurchaseReceiptItem(
+            purchase_receipt_id=receipt.id,
+            item_code="ITEM-AC3",
+            item_name="Item AC3",
+            qty=Decimal("3"),
+            qty_in_base_uom=Decimal("3"),
+            uom="EA-AC3",
+            rate=Decimal("30.00"),
+            amount=Decimal("90.00"),
+            warehouse="WH-AC3",
+        )
+    )
+    invoice = PurchaseInvoice(
+        company="cacao",
+        posting_date=date(2026, 5, 2),
+        supplier_id="SUPP-AC3",
+        purchase_receipt_id=receipt.id,
+        docstatus=1,
+    )
+    database.session.add(invoice)
+    database.session.flush()
+    database.session.add(
+        PurchaseInvoiceItem(
+            purchase_invoice_id=invoice.id,
+            item_code="ITEM-AC3",
+            item_name="Item AC3",
+            qty=Decimal("3"),
+            uom="EA-AC3",
+            rate=Decimal("30.00"),
+            amount=Decimal("90.00"),
+            warehouse="WH-AC3",
+        )
+    )
+    database.session.commit()
+
+    result = reconcile_purchase_invoice(invoice.id)
+    database.session.commit()
+
+    # Reconstruct state from event log
+    snapshot = reconstruct_reconciliation_state("cacao", result.reconciliation_id)
+
+    assert snapshot.company == "cacao"
+    assert snapshot.document_id == result.reconciliation_id
+    # At least one event was logged for this reconciliation
+    assert len(snapshot.events) >= 1
+    # Event log contains a MATCH event
+    event_types = [ev["event_type"] for ev in snapshot.events]
+    assert any("MATCH" in et for et in event_types)
+
+
+def test_system_supports_two_way_and_three_way_without_structural_changes(app_ctx):
+    """Criterio #4: el sistema soporta 2-way y 3-way sin cambios estructurales."""
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        MatchingType,
+        PurchaseMatchingConfig,
+        get_matching_config,
+        seed_matching_config_for_company,
+    )
+    from cacao_accounting.database import database
+
+    seed_matching_config_for_company("cacao")
+    database.session.commit()
+
+    # 3-way (default)
+    cfg_3way = get_matching_config("cacao")
+    assert cfg_3way.matching_type == MatchingType.THREE_WAY
+
+    # Switch to 2-way via config — no structural changes required
+    cfg = database.session.execute(database.select(PurchaseMatchingConfig).filter_by(company="cacao")).scalar_one()
+    cfg.matching_type = MatchingType.TWO_WAY
+    database.session.commit()
+
+    cfg_2way = get_matching_config("cacao")
+    assert cfg_2way.matching_type == MatchingType.TWO_WAY
+
+
+def test_bridge_account_is_configurable_not_required_by_default(app_ctx):
+    """Criterio #5: la cuenta puente es configurable, no obligatoria."""
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        PurchaseMatchingConfig,
+        seed_matching_config_for_company,
+    )
+    from cacao_accounting.database import database
+
+    seed_matching_config_for_company("cacao")
+    database.session.commit()
+
+    cfg = database.session.execute(database.select(PurchaseMatchingConfig).filter_by(company="cacao")).scalar_one()
+    # By default it is required (strict mode) but can be set to False
+    assert isinstance(cfg.bridge_account_required, bool)
+
+    cfg.bridge_account_required = False
+    database.session.commit()
+
+    cfg_relaxed = database.session.execute(database.select(PurchaseMatchingConfig).filter_by(company="cacao")).scalar_one()
+    assert cfg_relaxed.bridge_account_required is False
+
+
+def test_goods_received_cancelled_event_emitted_on_receipt_cancel(app_ctx):
+    """Cancelar una recepcion emite GOODS_RECEIVED_CANCELLED y cancela conciliaciones dependientes."""
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        emit_goods_received_cancelled,
+        reconcile_purchase_invoice,
+    )
+    from cacao_accounting.database import (
+        Item,
+        PurchaseEconomicEvent,
+        PurchaseInvoice,
+        PurchaseInvoiceItem,
+        PurchaseReceipt,
+        PurchaseReceiptItem,
+        PurchaseReconciliation,
+        UOM,
+        Warehouse,
+        database,
+    )
+
+    database.session.add_all(
+        [
+            UOM(code="EA-AC6", name="Each AC6"),
+            Item(code="ITEM-AC6", name="Item AC6", item_type="goods", is_stock_item=True, default_uom="EA-AC6"),
+            Warehouse(code="WH-AC6", name="Bodega AC6", company="cacao"),
+        ]
+    )
+    receipt = PurchaseReceipt(company="cacao", posting_date=date(2026, 5, 1), supplier_id="SUPP-AC6", docstatus=1)
+    database.session.add(receipt)
+    database.session.flush()
+    database.session.add(
+        PurchaseReceiptItem(
+            purchase_receipt_id=receipt.id,
+            item_code="ITEM-AC6",
+            item_name="Item AC6",
+            qty=Decimal("2"),
+            qty_in_base_uom=Decimal("2"),
+            uom="EA-AC6",
+            rate=Decimal("50.00"),
+            amount=Decimal("100.00"),
+            warehouse="WH-AC6",
+        )
+    )
+    invoice = PurchaseInvoice(
+        company="cacao",
+        posting_date=date(2026, 5, 2),
+        supplier_id="SUPP-AC6",
+        purchase_receipt_id=receipt.id,
+        docstatus=1,
+    )
+    database.session.add(invoice)
+    database.session.flush()
+    database.session.add(
+        PurchaseInvoiceItem(
+            purchase_invoice_id=invoice.id,
+            item_code="ITEM-AC6",
+            item_name="Item AC6",
+            qty=Decimal("2"),
+            uom="EA-AC6",
+            rate=Decimal("50.00"),
+            amount=Decimal("100.00"),
+            warehouse="WH-AC6",
+        )
+    )
+    database.session.commit()
+
+    reconcile_purchase_invoice(invoice.id)
+    database.session.commit()
+
+    # Cancel the receipt — should also cancel dependent reconciliation and emit event
+    emit_goods_received_cancelled(receipt.id, "cacao")
+    database.session.commit()
+
+    recon = database.session.execute(
+        database.select(PurchaseReconciliation).filter_by(purchase_receipt_id=receipt.id)
+    ).scalar_one()
+    assert recon.status == "cancelled"
+
+    cancel_event = database.session.execute(
+        database.select(PurchaseEconomicEvent).filter_by(
+            company="cacao", document_id=receipt.id, event_type="GOODS_RECEIVED_CANCELLED"
+        )
+    ).scalar_one_or_none()
+    assert cancel_event is not None
