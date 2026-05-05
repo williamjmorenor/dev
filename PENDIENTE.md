@@ -1,6 +1,6 @@
 # PENDIENTE — Cacao Accounting
 
-**Fecha de análisis:** 2026-05-04  
+**Fecha de análisis:** 2026-05-05  
 **Base:** definición de módulos en `modulos/` y estado actual del código.
 
 Este documento registra todo lo que está pendiente de implementar para cumplir la especificación completa de los módulos del sistema.
@@ -9,34 +9,39 @@ Este documento registra todo lo que está pendiente de implementar para cumplir 
 
 ## 🔴 BLOQUE 1 — Posting Contable (Core crítico)
 
-El sistema tiene modelos de base de datos y rutas de UI pero **ningún documento genera `GLEntry` automáticamente** al ser confirmado (submit). Este es el bloque más crítico y bloquea toda la funcionalidad contable real.
+El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos operativos principales: facturas de venta, facturas de compra, pagos y `StockEntry`. La prioridad cambia de “crear posting desde cero” a completar los escenarios faltantes: impuestos, COGS desde entregas, recibos directos, Journal Entry manual, reglas avanzadas y reportes.
 
 ### 1.1 Contabilización de Factura de Venta (`SalesInvoice`)
-- [ ] Al hacer submit, generar `GLEntry` por cada libro activo (`Book`):
+- [x] Al hacer submit, generar `GLEntry` por cada libro activo (`Book`):
   - Débito: Cuentas por cobrar (AR) — `PartyAccount` del cliente.
   - Crédito: Ingreso de ventas — cuenta de ingreso del ítem.
-  - Líneas de impuesto: según `TaxTemplate` aplicada.
-  - Costo de ventas (COGS) si el ítem es inventariable.
-- [ ] Respetar `posting_date` y período abierto.
-- [ ] Registrar `voucher_type` y `voucher_id` en cada `GLEntry`.
-- [ ] Calcular `outstanding_amount` inicial = `total_amount`.
-- [ ] Soportar multimoneda: guardar moneda base y moneda original con `exchange_rate`.
+- [ ] Líneas de impuesto: según `TaxTemplate` aplicada.
+- [ ] Costo de ventas (COGS) si el ítem es inventariable y se entrega/factura.
+- [x] Respetar `posting_date` y período abierto.
+- [x] Registrar `voucher_type` y `voucher_id` en cada `GLEntry`.
+- [ ] Calcular `outstanding_amount` inicial de forma centralizada al submit.
+- [x] Guardar moneda base/original y `exchange_rate` cuando el documento lo provee.
+- [x] Generar reverso contable append-only al cancelar.
 
 ### 1.2 Contabilización de Factura de Compra (`PurchaseInvoice`)
-- [ ] Al hacer submit, generar `GLEntry` por cada libro activo:
+- [x] Al hacer submit, generar `GLEntry` por cada libro activo:
   - Débito: gasto, inventario o impuesto acreditable según tipo de ítem.
   - Crédito: Cuentas por pagar (AP) — `PartyAccount` del proveedor.
   - Si hay recepción previa: descarga cuenta GI/IR.
-- [ ] Calcular `outstanding_amount` inicial.
-- [ ] Soportar multimoneda.
+- [ ] Separar impuestos acreditables en cuentas fiscales.
+- [ ] Calcular `outstanding_amount` inicial de forma centralizada al submit.
+- [x] Soportar multimoneda cuando el documento trae moneda/tasa.
+- [x] Generar reverso contable append-only al cancelar.
 
 ### 1.3 Contabilización de Pago (`PaymentEntry`)
-- [ ] Al hacer submit, generar `GLEntry`:
+- [x] Al hacer submit, generar `GLEntry`:
   - Cobro: Débito banco/caja, Crédito AR.
   - Pago: Débito AP, Crédito banco/caja.
   - Transferencia interna: Débito cuenta destino, Crédito cuenta origen.
-- [ ] Procesar `PaymentReference` y reducir `outstanding_amount` en documentos aplicados.
-- [ ] Calcular `allocation_date` para cada referencia.
+- [x] Procesar `PaymentReference` y reducir `outstanding_amount` en documentos aplicados al crear pagos desde factura.
+- [x] Calcular `allocation_date` para cada referencia.
+- [x] Usar cuenta explícita o fallback `BankAccount.gl_account_id`.
+- [ ] Recalcular referencias y outstanding desde GL/allocations como fuente dinámica.
 
 ### 1.4 Contabilización de Nota de Entrega / Recepción de Mercancía (Inventario)
 - [ ] Al hacer submit de `DeliveryNote`: generar `StockLedgerEntry` (salida) + `GLEntry` de COGS.
@@ -45,10 +50,12 @@ El sistema tiene modelos de base de datos y rutas de UI pero **ningún documento
 - [ ] Registrar `StockValuationLayer` con costo según método (FIFO / Moving Average).
 
 ### 1.5 Contabilización de Entrada de Almacén (`StockEntry`)
-- [ ] Al hacer submit: generar `StockLedgerEntry` según propósito (receipt, issue, transfer, adjustment).
-- [ ] Actualizar `StockBin`.
-- [ ] Generar `GLEntry` con cuenta de inventario vs contrapartida según propósito.
-- [ ] Registrar `StockValuationLayer`.
+- [x] Al hacer submit: generar `StockLedgerEntry` según propósito (material_receipt, material_issue, material_transfer).
+- [x] Actualizar `StockBin`.
+- [x] Generar `GLEntry` con cuenta de inventario vs contrapartida según propósito.
+- [x] Registrar `StockValuationLayer`.
+- [ ] Soportar ajustes de inventario/reconciliación física.
+- [ ] Implementar FIFO y Moving Average reales para consumo de capas.
 
 ### 1.6 Comprobante Contable Manual (Journal Entry)
 - [ ] Implementar servicio de posting completo en `contabilidad/gl/`.
@@ -124,9 +131,10 @@ El sistema tiene modelos de base de datos y rutas de UI pero **ningún documento
 - [ ] Generar nota de crédito de proveedor asociada.
 
 ### 3.7 Reversión de Comprobante Contable
-- [ ] Servicio de reversión que genera asiento espejo.
-- [ ] Poblar `reversal_of` y `is_reversal` en el asiento generado.
-- [ ] Trazabilidad bidireccional entre asiento original y reverso.
+- [x] Servicio de reversión para documentos operativos contabilizados.
+- [x] Poblar `reversal_of` y `is_reversal` en las entradas GL reversadas.
+- [ ] Trazabilidad bidireccional visible entre asiento original y reverso.
+- [ ] Aplicar el mismo patrón al comprobante contable manual.
 
 ---
 
@@ -152,16 +160,18 @@ El sistema tiene modelos de base de datos y rutas de UI pero **ningún documento
 ## 🟡 BLOQUE 5 — Inventario (Servicios de Valoración)
 
 ### 5.1 StockLedgerEntry automático
-- [ ] Generar `StockLedgerEntry` al submit de: `StockEntry`, `PurchaseReceipt`, `DeliveryNote`.
-- [ ] Campos obligatorios: `item_code`, `warehouse`, `posting_date`, `actual_qty`, `qty_after_transaction`, `incoming_rate`, `valuation_rate`, `voucher_type`, `voucher_id`.
-- [ ] Política de reversión: crear nuevo SLE inverso (nunca eliminar).
+- [x] Generar `StockLedgerEntry` al submit de `StockEntry`.
+- [ ] Generar `StockLedgerEntry` al submit directo de `PurchaseReceipt` y `DeliveryNote`.
+- [x] Campos base: `item_code`, `warehouse`, `posting_date`, `qty_change`, `qty_after_transaction`, `valuation_rate`, `voucher_type`, `voucher_id`.
+- [ ] Política de reversión con SLE inverso append-only; actualmente se marca cancelado y se ajusta bin al cancelar.
 
 ### 5.2 StockBin (cache de saldo actual)
-- [ ] Actualizar `StockBin` en cada `StockLedgerEntry` generado.
+- [x] Actualizar `StockBin` en cada `StockLedgerEntry` generado por `StockEntry`.
 - [ ] Campo: `actual_qty`, `valuation_rate`, `last_updated`.
 - [ ] Servicio de recalculo de `StockBin` desde `StockLedgerEntry`.
 
 ### 5.3 StockValuationLayer (costo por capa)
+- [x] Crear `StockValuationLayer` básico desde `StockEntry`.
 - [ ] Implementar método FIFO: crear capa con `qty` y `incoming_rate` en cada entrada; consumir capas más antiguas en salidas.
 - [ ] Implementar método Moving Average: recalcular costo promedio en cada entrada; usar promedio vigente en salidas.
 - [ ] Método de valuación inmutable una vez hay transacciones en el ítem.
@@ -189,9 +199,10 @@ El sistema tiene modelos de base de datos y rutas de UI pero **ningún documento
 
 ## 🟡 BLOQUE 6 — GI/IR (Goods Receipt / Invoice Receipt)
 
-- [ ] Definir cuenta GI/IR por compañía en `CompanyDefaultAccount`.
-- [ ] Al submit de `PurchaseReceipt`: acreditar GI/IR (no AP).
-- [ ] Al submit de `PurchaseInvoice` con recepción previa: debitar GI/IR, acreditar AP.
+- [x] Definir cuenta GI/IR por compañía en `CompanyDefaultAccount`.
+- [x] Al submit de `StockEntry` material_receipt: acreditar GI/IR.
+- [ ] Al submit directo de `PurchaseReceipt`: acreditar GI/IR (no AP).
+- [x] Al submit de `PurchaseInvoice` con recepción previa: debitar GI/IR, acreditar AP.
 - [ ] Implementar UI y servicio de `GRIRReconciliation`.
 - [ ] Reporte de GI/IR pendiente de reconciliar por proveedor/ítem/documento.
 
@@ -234,7 +245,7 @@ El sistema tiene modelos de base de datos y rutas de UI pero **ningún documento
 
 ## 🟡 BLOQUE 9 — Multi-Ledger
 
-- [ ] Implementar lógica de posting multi-libro: al contabilizar cualquier documento, generar `GLEntry` por cada `Book` activo de la compañía.
+- [x] Implementar lógica de posting multi-libro para facturas, pagos y `StockEntry`: genera `GLEntry` por cada `Book` activo de la compañía.
 - [ ] Implementar `LedgerMappingRule`: diferencias de cuenta/monto entre libros.
 - [ ] UI para gestión de reglas de mapeo entre libros.
 - [ ] Reporte de Mayor General por libro.
@@ -421,7 +432,7 @@ El sistema tiene modelos de base de datos y rutas de UI pero **ningún documento
 
 | Orden | Bloque | Impacto |
 |---|---|---|
-| 1 | Bloque 1 — Posting Contable | Desbloquea toda la funcionalidad financiera real |
+| 1 | Bloque 1 — Posting Contable restante | Completa JE manual, impuestos, COGS y documentos directos |
 | 2 | Bloque 2 — AR/AP y Pagos | Completa el ciclo de cobros y pagos |
 | 3 | Bloque 3 — Documentos de Corrección | Completa el flujo no lineal (correcciones) |
 | 4 | Bloque 4 — Formularios Proveedor/Cliente | Corrige problemas críticos documentados en FIXME |
@@ -429,7 +440,7 @@ El sistema tiene modelos de base de datos y rutas de UI pero **ningún documento
 | 6 | Bloque 6 — GI/IR | Completa separación entre recepción y facturación |
 | 7 | Bloque 7 — Impuestos y Cargos | Necesario para facturación completa |
 | 8 | Bloque 8 — Precios | Complementa ciclo de compra/venta |
-| 9 | Bloque 9 — Multi-Ledger | Habilita contabilidad paralela |
+| 9 | Bloque 9 — Multi-Ledger avanzado | Reglas diferenciales y reportes por libro |
 | 10 | Bloque 10 — Dimensiones | Habilita reportes analíticos |
 | 11 | Bloque 11 — Revalorización | Cierre contable multimoneda |
 | 12 | Bloque 12 — Cierre de Período | Completa el ciclo R2R |

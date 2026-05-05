@@ -336,6 +336,23 @@ Corregir los errores pendientes de formato, lint y tipos para confirmar que todo
 - `flake8 cacao_accounting tests` -> passed
 - `mypy cacao_accounting` -> passed
 - `pytest -q` -> 275 passed, 4 warnings
+
+## 2026-05-05 (documentacion de estado del posting)
+
+### Peticion del usuario
+Actualizar `ESTADO_ACTUAL.md` y `PENDIENTE.md` con los ultimos cambios hechos en el servicio de posting.
+
+### Plan implementado
+1. Revisar el contenido actual de ambos documentos y localizar afirmaciones obsoletas sobre GL, Stock Ledger, pagos y multi-ledger.
+2. Actualizar `ESTADO_ACTUAL.md` para reflejar `contabilidad/posting.py`, `submit_document`, `cancel_document`, multi-libro, AR/AP, pagos y `StockEntry`.
+3. Actualizar `PENDIENTE.md` marcando como completado lo ya implementado y dejando pendientes reales: impuestos, COGS, documentos directos de recepcion/entrega, JE manual, FIFO/Moving Average, reportes y reglas avanzadas.
+4. Mantener los pendientes de formularios, notas/devoluciones, reconciliacion y reportes sin darlos por completados.
+
+### Resumen tecnico de cambios
+- `ESTADO_ACTUAL.md` ahora incluye el servicio de posting como capa explicita del sistema.
+- Los modulos de compras, ventas, bancos e inventario documentan el estado real del posting operativo.
+- `PENDIENTE.md` diferencia entre posting base ya operativo y los escenarios contables que siguen incompletos.
+- Se ajusto la prioridad recomendada para enfocar la siguiente etapa en posting restante y reportes, no en crear el motor desde cero.
 2. El backend de comprobantes contables manuales/GL requiere una iteración dedicada para persistencia real de cabecera, líneas, validación debe/haber y contabilización en `GLEntry`.
 3. La contabilización automática de pagos e inventario hacia `GLEntry` queda pendiente para una etapa posterior de motor contable.
 

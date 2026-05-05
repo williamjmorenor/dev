@@ -982,9 +982,13 @@ def compras_recepcion(receipt_id):
     """Detalle de recepción de compra."""
     registro = database.session.get(PurchaseReceipt, receipt_id)
     if not registro:
+        registro = database.session.execute(
+            database.select(PurchaseReceipt).filter_by(document_no=receipt_id)
+        ).scalar_one_or_none()
+    if not registro:
         abort(404)
-    items = database.session.execute(database.select(PurchaseReceiptItem).filter_by(purchase_receipt_id=receipt_id)).all()
-    titulo = (registro.document_no or receipt_id) + " - " + APPNAME
+    items = database.session.execute(database.select(PurchaseReceiptItem).filter_by(purchase_receipt_id=registro.id)).all()
+    titulo = (registro.document_no or registro.id) + " - " + APPNAME
     return render_template("compras/recepcion.html", registro=registro, items=items, titulo=titulo)
 
 
