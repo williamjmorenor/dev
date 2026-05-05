@@ -1,13 +1,20 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
 
-"""Servicios de conciliacion GR/IR por lineas."""
+"""Servicios de conciliacion GR/IR por lineas.
+
+Framework de conciliacion de compras desacoplado (process-first, event-driven).
+Soporta matching 2-way (OC vs Factura) y 3-way (OC vs Recepcion vs Factura).
+Los parametros son configurables por compania mediante PurchaseMatchingConfig.
+"""
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 from sqlalchemy import func, select
@@ -15,16 +22,65 @@ from sqlalchemy import func, select
 from cacao_accounting.database import (
     GRIRReconciliation,
     GRIRReconciliationItem,
+    PurchaseEconomicEvent,
     PurchaseInvoice,
     PurchaseInvoiceItem,
+    PurchaseMatchingConfig,
     PurchaseReceipt,
     PurchaseReceiptItem,
     database,
 )
 
 
+# ---------------------------------------------------------------------------
+# Enums publicos para estados y tipos
+# ---------------------------------------------------------------------------
+
+
+class MatchingType(str, Enum):
+    """Tipo de matching de compras soportado."""
+
+    TWO_WAY = "2-way"
+    THREE_WAY = "3-way"
+
+
+class MatchingResult(str, Enum):
+    """Resultado de la evaluacion del motor de matching."""
+
+    MATCH_OK = "MATCH_OK"
+    MATCH_PARTIAL = "MATCH_PARTIAL"
+    MATCH_FAILED = "MATCH_FAILED"
+
+
+class ToleranceType(str, Enum):
+    """Tipo de tolerancia: porcentaje o valor absoluto."""
+
+    PERCENTAGE = "percentage"
+    ABSOLUTE = "absolute"
+
+
+class EventType(str, Enum):
+    """Tipos de eventos economicos inmutables."""
+
+    GOODS_RECEIVED = "GOODS_RECEIVED"
+    INVOICE_RECEIVED = "INVOICE_RECEIVED"
+    MATCH_COMPLETED = "MATCH_COMPLETED"
+    MATCH_FAILED = "MATCH_FAILED"
+    MATCH_CANCELLED = "MATCH_CANCELLED"
+
+
+# ---------------------------------------------------------------------------
+# Excepciones
+# ---------------------------------------------------------------------------
+
+
 class GRIRServiceError(ValueError):
     """Error controlado de conciliacion GR/IR."""
+
+
+# ---------------------------------------------------------------------------
+# Dataclasses de resultado
+# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -36,6 +92,7 @@ class GRIRResult:
     matched_amount: Decimal
     price_difference: Decimal
     status: str
+    matching_result: str
 
 
 @dataclass(frozen=True)
@@ -50,6 +107,26 @@ class GRIRPendingRow:
     pending_qty: Decimal
     pending_amount: Decimal
     status: str
+
+
+@dataclass(frozen=True)
+class MatchingConfig:
+    """Configuracion del motor de matching extraida de PurchaseMatchingConfig."""
+
+    matching_type: str
+    price_tolerance_type: str
+    price_tolerance_value: Decimal
+    qty_tolerance_type: str
+    qty_tolerance_value: Decimal
+    require_purchase_order: bool
+    bridge_account_required: bool
+    auto_reconcile: bool
+    allow_price_difference: bool
+
+
+# ---------------------------------------------------------------------------
+# Helpers internos
+# ---------------------------------------------------------------------------
 
 
 def _decimal_value(value: Any) -> Decimal:
@@ -128,9 +205,156 @@ def _find_receipt_item_for_invoice_line(
     return candidates[0]
 
 
-def reconcile_gr_ir_invoice(purchase_invoice_id: str) -> GRIRResult:
-    """Reconcilia una factura de compra contra su recepcion por lineas."""
+def _within_tolerance(difference: Decimal, reference: Decimal, tolerance_type: str, tolerance_value: Decimal) -> bool:
+    """Evalua si una diferencia esta dentro de la tolerancia configurada."""
+    if tolerance_value <= 0:
+        return difference == 0
+    match tolerance_type:
+        case ToleranceType.PERCENTAGE:
+            if reference == 0:
+                return difference == 0
+            return abs(difference / reference * 100) <= tolerance_value
+        case _:
+            return abs(difference) <= tolerance_value
 
+
+# ---------------------------------------------------------------------------
+# Servicio de configuracion de matching
+# ---------------------------------------------------------------------------
+
+
+def get_matching_config(company: str) -> MatchingConfig:
+    """Devuelve la configuracion de matching para la compania dada.
+
+    Si no existe configuracion, retorna los valores por defecto (modo estricto).
+    """
+    config = database.session.execute(
+        select(PurchaseMatchingConfig).filter_by(company=company)
+    ).scalar_one_or_none()
+
+    if config is None:
+        return MatchingConfig(
+            matching_type=MatchingType.THREE_WAY,
+            price_tolerance_type=ToleranceType.PERCENTAGE,
+            price_tolerance_value=Decimal("0"),
+            qty_tolerance_type=ToleranceType.PERCENTAGE,
+            qty_tolerance_value=Decimal("0"),
+            require_purchase_order=True,
+            bridge_account_required=True,
+            auto_reconcile=True,
+            allow_price_difference=False,
+        )
+
+    return MatchingConfig(
+        matching_type=str(config.matching_type),
+        price_tolerance_type=str(config.price_tolerance_type),
+        price_tolerance_value=_decimal_value(config.price_tolerance_value),
+        qty_tolerance_type=str(config.qty_tolerance_type),
+        qty_tolerance_value=_decimal_value(config.qty_tolerance_value),
+        require_purchase_order=bool(config.require_purchase_order),
+        bridge_account_required=bool(config.bridge_account_required),
+        auto_reconcile=bool(config.auto_reconcile),
+        allow_price_difference=bool(config.allow_price_difference),
+    )
+
+
+def seed_matching_config_for_company(company: str) -> PurchaseMatchingConfig:
+    """Crea la configuracion de matching en modo estricto para una compania nueva.
+
+    El usuario puede relajar las tolerancias desde la pantalla de configuracion.
+    """
+    existing = database.session.execute(
+        select(PurchaseMatchingConfig).filter_by(company=company)
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    config = PurchaseMatchingConfig(
+        company=company,
+        matching_type=MatchingType.THREE_WAY,
+        price_tolerance_type=ToleranceType.PERCENTAGE,
+        price_tolerance_value=Decimal("0"),
+        qty_tolerance_type=ToleranceType.PERCENTAGE,
+        qty_tolerance_value=Decimal("0"),
+        require_purchase_order=True,
+        bridge_account_required=True,
+        auto_reconcile=True,
+        allow_price_difference=False,
+    )
+    database.session.add(config)
+    return config
+
+
+# ---------------------------------------------------------------------------
+# Motor de eventos economicos
+# ---------------------------------------------------------------------------
+
+
+def emit_economic_event(
+    event_type: str,
+    company: str,
+    document_type: str,
+    document_id: str,
+    payload: dict[str, Any] | None = None,
+) -> PurchaseEconomicEvent:
+    """Emite un evento economico inmutable al log de eventos."""
+    event = PurchaseEconomicEvent(
+        event_type=event_type,
+        company=company,
+        document_type=document_type,
+        document_id=document_id,
+        payload=json.dumps(payload or {}),
+        processing_status="pending",
+    )
+    database.session.add(event)
+    return event
+
+
+def mark_event_processed(event: PurchaseEconomicEvent) -> None:
+    """Marca un evento como procesado."""
+    event.processing_status = "processed"
+    event.processed_at = datetime.utcnow()
+
+
+# ---------------------------------------------------------------------------
+# Motor de matching principal
+# ---------------------------------------------------------------------------
+
+
+def _evaluate_matching_result(
+    total_invoiced_qty: Decimal,
+    total_received_qty: Decimal,
+    total_price_difference: Decimal,
+    total_invoiced_amount: Decimal,
+    config: MatchingConfig,
+) -> str:
+    """Evalua el resultado del matching segun la configuracion de tolerancias."""
+    qty_ok = _within_tolerance(
+        total_invoiced_qty - total_received_qty,
+        total_received_qty,
+        config.qty_tolerance_type,
+        config.qty_tolerance_value,
+    )
+    price_ok = _within_tolerance(
+        total_price_difference,
+        total_invoiced_amount,
+        config.price_tolerance_type,
+        config.price_tolerance_value,
+    )
+
+    if qty_ok and price_ok:
+        return MatchingResult.MATCH_OK
+    if qty_ok or price_ok:
+        return MatchingResult.MATCH_PARTIAL
+    return MatchingResult.MATCH_FAILED
+
+
+def reconcile_gr_ir_invoice(purchase_invoice_id: str) -> GRIRResult:
+    """Reconcilia una factura de compra contra su recepcion por lineas.
+
+    Utiliza la configuracion de matching de la compania (2-way o 3-way)
+    y respeta las tolerancias configuradas.
+    """
     duplicate = database.session.execute(
         select(GRIRReconciliation.id)
         .filter_by(purchase_invoice_id=purchase_invoice_id)
@@ -151,6 +375,8 @@ def reconcile_gr_ir_invoice(purchase_invoice_id: str) -> GRIRResult:
     if getattr(receipt, "docstatus", 0) != 1:
         raise GRIRServiceError("La recepcion de compra debe estar aprobada.")
 
+    config = get_matching_config(str(invoice.company))
+
     receipt_items = _receipt_items(receipt.id)
     invoice_items = _invoice_items(invoice.id)
     if not receipt_items or not invoice_items:
@@ -160,9 +386,10 @@ def reconcile_gr_ir_invoice(purchase_invoice_id: str) -> GRIRResult:
         company=invoice.company,
         purchase_receipt_id=receipt.id,
         purchase_invoice_id=invoice.id,
+        matching_type=config.matching_type,
         matched_amount=Decimal("0"),
         matched_date=invoice.posting_date,
-        status="reconciled",
+        status="pending_invoice",
     )
     database.session.add(reconciliation)
     database.session.flush()
@@ -170,6 +397,9 @@ def reconcile_gr_ir_invoice(purchase_invoice_id: str) -> GRIRResult:
     total_qty = Decimal("0")
     total_amount = Decimal("0")
     total_difference = Decimal("0")
+    total_invoiced_qty = Decimal("0")
+    total_received_qty = Decimal("0")
+
     for invoice_item in invoice_items:
         receipt_item = _find_receipt_item_for_invoice_line(receipt_items, invoice_item)
         invoice_qty = _line_qty(invoice_item)
@@ -185,10 +415,11 @@ def reconcile_gr_ir_invoice(purchase_invoice_id: str) -> GRIRResult:
         matched_amount = invoice_qty * receipt_rate
         invoiced_amount = invoice_qty * invoice_rate
         price_difference = invoiced_amount - matched_amount
-        if price_difference != 0:
+
+        if price_difference != 0 and not config.allow_price_difference:
             raise GRIRServiceError("La diferencia de precio GR/IR requiere cuenta de ajuste configurada.")
 
-        status = "reconciled" if invoice_qty == pending_qty else "partial"
+        line_status = "reconciled" if invoice_qty == pending_qty else "partial"
         database.session.add(
             GRIRReconciliationItem(
                 gr_ir_reconciliation_id=reconciliation.id,
@@ -204,22 +435,59 @@ def reconcile_gr_ir_invoice(purchase_invoice_id: str) -> GRIRResult:
                 invoiced_amount=invoiced_amount,
                 matched_amount=matched_amount,
                 price_difference=price_difference,
-                status="reconciled",
+                status=line_status,
             )
         )
         total_qty += invoice_qty
         total_amount += matched_amount
         total_difference += price_difference
-        if status == "partial":
+        total_invoiced_qty += invoice_qty
+        total_received_qty += receipt_qty
+
+    matching_result = _evaluate_matching_result(
+        total_invoiced_qty,
+        total_received_qty,
+        total_difference,
+        total_amount + total_difference,
+        config,
+    )
+
+    match matching_result:
+        case MatchingResult.MATCH_OK:
+            reconciliation.status = "reconciled"
+            event_type = EventType.MATCH_COMPLETED
+        case MatchingResult.MATCH_PARTIAL:
             reconciliation.status = "partial"
+            event_type = EventType.MATCH_COMPLETED
+        case _:
+            reconciliation.status = "disputed"
+            event_type = EventType.MATCH_FAILED
 
     reconciliation.matched_amount = total_amount
+
+    emit_economic_event(
+        event_type=event_type,
+        company=str(invoice.company),
+        document_type="gr_ir_reconciliation",
+        document_id=reconciliation.id,
+        payload={
+            "purchase_invoice_id": purchase_invoice_id,
+            "purchase_receipt_id": receipt.id,
+            "matched_qty": str(total_qty),
+            "matched_amount": str(total_amount),
+            "price_difference": str(total_difference),
+            "matching_result": matching_result,
+            "matching_type": config.matching_type,
+        },
+    )
+
     return GRIRResult(
         reconciliation_id=reconciliation.id,
         matched_qty=total_qty,
         matched_amount=total_amount,
         price_difference=total_difference,
         status=str(reconciliation.status),
+        matching_result=matching_result,
     )
 
 
@@ -243,6 +511,14 @@ def cancel_gr_ir_for_invoice(purchase_invoice_id: str) -> None:
             .all()
         ):
             item.status = "cancelled"
+
+        emit_economic_event(
+            event_type=EventType.MATCH_CANCELLED,
+            company=str(reconciliation.company),
+            document_type="gr_ir_reconciliation",
+            document_id=reconciliation.id,
+            payload={"purchase_invoice_id": purchase_invoice_id},
+        )
 
 
 def get_gr_ir_pending(company: str, as_of_date: date | None = None) -> list[GRIRPendingRow]:

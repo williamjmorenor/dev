@@ -1855,23 +1855,79 @@ class ReconciliationItem(database.Model, BaseTabla):  # type: ignore[name-define
 
 # <---------------------------------------------------------------------------------------------> #
 # GR/IR — Goods Receipt / Invoice Receipt.
-# Cuenta intermedia obligatoria entre recepcion de mercancia y facturacion.
+# Framework moderno de conciliacion de compras (process-first, event-driven).
 # <---------------------------------------------------------------------------------------------> #
+
+
+class PurchaseMatchingConfig(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Configuracion de matching de compras por compania.
+
+    Parametros configurables que permiten al usuario ajustar el motor de
+    conciliacion sin alterar datos historicos.
+    """
+
+    __tablename__ = "purchase_matching_config"
+    __table_args__ = (UniqueConstraint("company", name="uq_purchase_matching_config"),)
+    company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=False, unique=True)
+    # 2-way: OC vs Factura | 3-way: OC vs Recepcion vs Factura
+    matching_type = database.Column(database.String(10), default="3-way", nullable=False)
+    # percentage | absolute
+    price_tolerance_type = database.Column(database.String(10), default="percentage", nullable=False)
+    price_tolerance_value = database.Column(database.Numeric(precision=10, scale=4), default=0, nullable=False)
+    # percentage | absolute
+    qty_tolerance_type = database.Column(database.String(10), default="percentage", nullable=False)
+    qty_tolerance_value = database.Column(database.Numeric(precision=10, scale=4), default=0, nullable=False)
+    # Si True, toda factura debe referenciar una OC
+    require_purchase_order = database.Column(database.Boolean(), default=True, nullable=False)
+    # Si True, se requiere cuenta puente GR/IR configurada en CompanyDefaultAccount
+    bridge_account_required = database.Column(database.Boolean(), default=True, nullable=False)
+    # Si True, la conciliacion se ejecuta automaticamente al aprobar la factura
+    auto_reconcile = database.Column(database.Boolean(), default=True, nullable=False)
+    # Si True, diferencias de precio generan asiento de ajuste; False -> rechazo
+    allow_price_difference = database.Column(database.Boolean(), default=False, nullable=False)
+
+
+class PurchaseEconomicEvent(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Evento economico inmutable generado por documentos de compra.
+
+    Los eventos son append-only y trazables.  Cada accion relevante del
+    flujo de compras produce un evento que el motor contable puede consumir
+    de forma independiente.
+    """
+
+    __tablename__ = "purchase_economic_event"
+    # GOODS_RECEIVED | INVOICE_RECEIVED | MATCH_COMPLETED | MATCH_FAILED | MATCH_CANCELLED
+    event_type = database.Column(database.String(30), nullable=False, index=True)
+    company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=False, index=True)
+    # purchase_receipt | purchase_invoice | gr_ir_reconciliation
+    document_type = database.Column(database.String(50), nullable=False, index=True)
+    document_id = database.Column(database.String(26), nullable=False, index=True)
+    payload = database.Column(database.Text(), nullable=True)
+    # pending | processed | failed | skipped
+    processing_status = database.Column(database.String(20), default="pending", nullable=False, index=True)
+    processed_at = database.Column(database.DateTime(), nullable=True)
+
+
 class GRIRReconciliation(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Conciliacion GR/IR entre recepcion y factura de compra."""
 
     __tablename__ = "gr_ir_reconciliation"
     company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=False, index=True)
+    purchase_order_id = database.Column(
+        database.String(26), database.ForeignKey("purchase_order.id"), nullable=True, index=True
+    )
     purchase_receipt_id = database.Column(
         database.String(26), database.ForeignKey("purchase_receipt.id"), nullable=True, index=True
     )
     purchase_invoice_id = database.Column(
         database.String(26), database.ForeignKey("purchase_invoice.id"), nullable=True, index=True
     )
+    # matching_type snapshot from config at the time of reconciliation
+    matching_type = database.Column(database.String(10), default="3-way", nullable=False)
     matched_amount = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     matched_date = database.Column(database.Date(), nullable=True)
-    # reconciled, partial, cancelled
-    status = database.Column(database.String(20), default="reconciled", nullable=False, index=True)
+    # pending_receipt | pending_invoice | partial | reconciled | disputed | cancelled
+    status = database.Column(database.String(20), default="pending_receipt", nullable=False, index=True)
 
 
 class GRIRReconciliationItem(database.Model, BaseTabla):  # type: ignore[name-defined]
