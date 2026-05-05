@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from cuid2 import Cuid
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import ForeignKeyConstraint, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint
 from ulid import ULID
 
 # ---------------------------------------------------------------------------------------
@@ -1526,20 +1526,24 @@ class GLBase:
     transaction = database.Column(database.String(50))
     transaction_id = database.Column(database.String(75))
     order = database.Column(database.Integer(), nullable=True)
-    value = database.Column(database.DECIMAL())
+    value = database.Column(database.Numeric(precision=20, scale=4))
     currency_id = database.Column(database.String(200))
-    exchange_rate = database.Column(database.DECIMAL())
-    value_default = database.Column(database.DECIMAL())
-    meno = database.Column(database.String(100))  # kept for legacy compatibility
+    exchange_rate = database.Column(database.Numeric(precision=20, scale=9))
+    value_default = database.Column(database.Numeric(precision=20, scale=4))
     memo = database.Column(database.String(500), nullable=True)
     reference = database.Column(database.String(50))
-    line_meno = database.Column(database.String(50))
+    line_memo = database.Column(database.String(50), nullable=True)
     internal_reference = database.Column(database.String(50))
     internal_reference_id = database.Column(database.String(75))
     reference1 = database.Column(database.String(50))
     reference2 = database.Column(database.String(50))
     third_type = database.Column(database.String(26))
     third_code = database.Column(database.String(26))
+    # Trazabilidad documental para detalle legacy
+    voucher_type = database.Column(database.String(50), nullable=True, index=True)
+    voucher_id = database.Column(database.String(26), nullable=True, index=True)
+    document_no = database.Column(database.String(100), nullable=True, index=True)
+    naming_series_id = database.Column(database.String(26), database.ForeignKey("naming_series.id"), nullable=True)
 
 
 class ComprobanteContable(database.Model, BaseTransaccion):  # type: ignore[name-defined]
@@ -1573,7 +1577,14 @@ class GLEntry(database.Model):  # type: ignore[name-defined]
         database.Index("ix_gl_entry_party", "party_type", "party_id"),
         database.Index("ix_gl_entry_company_date", "company", "posting_date"),
         database.Index("ix_gl_entry_ledger", "ledger_id", "posting_date"),
+        database.Index("ix_gl_entry_reversal", "reversal_of"),
         ForeignKeyConstraint(["company", "cost_center_code"], ["cost_center.entity", "cost_center.code"]),
+        CheckConstraint(
+            "(debit > 0 AND credit = 0) OR (debit = 0 AND credit > 0)",
+            name="ck_gl_entry_debit_credit_integrity",
+        ),
+        CheckConstraint("debit >= 0", name="ck_gl_entry_debit_non_negative"),
+        CheckConstraint("credit >= 0", name="ck_gl_entry_credit_non_negative"),
     )
 
     id = database.Column(
@@ -1604,14 +1615,21 @@ class GLEntry(database.Model):  # type: ignore[name-defined]
     # Trazabilidad de voucher — permite rastrear el origen de cada entrada
     voucher_type = database.Column(database.String(50), nullable=False, index=True)
     voucher_id = database.Column(database.String(26), nullable=False, index=True)
+    # Identificador documental (series) persistido para trazabilidad cruzada
+    document_no = database.Column(database.String(100), nullable=True, index=True)
+    naming_series_id = database.Column(database.String(26), database.ForeignKey("naming_series.id"), nullable=True)
     # Periodo fiscal
     fiscal_year_id = database.Column(database.String(26), database.ForeignKey("fiscal_year.id"), nullable=True)
+    accounting_period_id = database.Column(database.String(26), database.ForeignKey("accounting_period.id"), nullable=True)
     # Dimensiones analiticas de primer nivel
     cost_center_code = database.Column(database.String(10), nullable=True)
     # Unidad de negocio como dimension analitica (sucursal, oficina, punto de venta)
     unit_code = database.Column(database.String(10), database.ForeignKey("unit.code"), nullable=True)
     project_code = database.Column(database.String(10), database.ForeignKey("project.code"), nullable=True)
     remarks = database.Column(database.String(500), nullable=True)
+    # Reversion contable append-only
+    is_reversal = database.Column(database.Boolean(), default=False, nullable=False)
+    reversal_of = database.Column(database.String(10), database.ForeignKey("gl_entry.id"), nullable=True)
     is_cancelled = database.Column(database.Boolean(), default=False, nullable=False)
     created = database.Column(database.DateTime, default=database.func.now(), nullable=False)
     created_by = database.Column(database.String(26), nullable=True)

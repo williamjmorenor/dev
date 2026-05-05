@@ -338,6 +338,59 @@ Analizar `git diff --cached` contra `requerimiento.md`, corregir gaps de la impl
 
 ### Resumen tecnico de cambios
 - `cacao_accounting/contabilidad/forms.py`: validadores para aceptar cero y campos de secuencia en `FormularioNamingSeries`.
+
+## 2026-05-05 (roles, permisos y mayor contable)
+
+### Peticion del usuario
+Documentar los cambios recientes de UX de roles y permisos y la alineación del ledger contable con reglas estrictas de integridad y motor de posting.
+
+### Plan implementado
+1. Revisar e implementar la administración de roles y permisos en el módulo admin.
+2. Corregir la lógica del engine de permisos para que el acceso de administradores funcione y los templates usen campos seguros de Jinja.
+3. Añadir restricciones de integridad en `GLEntry` para asegurar que cada registro tenga solo débito o crédito positivo.
+4. Crear un motor de posting contable capaz de generar `GLEntry` desde documentos operativos clave.
+5. Añadir pruebas de validación para la integridad del mayor y para el posting de documentos contables.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/auth/permisos.py`:
+  - Se restauró el acceso `.autorizado` y el fallback admin para ingresar al panel.
+  - Se mejoró la consulta para obtener permisos de usuario por módulo y rol.
+- `cacao_accounting/admin/__init__.py`:
+  - Se agregaron rutas CRUD para `Roles` y asignación de permisos.
+  - Se corrigió el import de `RolesAccess` y se normalizaron los datos de permisos para templates.
+- Admin templates:
+  - Se corrigieron variables Jinja y se ocultó el token CSRF cuando se renderiza el formulario.
+  - Se agregaron vistas para lista de roles, edición y asignación de permisos.
+- `cacao_accounting/database/__init__.py`:
+  - Se agregó `CheckConstraint` en `GLEntry`:
+    - `ck_gl_entry_debit_credit_integrity`
+    - `ck_gl_entry_debit_non_negative`
+    - `ck_gl_entry_credit_non_negative`
+  - Esto refuerza la regla contable: una entrada GL debe tener solo débito o crédito positivo, no ambos.
+- `cacao_accounting/contabilidad/posting.py`:
+  - Nuevo motor de posting contable para documentar y poblar `GLEntry` desde:
+    - `SalesInvoice`
+    - `PurchaseInvoice`
+    - `PaymentEntry`
+    - `StockEntry`
+  - Soporta trazabilidad con `voucher_type`, `voucher_id`, `document_no`, `naming_series_id` y periodos contables.
+  - Valida periodos abiertos antes de contabilizar.
+- `tests/test_07posting_engine.py`:
+  - Se agregaron pruebas para:
+    - rechazo de asientos GL no balanceados por constraint.
+    - posting balanceado de `SalesInvoice`.
+    - posting balanceado de `PaymentEntry`.
+
+### Verificacion ejecutada
+- `python -m py_compile cacao_accounting/contabilidad/posting.py tests/test_07posting_engine.py` -> passed
+- `pytest tests/test_07posting_engine.py -q` -> 3 passed
+- `pytest tests/test_04database_schema.py -q` -> 191 passed
+- `pytest tests/test_06transaction_closure.py -q` -> 5 passed
+
+### Notas para siguiente iteracion
+1. Agregar pruebas adicionales de posting para `PurchaseInvoice` y `StockEntry`.
+2. Integrar el engine de posting en el flujo de submit de documentos operativos.
+3. Implementar validaciones de periodo contable y libro contable en la UI de cierre/contabilización.
 - `cacao_accounting/contabilidad/__init__.py`: rutas mutantes POST-only; alta de series crea secuencia/mapa; alta de contador crea mapa externo.
 - `cacao_accounting/contabilidad/templates/contabilidad/naming_series_lista.html`: acciones POST con CSRF y columnas de contador interno/externo.
 - `cacao_accounting/contabilidad/templates/contabilidad/naming_series_nueva.html`: captura de valor inicial, incremento, padding y politica de reinicio.
