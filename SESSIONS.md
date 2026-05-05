@@ -258,6 +258,101 @@ Finalizar los alcances propuestos en la bitácora del día, estabilizando series
 
 ### Pendientes documentados
 1. No se modificó `cacao_accounting/contabilidad/gl/templates/gl_new.html` por instrucción explícita del usuario.
+
+## 2026-05-05 (ledger financiero maestro y subledgers)
+
+### Peticion del usuario
+Implementar el plan para completar el ledger financiero maestro y los subledgers de AP, AR, Inventario y Bancos a partir del motor de posting creado en el ultimo commit.
+
+### Plan implementado
+1. Refactorizar `cacao_accounting/contabilidad/posting.py` como servicio transaccional con `submit_document`, `cancel_document` y `post_document_to_gl`.
+2. Hacer el posting idempotente para evitar duplicacion de `GLEntry` por `company + voucher_type + voucher_id`.
+3. Generar entradas GL por todos los libros (`Book`) de la compania, con validacion de balance por libro.
+4. Corregir trazabilidad de AR/AP para que facturas y pagos registren `party_type` y `party_id` del cliente/proveedor.
+5. Agregar resolucion jerarquica de cuentas usando cuentas explicitas, `PartyAccount`, `ItemAccount` y `CompanyDefaultAccount`.
+6. Implementar posting de inventario para `StockEntry`: `StockLedgerEntry`, `StockBin`, `StockValuationLayer` y GL para receipts/issues.
+7. Conectar submit/cancel de facturas de compra, facturas de venta, entradas de inventario y pagos al servicio contable con rollback ante errores.
+8. Agregar rutas de aprobar/cancelar pagos y acciones visibles en el detalle de pago.
+9. Ampliar pruebas del motor contable para multi-ledger, idempotencia, reversos, bancos e inventario.
+
+### Resumen tecnico de cambios
+- En `cacao_accounting/contabilidad/posting.py`:
+  - Nuevo `LedgerContext` para construir entradas por libro.
+  - `submit_document` aprueba y contabiliza en una sola unidad de trabajo.
+  - `cancel_document` genera reversos append-only y marca entradas originales como canceladas.
+  - `post_document_to_gl` rechaza documentos ya contabilizados.
+  - Facturas de venta generan AR por cliente e ingresos por linea.
+  - Facturas de compra generan AP por proveedor y gasto o GR/IR segun origen de recepcion.
+  - Pagos generan banco contra AR/AP; tambien soportan fallback a `BankAccount.gl_account_id`.
+  - Entradas de stock generan ledger de inventario, snapshot en bin, capa de valuacion y GL para receipt/issue; transferencias generan stock ledger sin GL.
+- En rutas:
+  - `ventas`, `compras`, `inventario` y `bancos` usan `submit_document`/`cancel_document`.
+  - Los errores de posting hacen rollback y se muestran con mensajes marcados para traduccion.
+- En `tests/test_07posting_engine.py`:
+  - La suite pasa de 3 a 9 pruebas cubriendo los escenarios clave del ledger.
+- En `tests/z_forms_data.py`:
+  - Se corrigio una parentesis extra que impedia ejecutar la suite completa de pytest.
+
+### Verificacion ejecutada
+- `pytest -q tests/test_07posting_engine.py` -> 9 passed
+- `pytest -q tests/test_06transaction_closure.py tests/test_07posting_engine.py` -> 14 passed
+- `pytest -q` -> 275 passed, 4 warnings
+- `python -m py_compile` sobre archivos modificados -> passed
+- `black --check` sobre archivos modificados -> passed
+- `ruff check` sobre archivos modificados -> passed
+- `flake8` sobre archivos modificados -> passed
+- `mypy cacao_accounting` -> falla por 12 errores preexistentes en `auth/forms.py`, `modulos/__init__.py`, `auth/permisos.py`, `document_flow/tracing.py`, `admin/__init__.py` y `api/__init__.py`; no quedan errores reportados en `contabilidad/posting.py`.
+
+### Notas para siguiente iteracion
+1. Completar engine de impuestos para separar `tax_total` en cuentas fiscales especificas.
+2. Agregar UI/reportes para trial balance, party ledger, bank ledger y kardex basados en GL/Stock Ledger.
+3. Resolver la deuda de mypy preexistente para recuperar la compuerta completa de tipos.
+
+## 2026-05-05 (calidad global)
+
+### Peticion del usuario
+Corregir los errores pendientes de formato, lint y tipos para confirmar que todos los controles de calidad pasan antes de continuar.
+
+### Plan implementado
+1. Corregir imports faltantes, imports no usados y definiciones duplicadas en autenticacion y formularios.
+2. Ajustar anotaciones y conversiones de resultados SQLAlchemy para cumplir `mypy`.
+3. Normalizar formato con `black` en los modulos afectados.
+4. Corregir lineas largas en el registro de flujos documentales.
+5. Verificar la suite completa de calidad solicitada.
+
+### Resumen tecnico de cambios
+- En `cacao_accounting/auth/__init__.py` se importo `url_for`.
+- En `cacao_accounting/auth/forms.py` se eliminaron imports y clases duplicadas.
+- En `cacao_accounting/auth/permisos.py` se declararon atributos dinamicos de permisos para tipado estatico.
+- En `cacao_accounting/contabilidad/forms.py` se elimino un import no usado.
+- En `cacao_accounting/modulos/__init__.py` se separo la lista detectada de plugins del valor opcional final.
+- En `cacao_accounting/admin/__init__.py`, `document_flow/tracing.py` y `api/__init__.py` se convirtieron resultados `Sequence` a `list` donde la firma lo requiere.
+- En `cacao_accounting/admin/__init__.py` se corrigio el uso de `proteger_passwd`.
+- En `cacao_accounting/document_flow/registry.py` se aplico formato para cumplir longitud de linea.
+
+### Verificacion ejecutada
+- `black --check cacao_accounting tests` -> passed
+- `ruff check cacao_accounting tests` -> passed
+- `flake8 cacao_accounting tests` -> passed
+- `mypy cacao_accounting` -> passed
+- `pytest -q` -> 275 passed, 4 warnings
+
+## 2026-05-05 (documentacion de estado del posting)
+
+### Peticion del usuario
+Actualizar `ESTADO_ACTUAL.md` y `PENDIENTE.md` con los ultimos cambios hechos en el servicio de posting.
+
+### Plan implementado
+1. Revisar el contenido actual de ambos documentos y localizar afirmaciones obsoletas sobre GL, Stock Ledger, pagos y multi-ledger.
+2. Actualizar `ESTADO_ACTUAL.md` para reflejar `contabilidad/posting.py`, `submit_document`, `cancel_document`, multi-libro, AR/AP, pagos y `StockEntry`.
+3. Actualizar `PENDIENTE.md` marcando como completado lo ya implementado y dejando pendientes reales: impuestos, COGS, documentos directos de recepcion/entrega, JE manual, FIFO/Moving Average, reportes y reglas avanzadas.
+4. Mantener los pendientes de formularios, notas/devoluciones, reconciliacion y reportes sin darlos por completados.
+
+### Resumen tecnico de cambios
+- `ESTADO_ACTUAL.md` ahora incluye el servicio de posting como capa explicita del sistema.
+- Los modulos de compras, ventas, bancos e inventario documentan el estado real del posting operativo.
+- `PENDIENTE.md` diferencia entre posting base ya operativo y los escenarios contables que siguen incompletos.
+- Se ajusto la prioridad recomendada para enfocar la siguiente etapa en posting restante y reportes, no en crear el motor desde cero.
 2. El backend de comprobantes contables manuales/GL requiere una iteración dedicada para persistencia real de cabecera, líneas, validación debe/haber y contabilización en `GLEntry`.
 3. La contabilización automática de pagos e inventario hacia `GLEntry` queda pendiente para una etapa posterior de motor contable.
 
@@ -338,6 +433,59 @@ Analizar `git diff --cached` contra `requerimiento.md`, corregir gaps de la impl
 
 ### Resumen tecnico de cambios
 - `cacao_accounting/contabilidad/forms.py`: validadores para aceptar cero y campos de secuencia en `FormularioNamingSeries`.
+
+## 2026-05-05 (roles, permisos y mayor contable)
+
+### Peticion del usuario
+Documentar los cambios recientes de UX de roles y permisos y la alineación del ledger contable con reglas estrictas de integridad y motor de posting.
+
+### Plan implementado
+1. Revisar e implementar la administración de roles y permisos en el módulo admin.
+2. Corregir la lógica del engine de permisos para que el acceso de administradores funcione y los templates usen campos seguros de Jinja.
+3. Añadir restricciones de integridad en `GLEntry` para asegurar que cada registro tenga solo débito o crédito positivo.
+4. Crear un motor de posting contable capaz de generar `GLEntry` desde documentos operativos clave.
+5. Añadir pruebas de validación para la integridad del mayor y para el posting de documentos contables.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/auth/permisos.py`:
+  - Se restauró el acceso `.autorizado` y el fallback admin para ingresar al panel.
+  - Se mejoró la consulta para obtener permisos de usuario por módulo y rol.
+- `cacao_accounting/admin/__init__.py`:
+  - Se agregaron rutas CRUD para `Roles` y asignación de permisos.
+  - Se corrigió el import de `RolesAccess` y se normalizaron los datos de permisos para templates.
+- Admin templates:
+  - Se corrigieron variables Jinja y se ocultó el token CSRF cuando se renderiza el formulario.
+  - Se agregaron vistas para lista de roles, edición y asignación de permisos.
+- `cacao_accounting/database/__init__.py`:
+  - Se agregó `CheckConstraint` en `GLEntry`:
+    - `ck_gl_entry_debit_credit_integrity`
+    - `ck_gl_entry_debit_non_negative`
+    - `ck_gl_entry_credit_non_negative`
+  - Esto refuerza la regla contable: una entrada GL debe tener solo débito o crédito positivo, no ambos.
+- `cacao_accounting/contabilidad/posting.py`:
+  - Nuevo motor de posting contable para documentar y poblar `GLEntry` desde:
+    - `SalesInvoice`
+    - `PurchaseInvoice`
+    - `PaymentEntry`
+    - `StockEntry`
+  - Soporta trazabilidad con `voucher_type`, `voucher_id`, `document_no`, `naming_series_id` y periodos contables.
+  - Valida periodos abiertos antes de contabilizar.
+- `tests/test_07posting_engine.py`:
+  - Se agregaron pruebas para:
+    - rechazo de asientos GL no balanceados por constraint.
+    - posting balanceado de `SalesInvoice`.
+    - posting balanceado de `PaymentEntry`.
+
+### Verificacion ejecutada
+- `python -m py_compile cacao_accounting/contabilidad/posting.py tests/test_07posting_engine.py` -> passed
+- `pytest tests/test_07posting_engine.py -q` -> 3 passed
+- `pytest tests/test_04database_schema.py -q` -> 191 passed
+- `pytest tests/test_06transaction_closure.py -q` -> 5 passed
+
+### Notas para siguiente iteracion
+1. Agregar pruebas adicionales de posting para `PurchaseInvoice` y `StockEntry`.
+2. Integrar el engine de posting en el flujo de submit de documentos operativos.
+3. Implementar validaciones de periodo contable y libro contable en la UI de cierre/contabilización.
 - `cacao_accounting/contabilidad/__init__.py`: rutas mutantes POST-only; alta de series crea secuencia/mapa; alta de contador crea mapa externo.
 - `cacao_accounting/contabilidad/templates/contabilidad/naming_series_lista.html`: acciones POST con CSRF y columnas de contador interno/externo.
 - `cacao_accounting/contabilidad/templates/contabilidad/naming_series_nueva.html`: captura de valor inicial, incremento, padding y politica de reinicio.

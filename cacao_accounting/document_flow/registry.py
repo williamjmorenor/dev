@@ -112,7 +112,9 @@ DOCUMENT_TYPES: dict[str, DocumentType] = {
         detail_arg="request_id",
         total_field="grand_total",
         filter_fields=("document_no", "company", "requested_by", "department", "posting_date", "grand_total", "docstatus"),
-        create_actions=(DocumentAction("Crear Orden de Compra", "purchase_order", "compras.compras_orden_compra_nuevo", "from_request"),),
+        create_actions=(
+            DocumentAction("Crear Orden de Compra", "purchase_order", "compras.compras_orden_compra_nuevo", "from_request"),
+        ),
     ),
     "purchase_quotation": DocumentType(
         key="purchase_quotation",
@@ -153,7 +155,11 @@ DOCUMENT_TYPES: dict[str, DocumentType] = {
         detail_arg="quotation_id",
         total_field="grand_total",
         filter_fields=("document_no", "company", "supplier_id", "supplier_name", "posting_date", "grand_total", "docstatus"),
-        create_actions=(DocumentAction("Crear Orden de Compra", "purchase_order", "compras.compras_orden_compra_nuevo", "from_supplier_quotation"),),
+        create_actions=(
+            DocumentAction(
+                "Crear Orden de Compra", "purchase_order", "compras.compras_orden_compra_nuevo", "from_supplier_quotation"
+            ),
+        ),
     ),
     "purchase_receipt": DocumentType(
         key="purchase_receipt",
@@ -201,7 +207,9 @@ DOCUMENT_TYPES: dict[str, DocumentType] = {
         ),
         create_actions=(
             DocumentAction("Crear Pago", "payment_entry", "bancos.bancos_pago_nuevo", "from_purchase_invoice"),
-            DocumentAction("Crear Nota de Crédito", "purchase_invoice", "compras.compras_factura_compra_nuevo", "from_invoice"),
+            DocumentAction(
+                "Crear Nota de Crédito", "purchase_invoice", "compras.compras_factura_compra_nuevo", "from_invoice"
+            ),
         ),
     ),
     "sales_order": DocumentType(
@@ -239,7 +247,9 @@ DOCUMENT_TYPES: dict[str, DocumentType] = {
         detail_arg="request_id",
         total_field="grand_total",
         filter_fields=("document_no", "company", "customer_id", "customer_name", "posting_date", "grand_total", "docstatus"),
-        create_actions=(DocumentAction("Crear Cotización", "sales_quotation", "ventas.ventas_cotizacion_nueva", "from_request"),),
+        create_actions=(
+            DocumentAction("Crear Cotización", "sales_quotation", "ventas.ventas_cotizacion_nueva", "from_request"),
+        ),
     ),
     "sales_quotation": DocumentType(
         key="sales_quotation",
@@ -256,7 +266,9 @@ DOCUMENT_TYPES: dict[str, DocumentType] = {
         detail_arg="quotation_id",
         total_field="grand_total",
         filter_fields=("document_no", "company", "customer_id", "customer_name", "posting_date", "grand_total", "docstatus"),
-        create_actions=(DocumentAction("Crear Orden de Venta", "sales_order", "ventas.ventas_orden_venta_nuevo", "from_quotation"),),
+        create_actions=(
+            DocumentAction("Crear Orden de Venta", "sales_order", "ventas.ventas_orden_venta_nuevo", "from_quotation"),
+        ),
     ),
     "delivery_note": DocumentType(
         key="delivery_note",
@@ -275,7 +287,9 @@ DOCUMENT_TYPES: dict[str, DocumentType] = {
         filter_fields=("document_no", "company", "customer_id", "customer_name", "posting_date", "grand_total", "docstatus"),
         create_actions=(
             DocumentAction("Crear Factura", "sales_invoice", "ventas.ventas_factura_venta_nuevo", "from_note"),
-            DocumentAction("Crear Movimiento de Inventario", "stock_entry", "inventario.inventario_entrada_nuevo", "source_id"),
+            DocumentAction(
+                "Crear Movimiento de Inventario", "stock_entry", "inventario.inventario_entrada_nuevo", "source_id"
+            ),
         ),
     ),
     "sales_invoice": DocumentType(
@@ -322,7 +336,16 @@ DOCUMENT_TYPES: dict[str, DocumentType] = {
         detail_arg="payment_id",
         date_field="posting_date",
         total_field="paid_amount",
-        filter_fields=("document_no", "company", "party_type", "party_id", "posting_date", "paid_amount", "received_amount", "docstatus"),
+        filter_fields=(
+            "document_no",
+            "company",
+            "party_type",
+            "party_id",
+            "posting_date",
+            "paid_amount",
+            "received_amount",
+            "docstatus",
+        ),
     ),
     "stock_entry": DocumentType(
         key="stock_entry",

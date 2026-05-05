@@ -621,83 +621,8 @@ def editar_comprobante(identifier: str):
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
-# Series e Identificadores
+# NamingSeries — CRUD robusto de series de numeracion
 
-
-@contabilidad.route("/series", methods=["GET", "POST"])
-@login_required
-@modulo_activo("accounting")
-@verifica_acceso("accounting")
-def series():
-    """Series e Identificadores."""
-    from cacao_accounting.database import Serie, database
-    from cacao_accounting.modulos import lista_tipos_documentos
-
-    TITULO = "Series e Identificadores - " + APPNAME
-
-    if request.args.get("doc", type=str):
-        consulta = consulta = database.paginate(
-            database.select(Serie).filter_by(doc=request.args.get("doc", type=str)),
-            page=request.args.get("page", default=1, type=int),
-            max_per_page=10,
-            count=True,
-        )
-    else:
-        consulta = database.paginate(
-            database.select(Serie),
-            page=request.args.get("page", default=1, type=int),
-            max_per_page=10,
-            count=True,
-        )
-
-    return render_template(
-        "contabilidad/serie_lista.html",
-        consulta=consulta,
-        documentos=lista_tipos_documentos(),
-        titulo=TITULO,
-    )
-
-
-@contabilidad.route("/serie/new", methods=["GET", "POST"])
-@login_required
-@modulo_activo("accounting")
-@verifica_acceso("accounting")
-def nueva_serie():
-    """Nueva Serie."""
-    from cacao_accounting.contabilidad.forms import FormularioSerie
-    from cacao_accounting.database import Entity, Serie, database
-
-    form = FormularioSerie()
-
-    CONSULTA_ENTIDADES = database.session.execute(database.select(Entity)).all()
-    LISTA_DE_ENTIDADES = []
-
-    for e in CONSULTA_ENTIDADES:
-        LISTA_DE_ENTIDADES.append((e[0].code, e[0].name))
-
-    form.entidad.choices = LISTA_DE_ENTIDADES
-
-    if form.validate_on_submit() or request.method == "POST":
-        SERIE = Serie(
-            entity=form.entidad.data,
-            doc=form.documento.data,
-            serie=form.serie.data,
-            enabled=True,
-            default=False,
-        )
-
-        database.session.add(SERIE)
-        database.session.commit()
-
-        return redirect(url_for("contabilidad.series"))
-
-    return render_template(
-        "contabilidad/serie_crear.html",
-        form=form,
-    )
-
-
-# <------------------------------------------------------------------------------------------------------------------------> #
 # NamingSeries — CRUD robusto de series de numeracion
 
 

@@ -29,6 +29,8 @@ from cacao_accounting.database import (
     database,
 )
 from cacao_accounting.database.helpers import get_active_naming_series
+from cacao_accounting.contabilidad.posting import PostingError, cancel_document, submit_document
+from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
@@ -407,3 +409,47 @@ def bancos_pago(payment_id):
         abort(404)
     titulo = (registro.document_no or payment_id) + " - " + APPNAME
     return render_template("bancos/pago.html", registro=registro, titulo=titulo)
+
+
+@bancos.route("/payment/<payment_id>/submit", methods=["POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_pago_submit(payment_id: str):
+    """Aprueba y contabiliza un pago."""
+
+    registro = database.session.get(PaymentEntry, payment_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 0:
+        abort(400)
+    try:
+        submit_document(registro)
+        database.session.commit()
+    except PostingError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("bancos.bancos_pago", payment_id=payment_id))
+    flash(_("Pago aprobado y contabilizado."), "success")
+    return redirect(url_for("bancos.bancos_pago", payment_id=payment_id))
+
+
+@bancos.route("/payment/<payment_id>/cancel", methods=["POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_pago_cancel(payment_id: str):
+    """Cancela un pago con reverso contable."""
+
+    registro = database.session.get(PaymentEntry, payment_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 1:
+        abort(400)
+    try:
+        cancel_document(registro)
+        database.session.commit()
+    except PostingError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("bancos.bancos_pago", payment_id=payment_id))
+    flash(_("Pago cancelado con reverso contable."), "warning")
+    return redirect(url_for("bancos.bancos_pago", payment_id=payment_id))

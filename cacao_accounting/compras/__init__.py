@@ -36,6 +36,7 @@ from cacao_accounting.database import (
     database,
 )
 from cacao_accounting.database.helpers import get_active_naming_series
+from cacao_accounting.contabilidad.posting import PostingError, cancel_document, submit_document
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 from cacao_accounting.document_flow import (
     DocumentFlowError,
@@ -43,6 +44,7 @@ from cacao_accounting.document_flow import (
     refresh_source_caches_for_target,
     revert_relations_for_target,
 )
+from cacao_accounting.document_flow.status import _
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
 
@@ -980,9 +982,13 @@ def compras_recepcion(receipt_id):
     """Detalle de recepción de compra."""
     registro = database.session.get(PurchaseReceipt, receipt_id)
     if not registro:
+        registro = database.session.execute(
+            database.select(PurchaseReceipt).filter_by(document_no=receipt_id)
+        ).scalar_one_or_none()
+    if not registro:
         abort(404)
-    items = database.session.execute(database.select(PurchaseReceiptItem).filter_by(purchase_receipt_id=receipt_id)).all()
-    titulo = (registro.document_no or receipt_id) + " - " + APPNAME
+    items = database.session.execute(database.select(PurchaseReceiptItem).filter_by(purchase_receipt_id=registro.id)).all()
+    titulo = (registro.document_no or registro.id) + " - " + APPNAME
     return render_template("compras/recepcion.html", registro=registro, items=items, titulo=titulo)
 
 
@@ -1163,9 +1169,14 @@ def compras_factura_compra_submit(invoice_id: str):
         abort(404)
     if registro.docstatus != 0:
         abort(400)
-    registro.docstatus = 1
-    database.session.commit()
-    flash("Factura de compra aprobada.", "success")
+    try:
+        submit_document(registro)
+        database.session.commit()
+    except PostingError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
+    flash(_("Factura de compra aprobada y contabilizada."), "success")
     return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
 
 
@@ -1179,9 +1190,14 @@ def compras_factura_compra_cancel(invoice_id: str):
         abort(404)
     if registro.docstatus != 1:
         abort(400)
-    registro.docstatus = 2
-    revert_relations_for_target("purchase_invoice", invoice_id)
-    refresh_source_caches_for_target("purchase_invoice", invoice_id)
-    database.session.commit()
-    flash("Factura de compra cancelada.", "warning")
+    try:
+        cancel_document(registro)
+        revert_relations_for_target("purchase_invoice", invoice_id)
+        refresh_source_caches_for_target("purchase_invoice", invoice_id)
+        database.session.commit()
+    except PostingError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
+    flash(_("Factura de compra cancelada con reverso contable."), "warning")
     return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))

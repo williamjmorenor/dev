@@ -1119,7 +1119,6 @@ def test_all_domain_models_importable():
         ComprobanteContable,
         ComprobanteContableDetalle,
         # Series
-        Serie,
         NamingSeries,
         Sequence,
         SeriesSequenceMap,
