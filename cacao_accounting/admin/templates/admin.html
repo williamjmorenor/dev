@@ -45,6 +45,24 @@
   </div>
 
   <div class="ca-module-card">
+    <h5><i class="bi bi-arrow-left-right"></i> {{ _("Conciliación de Compras") }}</h5>
+    <ul class="ca-module-links">
+      <li>
+        <a href="{{ url_for('admin.config_conciliacion_compras') }}">{{ _("Configuración de Conciliación") }}</a>
+        <span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span>
+      </li>
+      <li>
+        <a href="{{ url_for('compras.compras_reconciliation_panel') }}">{{ _("Panel de Conciliaciones") }}</a>
+        <span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span>
+      </li>
+      <li>
+        <a href="{{ url_for('compras.compras_purchase_reconciliation') }}">{{ _("Conciliaciones Pendientes") }}</a>
+        <span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="ca-module-card">
     <h5><i class="bi bi-card-list"></i> Registros</h5>
     <ul class="ca-module-links">
       <li><a href="#">Auditoría del Sistema</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>

@@ -32,10 +32,13 @@ def app_ctx():
         yield app
 
 
-def test_gr_ir_line_matching_supports_partial_and_completion(app_ctx):
-    from cacao_accounting.compras.gr_ir_service import get_gr_ir_pending, reconcile_gr_ir_invoice
+def test_purchase_reconciliation_line_matching_supports_partial_and_completion(app_ctx):
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        get_purchase_reconciliation_pending,
+        reconcile_purchase_invoice,
+    )
     from cacao_accounting.database import (
-        GRIRReconciliationItem,
+        PurchaseReconciliationItem,
         Item,
         PurchaseInvoice,
         PurchaseInvoiceItem,
@@ -95,19 +98,22 @@ def test_gr_ir_line_matching_supports_partial_and_completion(app_ctx):
         invoices.append(invoice)
     database.session.commit()
 
-    first = reconcile_gr_ir_invoice(invoices[0].id)
+    first = reconcile_purchase_invoice(invoices[0].id)
     assert first.matched_qty == Decimal("4.000000000")
-    assert get_gr_ir_pending("cacao")[0].pending_qty == Decimal("6.000000000")
+    assert get_purchase_reconciliation_pending("cacao")[0].pending_qty == Decimal("6.000000000")
 
-    second = reconcile_gr_ir_invoice(invoices[1].id)
+    second = reconcile_purchase_invoice(invoices[1].id)
     database.session.commit()
     assert second.matched_qty == Decimal("6.000000000")
-    assert get_gr_ir_pending("cacao") == []
-    assert database.session.execute(database.select(GRIRReconciliationItem)).scalars().all()
+    assert get_purchase_reconciliation_pending("cacao") == []
+    assert database.session.execute(database.select(PurchaseReconciliationItem)).scalars().all()
 
 
-def test_gr_ir_rejects_overbilling_and_price_difference(app_ctx):
-    from cacao_accounting.compras.gr_ir_service import GRIRServiceError, reconcile_gr_ir_invoice
+def test_purchase_reconciliation_rejects_overbilling_and_price_difference(app_ctx):
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        PurchaseReconciliationError,
+        reconcile_purchase_invoice,
+    )
     from cacao_accounting.database import (
         Item,
         PurchaseInvoice,
@@ -159,8 +165,8 @@ def test_gr_ir_rejects_overbilling_and_price_difference(app_ctx):
     )
     database.session.commit()
 
-    with pytest.raises(GRIRServiceError, match="excede"):
-        reconcile_gr_ir_invoice(invoice.id)
+    with pytest.raises(PurchaseReconciliationError, match="excede"):
+        reconcile_purchase_invoice(invoice.id)
 
 
 def test_bank_reconciliation_supports_partial_and_rejects_duplicates(app_ctx):
@@ -355,11 +361,13 @@ def test_inventory_uom_batch_serial_and_rebuild_stock_bins(app_ctx):
     from cacao_accounting.inventario.service import convert_item_qty, rebuild_stock_bins
 
     inventory = Accounts(entity="cacao", code="INV-S", name="Inventario", active=True, enabled=True, account_type="asset")
-    gr_ir = Accounts(entity="cacao", code="GRIR-S", name="GRIR", active=True, enabled=True, account_type="liability")
+    bridge = Accounts(
+        entity="cacao", code="BRIDGE-S", name="Cuenta Puente Compras", active=True, enabled=True, account_type="liability"
+    )
     database.session.add_all(
         [
             inventory,
-            gr_ir,
+            bridge,
             UOM(code="EA", name="Each"),
             UOM(code="BOX", name="Box"),
             Item(
@@ -377,7 +385,7 @@ def test_inventory_uom_batch_serial_and_rebuild_stock_bins(app_ctx):
     database.session.flush()
     database.session.add_all(
         [
-            CompanyDefaultAccount(company="cacao", default_inventory=inventory.id, gr_ir_account_id=gr_ir.id),
+            CompanyDefaultAccount(company="cacao", default_inventory=inventory.id, bridge_account_id=bridge.id),
             ItemAccount(item_code="ITEM-S", company="cacao", inventory_account_id=inventory.id),
             ItemUOMConversion(item_code="ITEM-S", from_uom="BOX", to_uom="EA", conversion_factor=Decimal("10")),
             Batch(item_code="ITEM-S", batch_no="B-1"),

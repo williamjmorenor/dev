@@ -207,9 +207,9 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Al submit de `StockEntry` material_receipt: acreditar GI/IR.
 - [x] Al submit directo de `PurchaseReceipt`: acreditar GI/IR (no AP).
 - [x] Al submit de `PurchaseInvoice` con recepción previa: debitar GI/IR, acreditar AP.
-- [x] Implementar UI y servicio de `GRIRReconciliation` por líneas.
+- [x] Implementar UI y servicio de `PurchaseReconciliation` por líneas.
 - [x] Reporte de GI/IR pendiente de reconciliar por proveedor/ítem/documento.
-- [ ] Definir cuenta de ajuste y flujo contable para diferencias de precio GR/IR.
+- [ ] Definir cuenta de ajuste y flujo contable para diferencias de precio conciliación de compras.
 
 ---
 

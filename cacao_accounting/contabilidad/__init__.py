@@ -151,6 +151,11 @@ def nueva_entidad():
         )
 
         database.session.add(ENTIDAD)
+        database.session.flush()
+
+        from cacao_accounting.compras.purchase_reconciliation_service import seed_matching_config_for_company
+
+        seed_matching_config_for_company(ENTIDAD.code)
         database.session.commit()
 
         return LISTA_ENTIDADES

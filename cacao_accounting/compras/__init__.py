@@ -17,7 +17,7 @@ from flask_login import login_required
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
-from cacao_accounting.compras.gr_ir_service import get_gr_ir_pending
+from cacao_accounting.compras.purchase_reconciliation_service import get_purchase_reconciliation_pending
 from cacao_accounting.database import (
     Item,
     Party,
@@ -29,6 +29,7 @@ from cacao_accounting.database import (
     PurchaseQuotationItem,
     PurchaseReceipt,
     PurchaseReceiptItem,
+    PurchaseReconciliation,
     PurchaseRequest,
     PurchaseRequestItem,
     SupplierQuotation,
@@ -454,16 +455,83 @@ def compras_proveedor_lista():
     return render_template("compras/proveedor_lista.html", consulta=consulta, titulo=titulo)
 
 
-@compras.route("/gr-ir")
+@compras.route("/purchase-reconciliation")
 @modulo_activo("purchases")
 @login_required
-def compras_gr_ir():
-    """Reporte operativo de GR/IR pendiente por linea."""
+def compras_purchase_reconciliation():
+    """Reporte operativo de conciliaciones de compra pendientes por linea."""
 
     company = request.args.get("company", "cacao")
-    rows = get_gr_ir_pending(company=company)
-    titulo = "GR/IR Pendiente - " + APPNAME
-    return render_template("compras/gr_ir.html", rows=rows, company=company, titulo=titulo)
+    rows = get_purchase_reconciliation_pending(company=company)
+    titulo = _("Conciliacion de Compras Pendiente") + " - " + APPNAME
+    return render_template("compras/purchase_reconciliation.html", rows=rows, company=company, titulo=titulo)
+
+
+@compras.route("/purchase-reconciliation/panel")
+@modulo_activo("purchases")
+@login_required
+def compras_reconciliation_panel():
+    """Panel de conciliacion: muestra OC con sus recepciones y facturas agrupadas con badges de estado."""
+    from dataclasses import dataclass, field
+    from typing import Any as _Any
+
+    company = request.args.get("company", "cacao")
+
+    reconciliations = (
+        database.session.execute(
+            database.select(PurchaseReconciliation)
+            .filter_by(company=company)
+            .where(PurchaseReconciliation.status != "cancelled")
+            .order_by(PurchaseReconciliation.matched_date.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+    @dataclass
+    class _PanelGroup:
+        purchase_order_id: str | None
+        purchase_order_name: str
+        reconciliations: list[_Any] = field(default_factory=list)
+        receipt_count: int = 0
+        invoice_count: int = 0
+        worst_status: str = "reconciled"
+
+    _STATUS_RANK: dict[str, int] = {
+        "disputed": 0,
+        "partial": 1,
+        "pending_receipt": 2,
+        "pending_invoice": 3,
+        "reconciled": 4,
+    }
+
+    groups: dict[str | None, _PanelGroup] = {}
+    receipt_ids_seen: set[str] = set()
+    invoice_ids_seen: set[str] = set()
+
+    for rec in reconciliations:
+        key = rec.purchase_order_id
+        if key not in groups:
+            po_name = str(rec.purchase_order_id) if rec.purchase_order_id else _("Sin Orden de Compra")
+            groups[key] = _PanelGroup(purchase_order_id=key, purchase_order_name=po_name)
+        g = groups[key]
+        g.reconciliations.append(rec)
+        if rec.purchase_receipt_id and rec.purchase_receipt_id not in receipt_ids_seen:
+            receipt_ids_seen.add(rec.purchase_receipt_id)
+            g.receipt_count += 1
+        if rec.purchase_invoice_id and rec.purchase_invoice_id not in invoice_ids_seen:
+            invoice_ids_seen.add(rec.purchase_invoice_id)
+            g.invoice_count += 1
+        if _STATUS_RANK.get(str(rec.status), 99) < _STATUS_RANK.get(g.worst_status, 99):
+            g.worst_status = str(rec.status)
+
+    titulo = _("Panel de Conciliacion de Compras") + " - " + APPNAME
+    return render_template(
+        "compras/purchase_reconciliation_panel.html",
+        groups=list(groups.values()),
+        company=company,
+        titulo=titulo,
+    )
 
 
 @compras.route("/supplier/new", methods=["GET", "POST"])

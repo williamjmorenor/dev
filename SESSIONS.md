@@ -910,3 +910,55 @@ Implementar el plan para completar brechas de Bancos, Inventario, Compras y Vent
 2. Prorrateo real de cargos capitalizables hacia `StockValuationLayer`.
 3. UI avanzada de edicion/eliminacion para impuestos, plantillas, precios y reglas bancarias.
 4. Exportaciones, paginacion avanzada y filtros configurables en reportes.
+
+## 2026-05-05 (Renaming: Framework de Conciliación de Compras — eliminación del término GR/IR)
+
+### Peticion del usuario
+1. Continuar la implementación sobre la rama `main` actualizada.
+2. El término **GR/IR (Goods Receipt / Invoice Receipt)** está prohibido en el proyecto — es terminología específica de SAP.  Se debe usar únicamente el nombre genérico **"Conciliación de Compras"** / **"Purchase Reconciliation"** en todo el código, plantillas, tests y documentación.
+3. Implementar el framework completo: configuración por compañía, eventos económicos inmutables, y tarjeta de administración en el menú de configuración.
+
+### Decisiones de diseño
+- **Terminología prohibida:** `GR/IR`, `GRIR`, `gr_ir`, `gr-ir` — ningún identificador o texto visible al usuario debe usar estos términos.
+- **Nombre canónico:** "Conciliación de Compras" (español) / "Purchase Reconciliation" (inglés).
+- **Cuenta puente:** renombrada de `gr_ir_account_id` a `bridge_account_id` en `CompanyDefaultAccount`.
+- **Tipo de cuenta interna:** renombrado de `"gr_ir"` a `"bridge"` en el mapa de cuentas del motor de posting.
+- **Nombre de tabla:** `gr_ir_reconciliation` → `purchase_reconciliation`; `gr_ir_reconciliation_item` → `purchase_reconciliation_item`.
+- **Clase Python:** `GRIRReconciliation` → `PurchaseReconciliation`; `GRIRReconciliationItem` → `PurchaseReconciliationItem`.
+- **Módulo de servicio:** `gr_ir_service.py` → `purchase_reconciliation_service.py` (el archivo antiguo queda como shim de compatibilidad con aliases).
+- **Eventos económicos:** `EventType` enum con valores descriptivos: `GOODS_RECEIVED`, `INVOICE_RECEIVED`, `MATCH_COMPLETED`, `MATCH_FAILED`, `MATCH_CANCELLED` — estos nombres de evento son aceptables porque describen la semántica de negocio, no el producto SAP.
+- **Items de conciliación:** el estado del item siempre es `"reconciled"` una vez creado (el ítem representa una cantidad ya conciliada); el estado parcial/total se refleja en el encabezado `PurchaseReconciliation`.
+- **Configuración por compañía:** `PurchaseMatchingConfig` permite configurar `matching_type` (2-way / 3-way), tolerancias de precio y cantidad, cuenta puente requerida y auto-conciliación. Al crear una compañía se siembra en modo **más estricto** (3-way, 0% tolerancia).
+
+### Plan implementado
+1. Merge de `main` → rama de trabajo (adquirió 6103 líneas nuevas en 37 archivos).
+2. Renombrado exhaustivo de todos los identificadores GR/IR en código Python, templates HTML y tests.
+3. Nuevos modelos en `database/__init__.py`: `PurchaseMatchingConfig`, `PurchaseEconomicEvent`, `PurchaseReconciliation`, `PurchaseReconciliationItem`.
+4. Nuevo servicio `purchase_reconciliation_service.py` con motor de matching configurable (2-way/3-way, tolerancias, eventos económicos).
+5. Ruta de administración `/settings/purchase-reconciliation` con formulario de configuración por compañía.
+6. Tarjeta "Conciliación de Compras" añadida a `admin.html`.
+7. Hook en creación de compañía (`nueva_entidad`) para sembrar configuración estricta automáticamente.
+8. Corrección de bug: `_matched_qty_for_receipt_item` filtraba solo `status="reconciled"` — ahora excluye `"cancelled"` para incluir ítems parciales.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/database/__init__.py`: modelos `PurchaseMatchingConfig`, `PurchaseEconomicEvent`, `PurchaseReconciliation`, `PurchaseReconciliationItem`; columna `bridge_account_id` en `CompanyDefaultAccount`.
+- `cacao_accounting/compras/purchase_reconciliation_service.py`: servicio nuevo con motor de matching configurable, enums `MatchingType`, `MatchingResult`, `ToleranceType`, `EventType`, `seed_matching_config_for_company`, `emit_economic_event`.
+- `cacao_accounting/compras/gr_ir_service.py`: convertido en shim de compatibilidad con re-exports y aliases.
+- `cacao_accounting/compras/__init__.py`: ruta `/purchase-reconciliation` (`compras_purchase_reconciliation`).
+- `cacao_accounting/compras/templates/compras/purchase_reconciliation.html`: plantilla renombrada sin GR/IR.
+- `cacao_accounting/contabilidad/posting.py`: tipo de cuenta `"bridge"`, función `_record_purchase_reconciliation`, cancel usa `cancel_purchase_reconciliation`.
+- `cacao_accounting/contabilidad/__init__.py`: `nueva_entidad` llama a `seed_matching_config_for_company`.
+- `cacao_accounting/reportes/services.py`: usa `get_purchase_reconciliation_pending`, `recon_type="purchase_reconciliation"`.
+- `cacao_accounting/admin/__init__.py`: ruta `/settings/purchase-reconciliation`, importa `PurchaseMatchingConfig`.
+- `cacao_accounting/admin/templates/admin.html`: tarjeta "Conciliación de Compras".
+- `cacao_accounting/admin/templates/admin/purchase_reconciliation_config.html`: UI de configuración.
+- `tests/test_04database_schema.py`: `PurchaseReconciliation`, tabla `purchase_reconciliation`.
+- `tests/test_07posting_engine.py`: `PurchaseReconciliation`, `bridge_account_id`, `bridge_account`.
+- `tests/test_08_reconciliation_reports.py`: `reconcile_purchase_invoice`, `get_purchase_reconciliation_pending`, `PurchaseReconciliationItem`, `PurchaseReconciliationError`.
+
+### Verificacion ejecutada
+- `black cacao_accounting/ tests/` → 5 archivos reformateados, resto sin cambios.
+- `flake8 cacao_accounting/ --max-line-length=130` → sin errores.
+- `ruff check cacao_accounting/` → All checks passed.
+- `mypy cacao_accounting/ --ignore-missing-imports` → Success: no issues found in 64 source files.
+- `pytest -q tests/` → **293 passed**, 4 warnings (Flask-Caching/deprecaciones externas).
