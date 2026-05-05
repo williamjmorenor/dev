@@ -7,7 +7,7 @@
 
 ## ¿Qué implementa el proyecto?
 
-**Cacao Accounting** es un sistema ERP/contable de código abierto orientado a pequeñas y medianas empresas. Implementa los flujos de negocio centrales de contabilidad:
+**Cacao Accounting** es un sistema contable de código abierto orientado a pequeñas y medianas empresas. Implementa los flujos de negocio centrales de contabilidad:
 
 - **R2R (Record to Report):** captura de transacciones → mayor general → reportes.
 - **S2P (Source to Pay):** solicitud de compra → orden → recepción → factura de proveedor → pago.
@@ -42,6 +42,9 @@ El sistema está diseñado con soporte nativo para:
 | Flujo documental | `cacao_accounting/document_flow/` | Trazabilidad entre documentos |
 | Identificadores | `cacao_accounting/document_identifiers.py` | Series y numeración automática |
 | Posting contable | `cacao_accounting/contabilidad/posting.py` | Servicio de contabilización GL, AR/AP, bancos e inventario |
+| Conciliación GR/IR | `cacao_accounting/compras/gr_ir_service.py` | Servicio de matching por líneas entre recepciones y facturas |
+| Conciliación bancaria | `cacao_accounting/bancos/reconciliation_service.py` | Servicio de matching parcial contra pagos y GL |
+| Reportes operativos | `cacao_accounting/reportes/` | Subledger, aging, Kardex y reconciliaciones |
 | Datos demo | `cacao_accounting/datos/` | Datos de carga inicial y desarrollo |
 | Pruebas | `tests/` | Suite de pruebas con pytest |
 
@@ -91,7 +94,8 @@ El posting contable actual:
 Pendiente en contabilidad:
 - El comprobante contable manual (`ComprobanteContable` / UI de GL) sigue sin generar `GLEntry`.
 - No hay reportes financieros construidos sobre `GLEntry`.
-- Impuestos, dimensiones adicionales y reglas diferenciales entre libros aún no están conectados al posting.
+- Dimensiones adicionales y reglas diferenciales entre libros aún no están conectadas al posting.
+- Impuestos/cargos ya tienen configuración admin, cálculo de plantilla y posting GL básico en facturas de compra/venta.
 
 Modelos en DB disponibles (implementados pero sin UI completa):  
 `GLEntry`, `ComprobanteContable`, `ComprobanteContableDetalle`, `GLEntryDimension`, `DimensionType`, `DimensionValue`, `LedgerMappingRule`, `ExchangeRevaluation`, `ExchangeRevaluationItem`, `PeriodCloseRun`, `PeriodCloseCheck`, `ItemAccount`, `PartyAccount`, `CompanyDefaultAccount`, `Tax`, `TaxTemplate`, `TaxTemplateItem`, `AccountBalanceSnapshot`.
@@ -104,13 +108,16 @@ Rutas implementadas con CRUD + submit/cancel:
 - **Cotización de Proveedor (`SupplierQuotation`):** lista, nueva, ver.
 - **Comparativo de Ofertas:** lista y vista por RFQ.
 - **Orden de Compra (`PurchaseOrder`):** lista, nuevo, ver, submit, cancel.
-- **Recepción de Mercancía (`PurchaseReceipt`):** lista, nueva, ver, submit, cancel.
+- **Recepción de Mercancía (`PurchaseReceipt`):** lista, nueva, ver, submit, cancel. El submit ahora genera `StockLedgerEntry` y GL hacia GR/IR, y el cancelado usa reversos append-only de stock y GL.
 - **Factura de Proveedor (`PurchaseInvoice`):** lista, nueva, ver, submit, cancel.
 - **Nota de Débito / Nota de Crédito / Devolución:** listas existentes; creación no implementada.
+- **GR/IR por líneas:** servicio y vista `/buying/gr-ir` para saldos pendientes por ítem/bodega/UOM; las facturas contra recepción crean detalle en `GRIRReconciliationItem`.
+- **Impuestos/cargos:** `PurchaseInvoice` puede usar `TaxTemplate`; el posting genera GL de impuestos/cargos aditivos o deductivos.
 - **Flujo documental:** integrado con `document_flow` y `document_identifiers` para relaciones y numeración.
 - **Posting:** al aprobar factura de compra se genera GL por libro activo:
   - AP por proveedor (`party_type="supplier"`).
   - Gasto directo o GR/IR cuando la factura viene de recepción.
+  - Impuestos/cargos desde plantilla.
   - Reverso contable al cancelar.
 
 ### `ventas` — Ventas (Order to Cash)
@@ -121,36 +128,61 @@ Rutas implementadas con CRUD + submit/cancel:
 - **Orden de Venta (`SalesOrder`):** lista, nueva, ver, submit, cancel.
 - **Nota de Entrega (`DeliveryNote`):** lista, nueva, ver, submit, cancel.
 - **Factura de Venta (`SalesInvoice`):** lista, nueva, ver, submit, cancel.
-- **Nota de Débito:** lista existente; creación no implementada.
-- **Devolución:** lista existente; creación no implementada.
-- **Nota de Crédito:** **no tiene ruta de lista ni creación** (es el gap más crítico en ventas).
+- **Nota de Débito:** lista existente; creación disponible en `/sales-invoice/new?document_type=sales_debit_note`.
+- **Devolución:** lista existente; creación disponible mediante `is_return=True` en la factura de venta.
+- **Nota de Crédito:** ruta de lista alias `/sales-invoice/credit-note/list` y creación disponible en `/sales-invoice/new?document_type=sales_credit_note`; pendiente validar flujo de reversión y `outstanding_amount`.
 - **Posting:** al aprobar factura de venta se genera GL por libro activo:
   - AR por cliente (`party_type="customer"`).
   - Ingreso por líneas.
+  - Impuestos/cargos desde plantilla.
   - Reverso contable al cancelar.
 
 ### `bancos` — Tesorería y Pagos
 Rutas implementadas:
 - **Banco:** lista, nuevo, ver.
 - **Cuenta Bancaria:** lista, nueva, ver.
-- **Pago (`PaymentEntry`):** lista, nuevo, ver, submit y cancel. Soporta cobros, pagos e internal_transfer.
+- **Pago (`PaymentEntry`):** lista, nuevo, ver, submit y cancel para cobros/pagos de terceros.
+- **Transferencia interna (`PaymentEntry` con `payment_type=internal_transfer`):** listado dedicado separado de pagos/cobros.
 - **Posting de pagos:** genera banco/caja contra AR/AP o banco origen/destino; puede usar cuenta explícita o `BankAccount.gl_account_id`.
-- **PaymentReference:** se registra al crear pagos desde facturas y actualiza `outstanding_amount` cacheado; aún falta cálculo dinámico/reportes históricos.
-- **Transacciones Bancarias:** lista solamente.
-- **Reconciliación bancaria:** modelo existe (`Reconciliation`, `ReconciliationItem`), sin UI.
+- **PaymentReference:** se registra al crear pagos desde facturas y el saldo vivo ahora se calcula dinámicamente a partir de las referencias de pago; soporta cálculo temporal por `allocation_date` para consistencia histórica.
+- **Transacciones Bancarias:** lista general, lista de notas de débito bancario y lista de notas de crédito bancario.
+- **Nota de Débito/Crédito Bancario:** creación manual implementada sobre `BankTransaction` (retiro/deposito).
+- **Reconciliación bancaria completa:** modelos extendidos, servicio de sugerencias y matching parcial contra `PaymentEntry` o `GLEntry`; vista mínima en `/cash_management/bank-reconciliation`.
+- **Importación de extractos:** UI CSV con preview, mapeo de columnas y detección de duplicados.
+- **Reglas de matching:** modelo y UI mínima para reglas por compañía/cuenta, texto de referencia, prioridad y tolerancias.
 
 ### `inventario` — Inventario y Almacén
 Rutas implementadas:
 - **Artículo (`Item`):** lista, nuevo, ver.
 - **Unidad de Medida (`UOM`):** lista, nueva, ver.
 - **Bodega (`Warehouse`):** lista, nueva, ver.
-- **Entrada de Almacén (`StockEntry`):** lista, nueva, ver, submit, cancel. Soporta material_receipt, material_issue, material_transfer.
+- **Entrada de Almacén (`StockEntry`):** lista, nueva, ver, submit, cancel. Soporta material_receipt, material_issue, material_transfer, stock_adjustment, stock_reconciliation, adjustment_positive y adjustment_negative.
 - **Filtros por tipo:** rutas diferenciadas para recibo de material, emisión y transferencia.
 - **Stock Ledger:** al aprobar `StockEntry` se genera `StockLedgerEntry`, se actualiza `StockBin` y se crea `StockValuationLayer`.
 - **Posting GL de inventario:** material receipt genera Inventario vs GR/IR; material issue genera gasto/costo vs Inventario; transferencias generan stock ledger sin GL.
+- **Recepción/Entrega directa:** el submit de `PurchaseReceipt` y `DeliveryNote` ahora genera `StockLedgerEntry` y GL de forma directa (GR/IR y COGS respectivamente), y el cancelado guarda reversos append-only en stock y GL.
+- **Servicios de inventario:** conversión UOM por ítem, validación obligatoria de lote/serial, actualización de seriales y reconstrucción de `StockBin` desde `StockLedgerEntry`.
 
 Modelos en DB disponibles pero sin funcionalidad completa:  
-`Batch`, `SerialNumber`, `StockBalanceSnapshot`. `StockLedgerEntry`, `StockBin` y `StockValuationLayer` ya están conectados para `StockEntry`, pero falta FIFO/Moving Average completo, reportes y conexión directa desde `PurchaseReceipt`/`DeliveryNote`.
+`StockBalanceSnapshot`. `Batch` y `SerialNumber` ya tienen validación operativa básica; `StockLedgerEntry`, `StockBin` y `StockValuationLayer` ya están conectados para `StockEntry`, `PurchaseReceipt` y `DeliveryNote`, pero falta gestión visual completa de lotes/seriales y recalculo histórico avanzado.
+
+### `reportes` — Reportes operativos
+- Blueprint global con rutas HTML:
+  - `/reports/subledger`
+  - `/reports/aging`
+  - `/reports/kardex`
+  - `/reports/reconciliations`
+  - `/reports/purchases-by-supplier`
+  - `/reports/purchases-by-item`
+  - `/reports/sales-by-customer`
+  - `/reports/sales-by-item`
+  - `/reports/gross-margin`
+  - `/reports/stock-balance`
+  - `/reports/inventory-valuation`
+  - `/reports/batches`
+  - `/reports/serials`
+- Servicios derivados desde GL/documentos, `PaymentReference`, `StockLedgerEntry` y reconciliaciones.
+- Estado actual: reportes operativos MVP con filtros básicos y totales; pendiente pulir UX, exportación y reportes financieros formales.
 
 ### `document_flow` — Flujo Documental
 - Registro de relaciones entre documentos (`DocumentRelation`).
@@ -199,7 +231,7 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 |---|---|
 | `cacao_accounting/contabilidad/gl/__init__.py` | Solo renderiza vistas; completamente desconectado del backend. El formulario de comprobante contable no genera GL entries. |
 | `cacao_accounting/contabilidad/__init__.py` | Rutas de Journal Entry (nuevo/ver/editar) existen pero no están conectadas al servicio de posting. |
-| `cacao_accounting/compras/templates/compras/proveedor_nuevo.html` | Formulario de nuevo proveedor documentado como "totalmente infuncional" en FIXME.md. |
+| `cacao_accounting/compras/templates/compras/proveedor_nuevo.html` | Formulario de nuevo proveedor operativo en el código; requiere verificación de datos y mejoras de UX tras la documentación FIXME. |
 | `cacao_accounting/compras/templates/compras/factura_compra_nuevo.html` | Documentado con "incompleto y con errores de HTML" en FIXME.md. |
 | `cacao_accounting/compras/templates/compras/recepcion_nuevo.html` | Documentado como "incompleto y con errores de HTML" en FIXME.md. |
 
@@ -208,8 +240,8 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 | Archivo | Problema |
 |---|---|
 | `cacao_accounting/ventas/__init__.py` | No existe ruta de creación de nota de crédito de cliente (el gap más relevante del módulo). |
-| `cacao_accounting/bancos/__init__.py` | Falta UI de conciliación bancaria y separar transferencia interna como flujo/documento independiente. |
-| `cacao_accounting/inventario/__init__.py` | StockEntry ya genera ledger/bin/valuation; faltan métodos FIFO/Moving Average completos, reportes y conexión directa desde DeliveryNote/PurchaseReceipt. |
+| `cacao_accounting/bancos/__init__.py` | Conciliación, importación CSV y reglas de matching MVP implementadas; falta UX avanzada y automatización de diferencias. |
+| `cacao_accounting/inventario/__init__.py` | StockEntry ya genera ledger/bin/valuation; existen UOM/lote/serial/rebuild/reportes MVP; faltan gestión visual avanzada y valoración histórica profunda. |
 | `cacao_accounting/admin/__init__.py` | Ya gestiona usuarios/roles/permisos; falta setup funcional de compañía y cuentas por defecto. |
 | `FIXME.md` | Bitácora de errores conocidos con ~18 items sin resolver; debe procesarse sistemáticamente. |
 
@@ -230,10 +262,10 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 | Auth | ✅ Completo | ✅ Login/Logout | ✅ RBAC activo | ❌ Sin reportes |
 | Admin | ✅ Completo | 🟡 Usuarios/roles/módulos | 🟡 Servicios básicos | ❌ Sin reportes |
 | Contabilidad | ✅ Completo | 🟡 Parcial | 🟡 Posting operativo; JE manual pendiente | ❌ Sin reportes |
-| Compras | ✅ Completo | 🟡 Parcial (sin notas/devoluciones) | ✅ Factura de compra genera GL | ❌ Sin reportes |
-| Ventas | ✅ Completo | 🟡 Parcial (sin nota crédito) | ✅ Factura de venta genera GL | ❌ Sin reportes |
-| Bancos | ✅ Completo | 🟡 Parcial (sin reconciliación) | ✅ Pagos generan GL; referencias parciales | ❌ Sin reportes |
-| Inventario | ✅ Completo | 🟡 Parcial | ✅ StockEntry genera SLE/Bin/Valuation/GL | ❌ Sin reportes |
+| Compras | ✅ Completo | 🟡 Parcial | ✅ Factura de compra genera GL + impuestos/cargos | 🟡 MVP |
+| Ventas | ✅ Completo | 🟡 Parcial | ✅ Factura de venta genera GL + impuestos/cargos | 🟡 MVP |
+| Bancos | ✅ Completo | 🟡 Parcial | ✅ Pagos, notas, conciliación e importación MVP | 🟡 MVP |
+| Inventario | ✅ Completo | 🟡 Parcial | ✅ SLE/Bin/Valuation/GL + UOM/lote/serial MVP | 🟡 MVP |
 | API | N/A | 🟡 Parcial | ✅ Flow endpoints | N/A |
 | Document Flow | ✅ Completo | ✅ API completa | ✅ Relaciones activas | ❌ Sin reportes |
 | Identificadores | ✅ Completo | ✅ NamingSeries UI | ✅ Generación activa | 🟡 Solo log |

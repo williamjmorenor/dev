@@ -36,6 +36,10 @@
         <a href="{{ url_for('bancos.bancos_cuenta_bancaria_lista') }}">Cuentas Bancarias</a>
         <span class="ca-status-dot ca-status-ok" title="Acceso disponible"></span>
       </li>
+      <li>
+        <a href="{{ url_for('bancos.bancos_reglas_matching') }}">{{ _("Reglas de Matching") }}</a>
+        <span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span>
+      </li>
       {% else %}
       <li class="ca-no-access">
         <span>Bancos</span>
@@ -63,6 +67,14 @@
       <li>
         <a href="{{ url_for('bancos.bancos_transaccion_lista') }}">Transacciones Bancarias</a>
         <span class="ca-status-dot ca-status-ok" title="Acceso disponible"></span>
+      </li>
+      <li>
+        <a href="{{ url_for('bancos.bancos_extracto_importar') }}">{{ _("Importar Extracto Bancario") }}</a>
+        <span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span>
+      </li>
+      <li>
+        <a href="{{ url_for('bancos.bancos_conciliacion_bancaria') }}">{{ _("Conciliación Bancaria") }}</a>
+        <span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span>
       </li>
       {% else %}
       <li class="ca-no-access">

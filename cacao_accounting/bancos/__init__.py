@@ -6,6 +6,7 @@
 # ---------------------------------------------------------------------------------------
 # Libreria estandar
 # --------------------------------------------------------------------------------------
+from datetime import date
 from decimal import Decimal
 from typing import cast
 
@@ -18,18 +19,33 @@ from flask_login import login_required
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
+from cacao_accounting.bancos.reconciliation_service import (
+    BankReconciliationError,
+    BankReconciliationMatch,
+    BankReconciliationRequest,
+    find_bank_reconciliation_candidates,
+    reconcile_bank_items,
+)
+from cacao_accounting.bancos.statement_service import (
+    BankStatementError,
+    apply_bank_matching_rule,
+    import_bank_statement,
+)
 from cacao_accounting.database import (
     Bank,
     BankAccount,
+    BankMatchingRule,
     BankTransaction,
     PaymentEntry,
     PaymentReference,
     PurchaseInvoice,
+    ReconciliationItem,
     SalesInvoice,
     database,
 )
 from cacao_accounting.database.helpers import get_active_naming_series
-from cacao_accounting.contabilidad.posting import PostingError, cancel_document, submit_document
+from cacao_accounting.contabilidad.posting import PostingError, cancel_document, post_bank_transaction, submit_document
+from cacao_accounting.document_flow.service import compute_outstanding_amount
 from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 from cacao_accounting.decorators import modulo_activo
@@ -98,13 +114,29 @@ def bancos_cuenta_bancaria_lista():
 def bancos_pago_lista():
     """Listado de entradas de pago."""
     consulta = database.paginate(
-        database.select(PaymentEntry),
+        database.select(PaymentEntry).filter(PaymentEntry.payment_type.in_(("receive", "pay"))),
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
     )
     titulo = "Listado de Pagos - " + APPNAME
     return render_template("bancos/pago_lista.html", consulta=consulta, titulo=titulo)
+
+
+@bancos.route("/transfer/list")
+@modulo_activo("cash")
+@login_required
+def bancos_transferencia_lista():
+    """Listado de transferencias internas."""
+
+    consulta = database.paginate(
+        database.select(PaymentEntry).filter_by(payment_type="internal_transfer"),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Transferencias Internas - " + APPNAME
+    return render_template("bancos/pago_lista.html", consulta=consulta, titulo=titulo, is_transfer_list=True)
 
 
 @bancos.route("/bank-transaction/list")
@@ -120,6 +152,355 @@ def bancos_transaccion_lista():
     )
     titulo = "Listado de Transacciones Bancarias - " + APPNAME
     return render_template("bancos/transaccion_lista.html", consulta=consulta, titulo=titulo)
+
+
+@bancos.route("/bank-transaction/debit-note/list")
+@modulo_activo("cash")
+@login_required
+def bancos_nota_debito_lista():
+    """Listado de notas de débito bancario (retiros)."""
+
+    consulta = database.paginate(
+        database.select(BankTransaction).filter(BankTransaction.withdrawal.is_not(None)),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Notas de Débito Bancario - " + APPNAME
+    return render_template(
+        "bancos/transaccion_lista.html",
+        consulta=consulta,
+        titulo=titulo,
+        page_heading="Listado de Notas de Débito Bancario",
+        new_url=url_for("bancos.bancos_nota_debito_nueva"),
+    )
+
+
+@bancos.route("/bank-transaction/credit-note/list")
+@modulo_activo("cash")
+@login_required
+def bancos_nota_credito_lista():
+    """Listado de notas de crédito bancario (depósitos)."""
+
+    consulta = database.paginate(
+        database.select(BankTransaction).filter(BankTransaction.deposit.is_not(None)),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Notas de Crédito Bancario - " + APPNAME
+    return render_template(
+        "bancos/transaccion_lista.html",
+        consulta=consulta,
+        titulo=titulo,
+        page_heading="Listado de Notas de Crédito Bancario",
+        new_url=url_for("bancos.bancos_nota_credito_nueva"),
+    )
+
+
+def _crear_nota_bancaria(note_kind: str):
+    """Crea una transacción bancaria manual como nota de débito/crédito."""
+
+    company = request.form.get("company") or request.args.get("company") or None
+    if request.method == "POST":
+        amount = _form_decimal("amount")
+        if amount <= 0:
+            abort(409)
+        bank_account_id = request.form.get("bank_account_id", "")
+        bank_account = database.session.get(BankAccount, bank_account_id)
+        if not bank_account:
+            abort(400)
+        if company and bank_account.company != company:
+            abort(409)
+        transaction = BankTransaction(
+            bank_account_id=bank_account_id,
+            posting_date=request.form.get("posting_date") or None,
+            description=request.form.get("description") or None,
+            reference_number=request.form.get("reference_number") or None,
+            deposit=amount if note_kind == "credit" else None,
+            withdrawal=amount if note_kind == "debit" else None,
+        )
+        database.session.add(transaction)
+        database.session.flush()
+        try:
+            post_bank_transaction(transaction)
+            database.session.commit()
+            flash(_("Nota bancaria registrada correctamente y registrada en el libro mayor."), "success")
+        except PostingError as exc:
+            database.session.rollback()
+            flash(_(str(exc)), "danger")
+            if note_kind == "credit":
+                return redirect(url_for("bancos.bancos_nota_credito_nueva"))
+            return redirect(url_for("bancos.bancos_nota_debito_nueva"))
+        list_view = "bancos.bancos_nota_credito_lista" if note_kind == "credit" else "bancos.bancos_nota_debito_lista"
+        return redirect(url_for(list_view))
+    cuentas_query = database.select(BankAccount).filter_by(is_active=True)
+    if company:
+        cuentas_query = cuentas_query.filter_by(company=company)
+    cuentas = database.session.execute(cuentas_query).scalars().all()
+    return render_template(
+        "bancos/transaccion_nueva.html",
+        titulo=("Nueva Nota de Crédito Bancario - " if note_kind == "credit" else "Nueva Nota de Débito Bancario - ")
+        + APPNAME,
+        note_kind=note_kind,
+        cuentas=cuentas,
+        company=company,
+    )
+
+
+@bancos.route("/bank-transaction/reconcile", methods=["POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_transaccion_reconciliar():
+    """Marca transacciones bancarias seleccionadas como conciliadas."""
+
+    transaction_ids = request.form.getlist("transaction_id")
+    if not transaction_ids:
+        abort(400)
+
+    transactions = (
+        database.session.execute(database.select(BankTransaction).filter(BankTransaction.id.in_(transaction_ids)))
+        .scalars()
+        .all()
+    )
+    if not transactions:
+        abort(404)
+    if any(transaction.is_reconciled for transaction in transactions):
+        abort(409)
+
+    company = None
+    for transaction in transactions:
+        bank_account = database.session.get(BankAccount, transaction.bank_account_id)
+        if not bank_account:
+            abort(404)
+        if company is None:
+            company = bank_account.company
+        elif bank_account.company != company:
+            abort(409)
+        duplicated_item = database.session.execute(
+            database.select(ReconciliationItem.id)
+            .filter_by(reference_type="bank_transaction", reference_id=transaction.id)
+            .limit(1)
+        ).scalar_one_or_none()
+        if duplicated_item:
+            abort(409)
+
+    try:
+        reconcile_bank_items(
+            BankReconciliationRequest(
+                company=str(company),
+                reconciliation_date=date.today(),
+                matches=[
+                    BankReconciliationMatch(
+                        bank_transaction_id=transaction.id,
+                        target_type="gl_entry",
+                        target_id=str(request.form.get(f"target_id_{transaction.id}") or ""),
+                        allocated_amount=transaction.deposit if transaction.deposit is not None else transaction.withdrawal,
+                    )
+                    for transaction in transactions
+                    if request.form.get(f"target_id_{transaction.id}")
+                ],
+            )
+        )
+    except BankReconciliationError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("bancos.bancos_conciliacion_bancaria"))
+
+    database.session.commit()
+    flash(_("Transacciones bancarias conciliadas correctamente."), "success")
+    return redirect(url_for("bancos.bancos_transaccion_lista"))
+
+
+@bancos.route("/bank-reconciliation")
+@modulo_activo("cash")
+@login_required
+def bancos_conciliacion_bancaria():
+    """Panel de conciliacion bancaria con transacciones pendientes."""
+
+    company = request.args.get("company") or None
+    query = database.select(BankTransaction).filter_by(is_reconciled=False)
+    if company:
+        query = query.join(BankAccount, BankAccount.id == BankTransaction.bank_account_id).filter(
+            BankAccount.company == company
+        )
+    transactions = database.session.execute(query.order_by(BankTransaction.posting_date)).scalars().all()
+    suggestions = {transaction.id: find_bank_reconciliation_candidates(transaction.id) for transaction in transactions}
+    return render_template(
+        "bancos/conciliacion_bancaria.html",
+        titulo="Conciliación Bancaria - " + APPNAME,
+        transactions=transactions,
+        suggestions=suggestions,
+        company=company,
+    )
+
+
+@bancos.route("/bank-reconciliation/<bank_account_id>")
+@modulo_activo("cash")
+@login_required
+def bancos_conciliacion_bancaria_cuenta(bank_account_id: str):
+    """Panel de conciliacion bancaria filtrado por cuenta."""
+
+    bank_account = database.session.get(BankAccount, bank_account_id)
+    if not bank_account:
+        abort(404)
+    transactions = (
+        database.session.execute(
+            database.select(BankTransaction)
+            .filter_by(bank_account_id=bank_account_id, is_reconciled=False)
+            .order_by(BankTransaction.posting_date)
+        )
+        .scalars()
+        .all()
+    )
+    suggestions = {transaction.id: find_bank_reconciliation_candidates(transaction.id) for transaction in transactions}
+    return render_template(
+        "bancos/conciliacion_bancaria.html",
+        titulo="Conciliación Bancaria - " + APPNAME,
+        transactions=transactions,
+        suggestions=suggestions,
+        company=bank_account.company,
+    )
+
+
+@bancos.route("/bank-reconciliation/apply", methods=["POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_conciliacion_bancaria_aplicar():
+    """Aplica conciliaciones bancarias seleccionadas."""
+
+    company = request.form.get("company") or "cacao"
+    matches: list[BankReconciliationMatch] = []
+    for transaction_id in request.form.getlist("bank_transaction_id"):
+        target = request.form.get(f"target_{transaction_id}") or ""
+        amount = _form_decimal(f"amount_{transaction_id}")
+        if not target or amount <= 0:
+            continue
+        target_type, target_id = target.split(":", 1)
+        matches.append(
+            BankReconciliationMatch(
+                bank_transaction_id=transaction_id,
+                target_type=target_type,
+                target_id=target_id,
+                allocated_amount=amount,
+            )
+        )
+    try:
+        reconcile_bank_items(BankReconciliationRequest(company=company, reconciliation_date=date.today(), matches=matches))
+        database.session.commit()
+        flash(_("Conciliación bancaria aplicada correctamente."), "success")
+    except BankReconciliationError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+    return redirect(url_for("bancos.bancos_conciliacion_bancaria", company=company))
+
+
+@bancos.route("/bank-statement/import", methods=["GET", "POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_extracto_importar():
+    """Importa extractos bancarios CSV con preview."""
+
+    accounts = (
+        database.session.execute(database.select(BankAccount).filter_by(is_active=True).order_by(BankAccount.account_name))
+        .scalars()
+        .all()
+    )
+    result = None
+    if request.method == "POST":
+        mapping = {
+            "date": request.form.get("date_column") or "date",
+            "reference": request.form.get("reference_column") or "reference",
+            "description": request.form.get("description_column") or "description",
+            "deposit": request.form.get("deposit_column") or "deposit",
+            "withdrawal": request.form.get("withdrawal_column") or "withdrawal",
+        }
+        try:
+            result = import_bank_statement(
+                request.files["statement_file"],
+                mapping,
+                request.form.get("bank_account_id") or "",
+                preview=request.form.get("action") == "preview",
+            )
+            if request.form.get("action") == "import":
+                database.session.commit()
+                flash(_("Extracto importado correctamente."), "success")
+                return redirect(url_for("bancos.bancos_transaccion_lista"))
+        except (BankStatementError, KeyError) as exc:
+            database.session.rollback()
+            flash(_(str(exc)), "danger")
+    return render_template(
+        "bancos/extracto_importar.html", accounts=accounts, result=result, titulo=_("Importar Extracto Bancario")
+    )
+
+
+@bancos.route("/bank-matching-rules", methods=["GET", "POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_reglas_matching():
+    """Administra reglas de matching bancario."""
+
+    accounts = (
+        database.session.execute(database.select(BankAccount).filter_by(is_active=True).order_by(BankAccount.account_name))
+        .scalars()
+        .all()
+    )
+    if request.method == "POST":
+        rule = BankMatchingRule(
+            company=request.form.get("company") or "",
+            bank_account_id=request.form.get("bank_account_id") or None,
+            name=request.form.get("name") or "",
+            days_tolerance=int(request.form.get("days_tolerance") or 7),
+            amount_tolerance=Decimal(request.form.get("amount_tolerance") or "0"),
+            reference_contains=request.form.get("reference_contains") or None,
+            priority=int(request.form.get("priority") or 100),
+            is_active=bool(request.form.get("is_active", "1")),
+        )
+        database.session.add(rule)
+        database.session.commit()
+        flash(_("Regla de matching creada correctamente."), "success")
+        return redirect(url_for("bancos.bancos_reglas_matching"))
+    rules = database.session.execute(database.select(BankMatchingRule).order_by(BankMatchingRule.priority)).scalars().all()
+    return render_template(
+        "bancos/reglas_matching.html", accounts=accounts, rules=rules, titulo=_("Reglas de Matching Bancario")
+    )
+
+
+@bancos.route("/bank-matching-rules/<rule_id>/run", methods=["POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_regla_matching_ejecutar(rule_id: str):
+    """Ejecuta una regla de matching para una cuenta y rango."""
+
+    try:
+        date_from = date.fromisoformat(request.form.get("date_from") or date.today().isoformat())
+        date_to = date.fromisoformat(request.form.get("date_to") or date.today().isoformat())
+        result = apply_bank_matching_rule(rule_id, request.form.get("bank_account_id") or "", (date_from, date_to))
+        flash(
+            _("Regla ejecutada: {count} transacciones evaluadas.").format(count=len(result.candidates_by_transaction)),
+            "success",
+        )
+    except BankStatementError as exc:
+        flash(_(str(exc)), "danger")
+    return redirect(url_for("bancos.bancos_reglas_matching"))
+
+
+@bancos.route("/bank-transaction/debit-note/new", methods=["GET", "POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_nota_debito_nueva():
+    """Formulario de nota de débito bancaria."""
+
+    return _crear_nota_bancaria("debit")
+
+
+@bancos.route("/bank-transaction/credit-note/new", methods=["GET", "POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_nota_credito_nueva():
+    """Formulario de nota de crédito bancaria."""
+
+    return _crear_nota_bancaria("credit")
 
 
 @bancos.route("/bank/new", methods=["GET", "POST"])
@@ -206,10 +587,9 @@ def _form_decimal(field_name: str, default: str = "0") -> Decimal:
 
 
 def _invoice_outstanding(invoice) -> Decimal:
-    """Devuelve el saldo vivo cacheado de una factura."""
+    """Devuelve el saldo vivo calculado de una factura."""
 
-    value = invoice.outstanding_amount if invoice.outstanding_amount is not None else invoice.grand_total
-    return Decimal(str(value or 0))
+    return compute_outstanding_amount(invoice)
 
 
 def _payment_source_rows(purchase_invoice_ids: list[str], sales_invoice_ids: list[str]) -> list[dict]:
@@ -336,6 +716,10 @@ def bancos_pago_nuevo():
         try:
             amount = _form_decimal("paid_amount", "0")
             payment_type = request.form.get("payment_type") or "receive"
+            if payment_type == "internal_transfer" and (from_purchase_invoice_ids or from_sales_invoice_ids):
+                abort(409)
+            if from_purchase_invoice_ids and from_sales_invoice_ids:
+                abort(409)
             payment = PaymentEntry(
                 payment_type=payment_type,
                 company=request.form.get("company") or None,

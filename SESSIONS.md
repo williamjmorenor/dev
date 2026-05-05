@@ -28,8 +28,8 @@ Analizar la definición de módulos del sistema (directorio `modulos/`) y genera
 ### Hallazgos clave
 - El modelo de base de datos es completo (~90 tablas en 2041 líneas).
 - Ningún documento operativo genera `GLEntry` al ser confirmado (submit). Este es el gap más crítico.
-- El módulo de ventas no tiene ruta de lista ni creación de nota de crédito de cliente.
-- El formulario de proveedor nuevo es no funcional (documentado en FIXME).
+- El módulo de ventas tiene ruta de lista y creación de nota de crédito de cliente; queda pendiente validar el flujo de reversión y el cálculo de `outstanding_amount`.
+- El formulario de proveedor nuevo es operativo en el código, aunque documentado en FIXME y sujeto a mejoras de UX.
 - `StockEntry` no genera `StockLedgerEntry` ni actualiza `StockBin` al hacer submit.
 - La reconciliación bancaria, cierre de período y revalorización cambiaria tienen modelos pero sin UI ni servicio.
 
@@ -41,6 +41,182 @@ Analizar la definición de módulos del sistema (directorio `modulos/`) y genera
 1. Priorizar implementación de posting contable (Bloque 1 de PENDIENTE.md).
 2. Corregir formularios documentados como no funcionales en FIXME.md.
 3. Implementar nota de crédito de venta (gap crítico en módulo ventas).
+
+## 2026-05-05 (inicio de implementación)
+
+### Peticion del usuario
+Iniciar la implementación de los registros pendientes para Bancos, Compras, Ventas e Inventario, alineando la documentación con el estado real del código.
+
+### Plan implementado
+1. Verificar en el código la existencia de rutas de ventas para nota de crédito y nota de débito, y actualizar la documentación para reflejar su estado real.
+2. Ajustar el backlog de pendientes para conservar solo las brechas reales: reconciliación bancaria, posteo directo de PurchaseReceipt/DeliveryNote, GL inverso en notas de crédito/débito y validaciones de `outstanding_amount`.
+3. Registrar el punto de inicio de esta iteración en la bitácora de sesión.
+
+### Resumen tecnico de cambios
+- Actualizado `ESTADO_ACTUAL.md` para reflejar que la lista y creación de notas de crédito/débito de venta ya existen como rutas operativas.
+- Ajustado `PENDIENTE.md` para no reportar como faltante la ruta de nota de crédito de ventas y el formulario de proveedor se marca como operativo básico sujeto a mejoras.
+- Añadido registro de sesión en `SESSIONS.md` para documentar el inicio de implementación.
+
+### Verificacion ejecutada
+- Revisión de código en `cacao_accounting/ventas/__init__.py` para rutas `sales-credit-note` y `sales-debit-note`.
+- Revisión de código en `cacao_accounting/compras/__init__.py` para el formulario de proveedor.
+- Revisión de estado en documentación y backlog.
+
+### Notas para siguiente iteracion
+1. Completar la UI de reconciliación bancaria y la lógica de `outstanding_amount` dinámica.
+2. Validar pruebas de regressión del flujo de notas de crédito/débito.
+3. Confirmar pruebas de reversión contable y de stock para `PurchaseReceipt` y `DeliveryNote`.
+
+## 2026-05-05 (cancelación de recepciones y entregas)
+
+### Peticion del usuario
+Agregar cancelación contable y de stock append-only a las recepciones de compra y notas de entrega, y actualizar la documentación de estado.
+
+### Plan implementado
+1. Extender `cancel_document` para que también revierta `StockLedgerEntry` de `PurchaseReceipt` y `DeliveryNote`.
+2. Usar `cancel_document` en las rutas de cancelación de `PurchaseReceipt` y `DeliveryNote`.
+3. Mantener la trazabilidad de `GL` y `StockBin` con reversos append-only.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/posting.py` ahora cancela movimientos de stock asociados a `PurchaseReceipt`, `DeliveryNote` y `StockEntry`.
+- `cacao_accounting/compras/__init__.py` usa `cancel_document` al cancelar `PurchaseReceipt`.
+- `cacao_accounting/ventas/__init__.py` usa `cancel_document` al cancelar `DeliveryNote`.
+- El backlog se actualizó para reflejar que la reversión append-only está implementada y requiere pruebas adicionales.
+
+### Verificacion ejecutada
+- Compilación de los archivos afectados.
+- Revisión de rutas de cancelación y del motor de posting.
+
+### Notas para siguiente iteracion
+1. Implementar pruebas de regresión para cancelaciones contables de notas de entrega y recepciones.
+2. Avanzar en la UI de reconciliación bancaria.
+3. Verificar el impacto de cancelaciones en `document_flow` y `outstanding_amount`.
+
+## 2026-05-05 (posteo directo de recepciones y entregas)
+
+### Peticion del usuario
+Implementar el posting contable directo para recepciones de compra y notas de entrega, manteniendo la documentación de estado actualizada.
+
+### Plan implementado
+1. Añadir soporte en `cacao_accounting/contabilidad/posting.py` para procesar `PurchaseReceipt` y `DeliveryNote` como documentos operativos contables.
+2. Generar `StockLedgerEntry`, `StockBin` y `StockValuationLayer` al aprobar recepciones y entregas.
+3. Generar GL de GR/IR en `PurchaseReceipt` y GL de COGS en `DeliveryNote`.
+4. Actualizar los submit handlers de `cacao_accounting/compras/__init__.py` y `cacao_accounting/ventas/__init__.py` para usar `submit_document`.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/posting.py` ahora soporta `PurchaseReceipt` y `DeliveryNote` en `post_document_to_gl`.
+- `PurchaseReceipt` crea movimientos de inventario con impacto en `StockLedgerEntry`, `StockBin` y `StockValuationLayer`, y registra GL hacia GR/IR.
+- `DeliveryNote` crea movimientos de inventario de salida y registra GL de costo de ventas contra inventario.
+- Los submit handlers ahora ejecutan `submit_document` y gestionan errores de posting.
+
+### Verificacion ejecutada
+- Compilación de `cacao_accounting/contabilidad/posting.py`, `cacao_accounting/compras/__init__.py` y `cacao_accounting/ventas/__init__.py`.
+- Confirmación de que los nuevos tipos de documento son reconocidos por el motor de posting.
+
+### Notas para siguiente iteracion
+1. Ajustar la reversión de `PurchaseReceipt` y `DeliveryNote` para que generen SLE reversos append-only.
+2. Implementar los reportes de stock y la validación FIFO / Moving Average.
+3. Avanzar en la UI de reconciliación bancaria.
+
+## 2026-05-05 (finalización Fase 3/4)
+
+### Peticion del usuario
+Finalizar la etapa Fase 3/4 con notas de crédito/débito, devoluciones, GR/IR y validaciones formales de período/cierre.
+
+### Plan implementado
+1. Añadir validación de período cerrado en el motor de cancelación para evitar reversos en períodos cerrados.
+2. Registrar conciliación GR/IR al contabilizar facturas de compra asociadas a recepciones de compra.
+3. Eliminar registros de conciliación GR/IR cuando se cancela la factura de compra correspondiente.
+4. Añadir pruebas de notas de crédito de compra, reconciliación GR/IR y bloqueo de cancelación en período cerrado.
+
+### Resumen tecnico de cambios
+- Actualizada `cacao_accounting/contabilidad/posting.py` con:
+  - conversión de errores de período cerrado a `PostingError` en el flujo de contabilización,
+  - reconciliación GR/IR registrada en `GRIRReconciliation` para facturas de compra con recepción asociada,
+  - limpieza de conciliaciones GR/IR en la cancelación de factura de compra.
+- Añadida cobertura de pruebas en `tests/test_07posting_engine.py` para:
+  - cálculo y registro de GR/IR,
+  - notas de crédito de compra balanceadas,
+  - bloqueo de cancelación en períodos cerrados.
+
+### Verificacion ejecutada
+- `pytest tests/test_07posting_engine.py -q` -> 17 passed.
+- `python -m py_compile cacao_accounting/contabilidad/posting.py tests/test_07posting_engine.py` -> sin errores de sintaxis.
+
+## 2026-05-05 (ledger core y notas bancarias)
+
+### Peticion del usuario
+Completar la implementación de ledger core con posting de comprobante contable manual, consumo FIFO/MA de capas de inventario y GL para notas bancarias.
+
+### Plan implementado
+1. Añadir soporte de `BankTransaction` en `cacao_accounting/contabilidad/posting.py` y procesar notas bancarias en GL.
+2. Implementar consumo de capas de valuación de inventario FIFO/Moving Average en `cacao_accounting/contabilidad/posting.py`.
+3. Ajustar `DeliveryNote` para usar costo real de inventario como base de COGS.
+4. Consolidar el cálculo de `outstanding_amount` temporal en `cacao_accounting/document_flow/service.py`.
+5. Agregar conciliación bancaria MVP en `cacao_accounting/bancos/__init__.py` con estado `is_reconciled` y registro de conciliaciones.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/posting.py`: soporte completo de `BankTransaction` en `post_document_to_gl`; consumo de capas de valuación negado para salidas; fallback de costo cuando no hay capas registradas; `DeliveryNote` usa costo real para GL de COGS.
+- `cacao_accounting/document_flow/service.py`: `compute_outstanding_amount` ahora usa fecha actual por defecto para consultas temporales.
+- `cacao_accounting/bancos/__init__.py`: notas bancarias ahora generan GL al crearse y existe endpoint para marcar transacciones como conciliadas.
+
+### Verificacion ejecutada
+- `ruff check cacao_accounting/contabilidad/posting.py cacao_accounting/bancos/__init__.py cacao_accounting/document_flow/service.py`
+- `pytest -q tests/test_07posting_engine.py -q`
+
+### Notas para siguiente iteracion
+1. Añadir pruebas unitarias para reconciliación bancaria y notas bancarias en `tests/`.
+2. Extender Fase 3 con notas de crédito/débito de compras y ventas.
+3. Completar validación de período contable para operaciones de pago y cierre.
+
+## 2026-05-05 (posteo de comprobantes contables manuales)
+
+### Peticion del usuario
+Agregar soporte de contabilización para comprobantes contables manuales (`ComprobanteContable`) y dejar listo el motor de posting para entradas de diario.
+
+### Plan implementado
+1. Extender `cacao_accounting/contabilidad/posting.py` para reconocer `ComprobanteContable` en `post_document_to_gl`.
+2. Implementar la traducción de líneas del comprobante (`ComprobanteContableDetalle`) a `GLEntry` balanceadas.
+3. Soportar `entity`/`date` como alias de `company`/`posting_date` para documentos de diario manual.
+4. Añadir prueba de regresión en `tests/test_07posting_engine.py` para asegurar que un comprobante manual produce entradas GL balanceadas.
+
+### Resumen tecnico de cambios
+- `post_comprobante_contable` ahora prepara entradas de débito/crédito desde `ComprobanteContableDetalle`.
+- El motor de posting valida que el comprobante está balanceado y que cada línea tiene cuenta y monto válidos.
+- Se resolvió la cuenta contable por código usando `Accounts(entity, code)` y se trasladó la metadata de dimensiones y tercero a `GLEntry`.
+
+### Verificacion ejecutada
+- `pytest -q tests/test_07posting_engine.py -q`
+- `ruff check cacao_accounting/contabilidad/posting.py tests/test_07posting_engine.py`
+
+### Notas para siguiente iteracion
+1. Conectar la UI de comprobantes contables al servicio de posting manual.
+2. Añadir manejo de referencias cruzadas y validaciones de periodos fiscales en formularios de GL.
+3. Verificar la implicación de `ComprobanteContable` en la lógica de reversos y conciliación contable.
+
+## 2026-05-05 (outstanding dinámico y pruebas de inventario)
+
+### Peticion del usuario
+Calcular el saldo vivo de AR/AP desde las referencias de pago y agregar cobertura de pruebas para las cancelaciones de inventario.
+
+### Plan implementado
+1. Agregar `compute_outstanding_amount` en `cacao_accounting/document_flow/service.py`.
+2. Usar el cálculo dinámico en el módulo de bancos y en el estado de documento `document_flow.status`.
+3. Añadir pruebas que validan la reversión de `PurchaseReceipt` y el cálculo dinámico de `outstanding_amount`.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/document_flow/service.py` ahora calcula el saldo vivo de facturas con `PaymentReference` en lugar de depender únicamente del cache.
+- `cacao_accounting/bancos/__init__.py` usa el saldo dinámico en los formularios de pago.
+- `cacao_accounting/document_flow/status.py` usa el saldo dinámico para el estado de pagos de facturas.
+- Se agregaron pruebas de cancelación para `PurchaseReceipt` y de cálculo de saldo vivo.
+
+### Verificacion ejecutada
+- Revisión de código y pruebas unitarias específicas de posting y AR/AP.
+
+### Notas para siguiente iteracion
+1. Confirmar la consistencia temporal de `outstanding_amount` con filtros por `posting_date` y `allocation_date`.
+2. Avanzar en la UI de reconciliación bancaria.
+3. Extender pruebas para `DeliveryNote` y notas de crédito de venta.
 
 ## 2026-05-04
 
@@ -588,3 +764,149 @@ Implementar el framework de trazabilidad de documentos descrito en `requerimient
 2. Implementar arbol grafico de trazabilidad directa e indirecta basado en `/api/document-flow/tree` (vista de diagrama de flujo completo).
 3. Constructor de filtros avanzados por campos del encabezado en listas de documentos (filtros personalizados por campo/valor/operador).
 4. Soporte de filtros relacionales en los listados propios de cada modulo (compras, ventas, bancos, inventario) sin requerir la vista generica de flujo.
+
+## 2026-05-05 (registros pendientes bancos/compras/ventas/inventario)
+
+### Peticion del usuario
+Analizar `ESTADO_ACTUAL.md` y `PENDIENTE.md`, finalizar registros pendientes en Bancos, Compras, Ventas e Inventario, separar transferencias de pagos a clientes/proveedores y actualizar la bitacora/documentacion.
+
+### Plan implementado
+1. Revisar estado de rutas de registros y confirmar cobertura de notas de débito, notas de crédito y devoluciones en compras/ventas/inventario.
+2. Completar ajuste estructural en Bancos para separar transferencias internas de pagos/cobros.
+3. Endurecer validaciones para impedir mezcla de referencias de compras/ventas y transferencias en la misma operación.
+4. Actualizar `ESTADO_ACTUAL.md` y `PENDIENTE.md` con el nuevo estado funcional.
+
+### Resumen tecnico de cambios
+- `bancos` separa listado de pagos/cobros versus transferencias internas (`/payment/list` y `/transfer/list`).
+- Se agregaron validaciones para bloquear mezclas no permitidas:
+  - no se permite combinar facturas de compra y venta en un mismo pago;
+  - no se permite usar transferencias internas con referencias de facturas.
+- Se actualizó la documentación de estado y pendientes para reflejar la separación operativa de transferencias bancarias y la implementación vigente de registros de notas/devoluciones en compras y ventas.
+
+### Actualizacion adicional
+- Se implementaron registros operativos faltantes en Bancos para notas de débito y notas de crédito bancario (listado + creación).
+- Se dejó separación explícita entre pagos/cobros (`PaymentEntry`) y notas bancarias (`BankTransaction`) para evitar mezcla de naturalezas.
+
+## 2026-05-05 (registros pendientes compras/ventas/inventario)
+
+### Peticion del usuario
+Completar registros pendientes en Compras, Ventas e Inventarios.
+
+### Plan implementado
+1. Crear rutas explícitas de creación para notas y devoluciones de compra.
+2. Agregar alias explícito para listado de nota de crédito en ventas.
+3. Implementar registros de ajuste y conciliación física en inventario como propósitos de `StockEntry` con listados y accesos directos.
+
+### Resumen tecnico de cambios
+- Compras: nuevas rutas de creación para nota de débito, nota de crédito y devolución sobre factura de compra.
+- Ventas: alias explícito para listado de nota de crédito de venta (`/sales-invoice/credit-note/list`).
+- Inventario: nuevos listados y creación para `stock_adjustment` y `stock_reconciliation` dentro de `StockEntry`.
+
+### Actualizacion de inventario (ajustes + conciliación)
+- Se implementaron rutas y propósitos explícitos para `adjustment_positive` y `adjustment_negative` en `StockEntry` (listado/creación).
+- Se completó el soporte de conciliación de inventario en posting para generar movimientos de stock y GL según el signo del ajuste.
+
+## 2026-05-05 (cierre de auditoría de registros y ledgers)
+
+### Peticion del usuario
+Implementar el plan de cierre de issues detectados en la auditoría de calidad de los cambios staged para Bancos, Compras, Ventas e Inventarios.
+
+### Plan implementado
+1. Limpiar código generado duplicado en `posting.py` y dejar una sola definición de helpers contables centrales.
+2. Bloquear salidas de inventario sin capas de valuación suficientes y eliminar el fallback de costo por rate de línea.
+3. Cambiar cancelación de inventario a reversos append-only en `StockLedgerEntry` y `StockValuationLayer`, actualizando `StockBin` desde el reverso.
+4. Endurecer GR/IR para exigir recepción aprobada, contabilizada y con saldo pendiente antes de reconciliar una factura.
+5. Mejorar notas bancarias y conciliación MVP con carga usable de cuentas, validación de compañía y bloqueo de duplicados.
+6. Ampliar pruebas de posting para cubrir reversos de stock append-only, bloqueo de stock negativo, GR/IR y notas bancarias.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/posting.py`: stock negativo bloqueado para entregas/salidas; reversos de stock append-only; GR/IR validado; helpers duplicados eliminados.
+- `cacao_accounting/bancos/__init__.py`: creación de notas bancarias valida cuenta/compañía y conciliación rechaza transacciones ya conciliadas o duplicadas.
+- `cacao_accounting/bancos/templates/bancos/transaccion_nueva.html`: strings visibles nuevos marcados para traducción.
+- `cacao_accounting/document_flow/service.py`: ajustes menores de typing para mypy.
+- `tests/test_07posting_engine.py`: cobertura ampliada de 17 a 20 pruebas.
+
+### Verificacion ejecutada
+- `pytest -q tests/test_07posting_engine.py` -> 20 passed.
+- `ruff check cacao_accounting/contabilidad/posting.py cacao_accounting/bancos/__init__.py cacao_accounting/compras/__init__.py cacao_accounting/ventas/__init__.py cacao_accounting/inventario/__init__.py cacao_accounting/document_flow/service.py cacao_accounting/document_flow/status.py tests/test_07posting_engine.py` -> passed.
+- `mypy cacao_accounting/contabilidad/posting.py cacao_accounting/bancos/__init__.py cacao_accounting/document_flow/service.py cacao_accounting/document_flow/status.py` -> passed.
+- `black --check cacao_accounting/contabilidad/posting.py cacao_accounting/bancos/__init__.py cacao_accounting/document_flow/service.py tests/test_07posting_engine.py` -> passed.
+- `flake8 cacao_accounting/contabilidad/posting.py cacao_accounting/bancos/__init__.py tests/test_07posting_engine.py` -> passed.
+- `python -m py_compile cacao_accounting/contabilidad/posting.py cacao_accounting/bancos/__init__.py cacao_accounting/compras/__init__.py cacao_accounting/ventas/__init__.py cacao_accounting/inventario/__init__.py cacao_accounting/document_flow/service.py cacao_accounting/document_flow/status.py tests/test_07posting_engine.py` -> passed.
+
+## 2026-05-05 (conciliaciones finales y reportes operativos)
+
+### Peticion del usuario
+Implementar el plan revisado para cerrar brechas restantes: GR/IR por lineas y cantidades, conciliacion bancaria completa contra `PaymentEntry`/`GLEntry`, reportes finales y actualizacion de `ESTADO_ACTUAL.md`, `PENDIENTE.md` y `SESSIONS.md`.
+
+### Plan implementado
+1. Extender el modelo de conciliaciones para soportar conciliacion parcial, origen/destino, estado y fecha de conciliacion.
+2. Crear detalle `GRIRReconciliationItem` para reconciliar facturas de compra contra recepciones por linea, cantidad, monto, item, almacen y UOM.
+3. Crear servicios de GR/IR y conciliacion bancaria con validaciones de compania, duplicados, parcialidades y reversibilidad.
+4. Agregar vistas HTML minimas para GR/IR, conciliacion bancaria y reportes operativos.
+5. Implementar servicios de reportes para subledger AR/AP, aging, Kardex y reconciliaciones.
+6. Agregar pruebas de regresion para parcialidades, duplicados, reportes y cuadratura contra las fuentes operativas.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/database/__init__.py`: `ReconciliationItem` ahora guarda asignacion parcial, fuente, destino, fecha y estado; se agrego `GRIRReconciliationItem`.
+- `cacao_accounting/compras/gr_ir_service.py`: nuevo servicio `reconcile_gr_ir_invoice`, `cancel_gr_ir_for_invoice` y `get_gr_ir_pending`.
+- `cacao_accounting/contabilidad/posting.py`: el posting de `PurchaseInvoice` usa GR/IR por lineas; la cancelacion revierte solo conciliaciones activas de la factura.
+- `cacao_accounting/bancos/reconciliation_service.py`: nuevo motor para reconciliar `BankTransaction` contra pagos o GL bancario, con 1:1, 1:N, N:1 y parcialidades.
+- `cacao_accounting/bancos/__init__.py`: rutas HTML para `/bank-reconciliation`, detalle por cuenta y aplicacion de conciliacion.
+- `cacao_accounting/compras/__init__.py`: ruta `/gr-ir` para consulta de pendientes GR/IR.
+- `cacao_accounting/reportes/`: nuevo blueprint y servicios para `/reports/subledger`, `/reports/aging`, `/reports/kardex` y `/reports/reconciliations`.
+- `tests/test_08_reconciliation_reports.py`: nueva cobertura para GR/IR parcial, conciliacion bancaria parcial/duplicada y reportes.
+- `ESTADO_ACTUAL.md` y `PENDIENTE.md`: actualizados para reflejar lo implementado y dejar pendientes posteriores.
+
+### Verificacion ejecutada
+- `pytest -q tests/test_07posting_engine.py tests/test_08_reconciliation_reports.py` -> 24 passed.
+- `pytest -q tests/test_08_reconciliation_reports.py` -> 4 passed.
+- `pytest -q` -> 290 passed, 4 warnings de Flask-Caching/deprecacion externa.
+- `ruff check` sobre archivos tocados -> passed.
+- `black --check` sobre archivos tocados -> passed.
+- `flake8 cacao_accounting` -> passed.
+- `mypy cacao_accounting tests/test_08_reconciliation_reports.py` -> passed.
+- `python -m py_compile` sobre archivos tocados -> passed.
+
+### Pendientes posteriores
+1. Definir cuenta y politica de ajuste para diferencias de precio GR/IR; por ahora se bloquean.
+2. Mejorar reglas configurables de matching bancario e importacion masiva de extractos.
+3. Agregar exportaciones, paginacion avanzada y buckets configurables en reportes.
+4. Crear migracion formal si se deja de depender de `database.create_all()` para pruebas y entornos nuevos.
+
+## 2026-05-05 (cierre funcional bancos/inventario/compras/ventas)
+
+### Peticion del usuario
+Implementar el plan para completar brechas de Bancos, Inventario, Compras y Ventas: impuestos/cargos y pricing desde configuracion admin, anticipos, UOM/lote/serial, reconstruccion de bins, importacion de extractos, reglas de matching y reportes operativos finales.
+
+### Plan implementado
+1. Extender modelos existentes de impuestos, plantillas, listas de precio y cuentas por defecto; agregar regla de matching bancario.
+2. Crear servicios publicos para calculo de impuestos/precios, conversion UOM, validacion lote/serial, reconstruccion de `StockBin`, importacion CSV bancaria y ajustes de diferencia.
+3. Conectar `TaxTemplate` al posting de facturas de compra y venta, manteniendo GL balanceado por libro.
+4. Agregar UI admin exclusiva para impuestos/precios y UI bancaria para importar extractos y configurar reglas.
+5. Ampliar reportes operativos de compras, ventas, margen, stock balance, valoracion, lotes y seriales.
+6. Actualizar documentacion de estado, pendientes y bitacora.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/tax_pricing_service.py`: nuevo servicio `calculate_taxes`, `get_item_price` y `validate_price_tolerance`.
+- `cacao_accounting/inventario/service.py`: nuevo servicio `convert_item_qty`, validacion lote/serial, actualizacion de seriales y `rebuild_stock_bins`.
+- `cacao_accounting/bancos/statement_service.py`: importacion CSV con preview, duplicados, reglas de matching y helper de ajuste bancario.
+- `cacao_accounting/admin/__init__.py`: rutas `/settings/taxes`, `/settings/tax-templates`, `/settings/price-lists` y `/settings/item-prices`, protegidas para administrador.
+- `cacao_accounting/contabilidad/posting.py`: facturas de compra/venta generan GL de impuestos/cargos; pagos sin cuenta AR/AP pueden usar cuentas de anticipo configuradas.
+- `cacao_accounting/reportes/`: reportes MVP de compras/ventas por tercero/item, margen bruto, stock balance, valoracion, lotes y seriales.
+- `tests/test_08_reconciliation_reports.py`: cobertura ampliada para impuestos, pricing, UOM/lote/serial/rebuild e importacion bancaria.
+
+### Verificacion ejecutada
+- `pytest -q tests/test_08_reconciliation_reports.py` -> 7 passed.
+- `pytest -q tests/test_07posting_engine.py tests/test_08_reconciliation_reports.py` -> 27 passed.
+- `pytest -q` -> 293 passed, 4 warnings de Flask-Caching/deprecacion externa.
+- `ruff check cacao_accounting tests/test_07posting_engine.py tests/test_08_reconciliation_reports.py` -> passed.
+- `flake8 cacao_accounting` -> passed.
+- `mypy cacao_accounting tests/test_08_reconciliation_reports.py` -> passed.
+- `python -m py_compile` sobre archivos tocados -> passed.
+
+### Pendientes posteriores
+1. Migracion formal del esquema extendido para instalaciones existentes.
+2. Prorrateo real de cargos capitalizables hacia `StockValuationLayer`.
+3. UI avanzada de edicion/eliminacion para impuestos, plantillas, precios y reglas bancarias.
+4. Exportaciones, paginacion avanzada y filtros configurables en reportes.

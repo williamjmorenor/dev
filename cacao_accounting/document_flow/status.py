@@ -33,6 +33,7 @@ from cacao_accounting.document_flow.repository import (
     get_document_items,
     get_line_flow_state,
 )
+from cacao_accounting.document_flow.service import compute_outstanding_amount
 
 
 @dataclass(frozen=True)
@@ -124,7 +125,7 @@ def _payment_status(doctype: str, document: Any) -> DocumentStatusInfo | None:
         return None
 
     grand_total = decimal_or_zero(getattr(document, "grand_total", 0))
-    outstanding = decimal_or_zero(getattr(document, "outstanding_amount", None) or grand_total)
+    outstanding = compute_outstanding_amount(document)
     if grand_total <= 0:
         return None
     if outstanding <= 0:

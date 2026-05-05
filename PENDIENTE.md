@@ -38,16 +38,19 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
   - Cobro: Débito banco/caja, Crédito AR.
   - Pago: Débito AP, Crédito banco/caja.
   - Transferencia interna: Débito cuenta destino, Crédito cuenta origen.
+- [x] Separar operativamente transferencias internas de pagos/cobros en listados y flujo de registro.
 - [x] Procesar `PaymentReference` y reducir `outstanding_amount` en documentos aplicados al crear pagos desde factura.
 - [x] Calcular `allocation_date` para cada referencia.
 - [x] Usar cuenta explícita o fallback `BankAccount.gl_account_id`.
 - [ ] Recalcular referencias y outstanding desde GL/allocations como fuente dinámica.
 
 ### 1.4 Contabilización de Nota de Entrega / Recepción de Mercancía (Inventario)
-- [ ] Al hacer submit de `DeliveryNote`: generar `StockLedgerEntry` (salida) + `GLEntry` de COGS.
-- [ ] Al hacer submit de `PurchaseReceipt`: generar `StockLedgerEntry` (entrada) + `GLEntry` GI/IR.
-- [ ] Actualizar `StockBin` (saldo actual) tras cada movimiento.
-- [ ] Registrar `StockValuationLayer` con costo según método (FIFO / Moving Average).
+- [x] Al hacer submit de `DeliveryNote`: generar `StockLedgerEntry` (salida) + `GLEntry` de COGS.
+- [x] Al hacer submit de `PurchaseReceipt`: generar `StockLedgerEntry` (entrada) + `GLEntry` GI/IR.
+- [x] Actualizar `StockBin` (saldo actual) tras cada movimiento.
+- [x] Registrar `StockValuationLayer` con costo según método (FIFO / Moving Average).
+- [x] Validar reversión de notas de entrega y recepciones con `is_return` y reversos append-only.
+- [x] Añadir pruebas de reversión contable y stock para `PurchaseReceipt` y `DeliveryNote`.
 
 ### 1.5 Contabilización de Entrada de Almacén (`StockEntry`)
 - [x] Al hacer submit: generar `StockLedgerEntry` según propósito (material_receipt, material_issue, material_transfer).
@@ -69,10 +72,10 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 ## 🟠 BLOQUE 2 — Cuentas por Cobrar / Cuentas por Pagar (AR/AP)
 
 ### 2.1 Saldo pendiente (`outstanding_amount`)
-- [ ] Implementar cálculo dinámico de `outstanding_amount` para `SalesInvoice` y `PurchaseInvoice`.
-- [ ] Fórmula: `outstanding_amount = total_amount - SUM(allocated_amount de PaymentReference)`.
-- [ ] El campo persistido es cache; el cálculo dinámico es la fuente de verdad.
-- [ ] Consistencia temporal: filtrar por `posting_date` y `allocation_date`.
+- [x] Implementar cálculo dinámico de `outstanding_amount` para `SalesInvoice` y `PurchaseInvoice`.
+- [x] Fórmula: `outstanding_amount = total_amount - SUM(allocated_amount de PaymentReference)`.
+- [x] El campo persistido es cache; el cálculo dinámico es la fuente de verdad.
+- [x] Consistencia temporal: filtrar por `posting_date` y `allocation_date`.
 
 ### 2.2 Aplicación de pagos a facturas
 - [ ] Permitir desde el formulario de pago seleccionar una o varias facturas pendientes del mismo tercero.
@@ -91,23 +94,23 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [ ] Configuración de cuentas contables de anticipos por compañía en `CompanyDefaultAccount`.
 
 ### 2.4 Aging AR/AP
-- [ ] Implementar cálculo de aging por buckets (0-30, 31-60, 61-90, +90 días) basado en `posting_date`.
-- [ ] Reproducible históricamente: calcular aging para cualquier fecha pasada.
-- [ ] Vista de aging por cliente (AR) y por proveedor (AP).
+- [x] Implementar cálculo de aging por buckets (0-30, 31-60, 61-90, +90 días) basado en `posting_date`.
+- [x] Reproducible históricamente: calcular aging para cualquier fecha pasada.
+- [x] Vista MVP de aging por cliente (AR) y por proveedor (AP).
+- [ ] Mejorar UX/exportación y permitir buckets configurables por compañía.
 
 ---
 
 ## 🟠 BLOQUE 3 — Documentos de Corrección
 
 ### 3.1 Nota de Crédito de Venta (Sales Credit Note)
-- [ ] Crear ruta, formulario y template `ventas_factura_venta_nota_credito_nueva`.
-- [ ] Campos: `is_return=True`, `reversal_of` → ID de factura origen.
+- [ ] Verificar y reforzar la creación de nota de crédito de venta con `is_return=True` y `reversal_of` a factura origen.
 - [ ] Generar GL inverso al de la factura original.
 - [ ] Reducir `outstanding_amount` de la factura referenciada.
-- [ ] Incluir lista de notas de crédito (actualmente **no existe** la ruta de lista de nota de crédito de ventas).
+- [ ] Validar que la lista de notas de crédito muestre correctamente el origen y el estado del documento.
 
 ### 3.2 Nota de Débito de Venta (Sales Debit Note)
-- [ ] Crear ruta, formulario y template de nota de débito de venta.
+- [ ] Verificar la creación de nota de débito de venta y su asociación a la factura origen.
 - [ ] Generar GL adicional al de la factura original.
 - [ ] Incrementar `outstanding_amount` de la factura referenciada.
 
@@ -141,7 +144,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 ## 🟠 BLOQUE 4 — Proveedor y Cliente (formularios completos)
 
 ### 4.1 Formulario de Proveedor
-- [ ] Corregir y completar `proveedor_nuevo.html` (documentado en FIXME como "totalmente infuncional").
+- [ ] Validar y mejorar `proveedor_nuevo.html` tras la documentación de FIXME; el flujo actual es operativo pero requiere controles adicionales.
 - [ ] Campos requeridos: razón social, identificación fiscal, moneda, condiciones de pago, cuentas AP.
 - [ ] Gestión de direcciones (`Address`) y contactos (`Contact`) vinculados (`PartyAddress`, `PartyContact`).
 - [ ] Activación en compañía (`CompanyParty`).
@@ -161,14 +164,15 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 
 ### 5.1 StockLedgerEntry automático
 - [x] Generar `StockLedgerEntry` al submit de `StockEntry`.
-- [ ] Generar `StockLedgerEntry` al submit directo de `PurchaseReceipt` y `DeliveryNote`.
+- [x] Generar `StockLedgerEntry` al submit directo de `PurchaseReceipt` y `DeliveryNote`.
 - [x] Campos base: `item_code`, `warehouse`, `posting_date`, `qty_change`, `qty_after_transaction`, `valuation_rate`, `voucher_type`, `voucher_id`.
-- [ ] Política de reversión con SLE inverso append-only; actualmente se marca cancelado y se ajusta bin al cancelar.
+- [x] Política de reversión con SLE inverso append-only implementada para `StockEntry`, `PurchaseReceipt` y `DeliveryNote`.
+- [ ] Ampliar pruebas de reversión para validar `is_return`, stock negativo y ajustes de bin.
 
 ### 5.2 StockBin (cache de saldo actual)
 - [x] Actualizar `StockBin` en cada `StockLedgerEntry` generado por `StockEntry`.
-- [ ] Campo: `actual_qty`, `valuation_rate`, `last_updated`.
-- [ ] Servicio de recalculo de `StockBin` desde `StockLedgerEntry`.
+- [x] Campo: `actual_qty`, `valuation_rate`, `stock_value`.
+- [x] Servicio de recalculo de `StockBin` desde `StockLedgerEntry`.
 
 ### 5.3 StockValuationLayer (costo por capa)
 - [x] Crear `StockValuationLayer` básico desde `StockEntry`.
@@ -177,23 +181,23 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [ ] Método de valuación inmutable una vez hay transacciones en el ítem.
 
 ### 5.4 Lotes (Batch)
-- [ ] Requerir selección de lote en recepciones/salidas cuando `item.has_batch = True`.
-- [ ] Validar existencia del lote en el almacén antes de salida.
-- [ ] Reporte de lotes por estado y vencimiento.
+- [x] Requerir selección de lote en recepciones/salidas cuando `item.has_batch = True`.
+- [x] Validar existencia del lote antes de movimiento.
+- [x] Reporte de lotes por estado y vencimiento MVP.
 
 ### 5.5 Números de Serie (SerialNumber)
-- [ ] Requerir selección de serial en recepciones/salidas cuando `item.has_serial_no = True`.
-- [ ] Actualizar `serial_status` y `warehouse` en cada movimiento.
-- [ ] Reporte de seriales por estado y ubicación.
+- [x] Requerir selección de serial en recepciones/salidas cuando `item.has_serial_no = True`.
+- [x] Actualizar `serial_status` y `warehouse` en cada movimiento.
+- [x] Reporte de seriales por estado y ubicación MVP.
 
 ### 5.6 Stock Reconciliation
-- [ ] CRUD completo de conciliación física de inventario.
+- [x] UI MVP de conciliación física de inventario sobre `StockEntry`.
 - [ ] Tipos: ajuste de cantidad, ajuste de valuación.
-- [ ] Generar `StockLedgerEntry` de ajuste positivo/negativo con motivo obligatorio.
+- [x] Generar `StockLedgerEntry` de ajuste positivo/negativo.
 
 ### 5.7 Conversiones de UOM
-- [ ] Aplicar `ItemUOMConversion` al ingresar cantidad en unidad alternativa.
-- [ ] `StockLedgerEntry` siempre en unidad base.
+- [x] Aplicar `ItemUOMConversion` al ingresar cantidad en unidad alternativa.
+- [x] `StockLedgerEntry` siempre en unidad base.
 
 ---
 
@@ -201,30 +205,31 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 
 - [x] Definir cuenta GI/IR por compañía en `CompanyDefaultAccount`.
 - [x] Al submit de `StockEntry` material_receipt: acreditar GI/IR.
-- [ ] Al submit directo de `PurchaseReceipt`: acreditar GI/IR (no AP).
+- [x] Al submit directo de `PurchaseReceipt`: acreditar GI/IR (no AP).
 - [x] Al submit de `PurchaseInvoice` con recepción previa: debitar GI/IR, acreditar AP.
-- [ ] Implementar UI y servicio de `GRIRReconciliation`.
-- [ ] Reporte de GI/IR pendiente de reconciliar por proveedor/ítem/documento.
+- [x] Implementar UI y servicio de `GRIRReconciliation` por líneas.
+- [x] Reporte de GI/IR pendiente de reconciliar por proveedor/ítem/documento.
+- [ ] Definir cuenta de ajuste y flujo contable para diferencias de precio GR/IR.
 
 ---
 
 ## 🟡 BLOQUE 7 — Impuestos y Cargos
 
 ### 7.1 UI de Gestión de Impuestos
-- [ ] CRUD de `Tax` (definición de impuesto: nombre, tasa, cuenta contable, tipo).
-- [ ] CRUD de `TaxTemplate` (plantilla: nombre, tipo buying/selling).
-- [ ] CRUD de `TaxTemplateItem` (líneas: impuesto, tasa, tipo cálculo, comportamiento).
+- [x] CRUD MVP de `Tax` (definición de impuesto/cargo: nombre, tasa, cuenta contable, tipo).
+- [x] CRUD MVP de `TaxTemplate` (plantilla: nombre, tipo buying/selling).
+- [x] CRUD MVP de `TaxTemplateItem` (líneas: impuesto, tipo cálculo, comportamiento).
 
 ### 7.2 Aplicación en Documentos
-- [ ] Al crear factura, aplicar `TaxTemplate` seleccionada y calcular monto de cada línea de impuesto.
-- [ ] Soportar cálculo fijo (monto absoluto) y porcentual.
-- [ ] Soportar comportamiento aditivo (suma al total) y deductivo (resta del total).
-- [ ] Base de cálculo configurable: neto de línea, neto documento, base previa.
+- [x] Al postear factura, aplicar `TaxTemplate` seleccionada y calcular monto de cada línea de impuesto.
+- [x] Soportar cálculo fijo (monto absoluto) y porcentual.
+- [x] Soportar comportamiento aditivo (suma al total) y deductivo (resta del total).
+- [x] Base de cálculo configurable MVP: neto documento y base previa.
 
 ### 7.3 Cargos Adicionales (Flete, Seguro, Aduana)
-- [ ] Campo `capitalizable` en líneas de cargo de compra.
+- [x] Campo `capitalizable` en definición de cargo/impuesto.
 - [ ] Si capitalizable: prorratear costo entre ítems según regla (por cantidad, por valor, por peso/volumen).
-- [ ] Si no capitalizable: registrar como gasto directo en cuenta contable definida.
+- [x] Si no capitalizable: registrar como gasto/ingreso/impuesto en cuenta contable definida.
 - [ ] Actualizar `StockValuationLayer` para ítems inventariables capitalizables.
 
 ---
@@ -232,11 +237,11 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 ## 🟡 BLOQUE 8 — Precios
 
 ### 8.1 UI de Listas de Precios
-- [ ] CRUD de `PriceList` (nombre, tipo buying/selling, moneda, activa).
-- [ ] CRUD de `ItemPrice` (ítem, precio, moneda, fecha inicio/fin de vigencia).
+- [x] CRUD MVP de `PriceList` (nombre, tipo buying/selling, moneda, activa).
+- [x] CRUD MVP de `ItemPrice` (ítem, precio, fecha inicio/fin de vigencia).
 
 ### 8.2 Sugerencia de Precio en Documentos
-- [ ] Al agregar ítem a documento de compra/venta, sugerir precio desde `ItemPrice` activo.
+- [x] Servicio `get_item_price` para sugerir precio desde `ItemPrice` activo.
 - [ ] El precio sugerido es editable en el documento.
 - [ ] Tolerancia de precio por rol y tipo de documento.
 - [ ] Documentos con precios fuera de tolerancia requieren aprobación por workflow.
@@ -291,10 +296,13 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 ## 🟡 BLOQUE 13 — Reconciliación Bancaria
 
 - [ ] UI de importación/registro manual de `BankTransaction` (extracto bancario).
-- [ ] Herramienta de reconciliación: vincular `BankTransaction` con `PaymentEntry`.
-- [ ] Ajustes de diferencia vía Journal Entry.
-- [ ] Reporte de transacciones no reconciliadas.
-- [ ] Separar "Transferencia Interna" como documento independiente (documentado en FIXME).
+- [x] Herramienta de reconciliación: vincular `BankTransaction` con `PaymentEntry`.
+- [x] Soportar fallback de conciliación contra `GLEntry` bancaria.
+- [x] Soportar conciliación parcial, 1:1, 1:N y N:1.
+- [x] Servicio de ajuste de diferencia vía Journal Entry.
+- [x] Reporte de transacciones/reconciliaciones operativo.
+- [x] Separar "Transferencia Interna" como flujo dedicado en listados.
+- [x] Importar extractos bancarios y configurar reglas de matching MVP.
 
 ---
 
@@ -306,36 +314,36 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [ ] Mayor General (por cuenta y tercero).
 - [ ] Libro Diario (asientos cronológicos).
 - [ ] Balanza de Comprobación (saldos por cuenta).
-- [ ] Aging AR/AP (saldos por antigüedad).
+- [x] Aging AR/AP MVP (saldos por antigüedad).
 - [ ] Saldos por dimensión (cost_center, unit, project).
 - [ ] Revalorización cambiaria histórica.
 - [ ] Anticipos de clientes/proveedores (aplicado, pendiente, remanente).
 
 ### Compras
 - [ ] Órdenes de compra pendientes (por proveedor, ítem, estado).
-- [ ] Recepciones vs Facturas (estado GI/IR por orden).
-- [ ] Cuentas por pagar (saldo pendiente por proveedor).
-- [ ] Aging AP (vencimientos por bucket).
-- [ ] Compras por proveedor (monto total por período).
-- [ ] Compras por ítem (consumo y precio promedio).
+- [x] Recepciones vs Facturas MVP (estado GI/IR por línea).
+- [x] Cuentas por pagar MVP (saldo pendiente por proveedor).
+- [x] Aging AP MVP (vencimientos por bucket).
+- [x] Compras por proveedor (monto total por período) MVP.
+- [x] Compras por ítem (consumo y monto) MVP.
 
 ### Ventas
 - [ ] Órdenes de venta pendientes (por cliente, ítem, estado).
 - [ ] Entregas pendientes de facturar.
-- [ ] Cuentas por cobrar (saldo pendiente por cliente).
-- [ ] Aging AR (vencimientos por bucket 30/60/90/+90 días).
-- [ ] Ventas por cliente (monto total por período).
-- [ ] Ventas por ítem (unidades y valor).
-- [ ] Margen bruto (ingreso − COGS por ítem/cliente/período).
+- [x] Cuentas por cobrar MVP (saldo pendiente por cliente).
+- [x] Aging AR MVP (vencimientos por bucket 30/60/90/+90 días).
+- [x] Ventas por cliente (monto total por período) MVP.
+- [x] Ventas por ítem (unidades y valor) MVP.
+- [x] Margen bruto (ingreso − COGS) MVP.
 
 ### Inventario
-- [ ] Stock Balance (existencia actual por ítem+almacén).
-- [ ] Stock Ledger (historial de movimientos por ítem).
-- [ ] Valoración de inventario (costo total por almacén).
-- [ ] Movimientos por período (entradas y salidas por fecha).
+- [x] Stock Balance (existencia actual por ítem+almacén) MVP.
+- [x] Kardex/Stock Ledger MVP (historial de movimientos por ítem).
+- [x] Valoración de inventario (costo total por almacén) MVP.
+- [x] Movimientos por período (entradas y salidas por fecha) vía Kardex.
 - [ ] Ítems bajo mínimo de existencia.
-- [ ] Reporte de lotes (estado y vencimiento).
-- [ ] Reporte de seriales (estado y ubicación).
+- [x] Reporte de lotes (estado y vencimiento) MVP.
+- [x] Reporte de seriales (estado y ubicación) MVP.
 
 ---
 
@@ -449,3 +457,16 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 | 15 | Bloque 15 — Setup/Admin | Completa la configuración inicial |
 | 16 | Bloque 16 — Mejoras UI | Mejora la experiencia de usuario |
 | 17 | Bloque 17 — Series (mejoras) | Consolida el subsistema de identificadores |
+
+
+### 2.x Bancos — Registros operativos
+- [x] Separar transferencias internas de pagos/cobros en listados y validaciones de creación.
+- [x] Implementar registros manuales para notas de débito/crédito bancario usando `BankTransaction` (withdrawal/deposit).
+- [x] Conectar notas bancarias a posting GL automático y conciliación bancaria asistida.
+
+- [x] Agregar rutas explícitas de alta para notas de compra (débito/crédito/devolución).
+- [x] Agregar alias explícito de listado para nota de crédito en ventas.
+- [x] Agregar registros de ajuste y conciliación de inventario (listado + creación) en `StockEntry`.
+
+- [x] Implementar `adjustment_positive` y `adjustment_negative` en Inventario (rutas + posting).
+- [x] Completar soporte de conciliación de inventario en posting de `StockEntry`.

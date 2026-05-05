@@ -244,6 +244,15 @@ def ventas_factura_venta_devolucion_lista():
     )
 
 
+@ventas.route("/sales-invoice/credit-note/list")
+@modulo_activo("sales")
+@login_required
+def ventas_factura_venta_nota_credito_lista():
+    """Alias explicito para listado de notas de crédito de venta."""
+
+    return ventas_factura_venta_devolucion_lista()
+
+
 @ventas.route("/customer/list")
 @modulo_activo("sales")
 @login_required
@@ -806,9 +815,13 @@ def ventas_entrega_submit(note_id: str):
         abort(404)
     if registro.docstatus != 0:
         abort(400)
-    registro.docstatus = 1
-    database.session.commit()
-    flash("Nota de entrega aprobada.", "success")
+    try:
+        submit_document(registro)
+        database.session.commit()
+        flash("Nota de entrega aprobada.", "success")
+    except PostingError as exc:
+        database.session.rollback()
+        flash(str(exc), "danger")
     return redirect(url_for("ventas.ventas_entrega", note_id=note_id))
 
 
@@ -822,11 +835,15 @@ def ventas_entrega_cancel(note_id: str):
         abort(404)
     if registro.docstatus != 1:
         abort(400)
-    registro.docstatus = 2
-    revert_relations_for_target("delivery_note", note_id)
-    refresh_source_caches_for_target("delivery_note", note_id)
-    database.session.commit()
-    flash("Nota de entrega cancelada.", "warning")
+    try:
+        cancel_document(registro)
+        revert_relations_for_target("delivery_note", note_id)
+        refresh_source_caches_for_target("delivery_note", note_id)
+        database.session.commit()
+        flash("Nota de entrega cancelada.", "warning")
+    except PostingError as exc:
+        database.session.rollback()
+        flash(str(exc), "danger")
     return redirect(url_for("ventas.ventas_entrega", note_id=note_id))
 
 

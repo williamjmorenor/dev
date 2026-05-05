@@ -50,6 +50,7 @@ from cacao_accounting.modulos import (
     registrar_modulos_adicionales,
     validar_modulo_activo,
 )
+from cacao_accounting.reportes import reportes
 from cacao_accounting.setup import setup_ as setup_wizard
 from cacao_accounting.ventas import ventas
 from cacao_accounting.version import PRERELEASE
@@ -120,6 +121,7 @@ def registrar_blueprints(app: Flask | None = None) -> None:
             app.register_blueprint(contabilidad, url_prefix="/accounting")
             app.register_blueprint(compras, url_prefix="/buying")
             app.register_blueprint(inventario, url_prefix="/inventory")
+            app.register_blueprint(reportes)
             app.register_blueprint(ventas, url_prefix="/sales")
             app.register_blueprint(setup_wizard, url_prefix="/setup")
 

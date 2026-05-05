@@ -35,6 +35,16 @@
   </div>
 
   <div class="ca-module-card">
+    <h5><i class="bi bi-receipt"></i> {{ _("Impuestos y Precios") }}</h5>
+    <ul class="ca-module-links">
+      <li><a href="{{ url_for('admin.lista_impuestos') }}">{{ _("Impuestos y Cargos") }}</a><span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span></li>
+      <li><a href="{{ url_for('admin.lista_plantillas_impuesto') }}">{{ _("Plantillas de Impuestos") }}</a><span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span></li>
+      <li><a href="{{ url_for('admin.lista_precios') }}">{{ _("Listas de Precios") }}</a><span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span></li>
+      <li><a href="{{ url_for('admin.precios_item') }}">{{ _("Precios por Item") }}</a><span class="ca-status-dot ca-status-ok" title="{{ _('Disponible') }}"></span></li>
+    </ul>
+  </div>
+
+  <div class="ca-module-card">
     <h5><i class="bi bi-card-list"></i> Registros</h5>
     <ul class="ca-module-links">
       <li><a href="#">Auditoría del Sistema</a><span class="ca-status-dot ca-status-ok" title="Disponible"></span></li>

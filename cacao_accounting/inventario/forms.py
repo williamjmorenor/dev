@@ -43,6 +43,9 @@ class FormularioEntradaAlmacen(FlaskForm):
             ("material_receipt", "Recepción de Material"),
             ("material_issue", "Salida de Material"),
             ("material_transfer", "Transferencia"),
+            ("adjustment_positive", "Ajuste Positivo"),
+            ("adjustment_negative", "Ajuste Negativo"),
+            ("stock_reconciliation", "Conciliación de Inventario"),
         ],
     )
     company = SelectField("Compañía", choices=[])
