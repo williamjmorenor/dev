@@ -253,32 +253,43 @@ static_rutes = [
         ],
     ),
     Route(
-        url="/accounting/series",
-        text=[
-            "Listado de Series e Identificadores.".encode("utf-8"),
-            "Nueva Serie".encode("utf-8"),
-            "Tipo de Documento".encode("utf-8"),
-            "Filtrar".encode("utf-8"),
-        ],
-    ),
-    Route(
-        url="/accounting/series?doc=journal",
-        text=["Listado de Series e Identificadores.".encode("utf-8"), "Nueva Serie".encode("utf-8")],
-    ),
-    Route(
-        url="/accounting/serie/new",
-        text=[
-            "Crear Nueva Serie.".encode("utf-8"),
-            "Nueva Serie".encode("utf-8"),
-            "Documento".encode("utf-8"),
-        ],
-    ),
-    Route(
         url="/accounting/book/list",
         text=[
             "La Plantilla fue renderizada correctamente: cacao_accounting/contabilidad/templates/contabilidad/book_lista.html".encode(
                 "utf-8"
             ),
+        ],
+    ),
+    Route(
+        url="/settings/modules",
+        text=[
+            "Administración de Módulos".encode("utf-8"),
+            "Nombre".encode("utf-8"),
+            "Activo".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/settings/users",
+        text=[
+            "Administración de Usuarios".encode("utf-8"),
+            "Usuario".encode("utf-8"),
+            "Correo".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/settings/users/new",
+        text=[
+            "Crear Usuario".encode("utf-8"),
+            "Nombre".encode("utf-8"),
+            "Contraseña".encode("utf-8"),
+        ],
+    ),
+    Route(
+        url="/auth/profile",
+        text=[
+            "Mi Perfil".encode("utf-8"),
+            "Información personal".encode("utf-8"),
+            "Cambiar contraseña".encode("utf-8"),
         ],
     ),
     Route(

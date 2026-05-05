@@ -462,17 +462,6 @@ class Project(database.Model, BaseTabla):  # type: ignore[name-defined]
 # <---------------------------------------------------------------------------------------------> #
 # Series e Identificadores — Framework robusto multi-contexto.
 # <---------------------------------------------------------------------------------------------> #
-class Serie(database.Model, BaseTabla):  # type: ignore[name-defined]
-    """Serie para numerar transacciones (legacy — mantenida para compatibilidad)."""
-
-    entity = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE))
-    doc = database.Column(database.String(25))
-    enabled = database.Column(database.Boolean())
-    serie = database.Column(database.String(30))
-    current_value = database.Column(database.Integer(), default=0)
-    default = database.Column(database.Boolean())
-
-
 class NamingSeries(database.Model, BaseTabla):  # type: ignore[name-defined]
     """Define el formato logico de una serie de numeracion.
 

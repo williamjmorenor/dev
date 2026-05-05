@@ -86,18 +86,6 @@ class ComprobanteContableDetalle(FlaskForm):
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
-# Series e Identificadores (legacy — mantenida para compatibilidad)
-class FormularioSerie(FlaskForm):
-    """Serie legacy."""
-
-    entidad = SelectField(
-        "Entidad",
-    )
-    documento = SelectField("Documento", choices=lista_tipos_documentos())
-    serie = StringField(validators=[])
-
-
-# <------------------------------------------------------------------------------------------------------------------------> #
 # NamingSeries — Framework robusto de series e identificadores
 
 ENTITY_TYPE_CHOICES = [

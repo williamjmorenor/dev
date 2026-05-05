@@ -34,7 +34,6 @@ from cacao_accounting.database import (
     SalesInvoiceItem,
     SalesOrder,
     SalesOrderItem,
-    Serie,
     UOM,
     Unit,
     Warehouse,
@@ -177,30 +176,7 @@ ENTIDADES = (
     ),
 )
 
-SERIES = (
-    Serie(
-        entity="cacao",
-        doc="journal",
-        enabled=True,
-        default=True,
-        serie="CD-CACAO",
-    ),
-    Serie(
-        entity="cafe",
-        doc="journal",
-        enabled=True,
-        default=True,
-        serie="CD-CAFE",
-    ),
-    Serie(
-        entity="dulce",
-        doc="journal",
-        enabled=True,
-        default=True,
-        serie="CD-DULCE",
-    ),
-)
-
+SERIES = ()
 
 CUENTAS = (
     Accounts(

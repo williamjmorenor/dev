@@ -80,6 +80,9 @@
     <button class="ca-nav-btn" id="ca-theme-btn" onclick="caToggleTheme()" title="Cambiar tema" type="button">
       <i class="bi bi-moon-stars-fill" id="ca-theme-icon"></i>
     </button>
+    <a class="ca-nav-btn" href="{{ url_for('login.profile') }}" title="Mi perfil">
+      <i class="bi bi-person-circle"></i>
+    </a>
     <a class="ca-nav-btn" href="{{ url_for('login.cerrar_sesion') }}" title="Cerrar sesión">
       <i class="bi bi-box-arrow-right"></i>
     </a>
