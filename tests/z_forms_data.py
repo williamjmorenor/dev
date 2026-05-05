@@ -40,5 +40,4 @@ forms = [
         file=None,
         flash=None,
     ),
-    ),
 ]

@@ -78,6 +78,23 @@ class Permisos:
         "validar": "validate",
     }
 
+    access: bool
+    actualizar: bool
+    anular: bool
+    autorizar: bool
+    bi: bool
+    cerrar: bool
+    configurar: bool
+    consultar: bool
+    corregir: bool
+    crear: bool
+    editar: bool
+    eliminar: bool
+    importar: bool
+    reportes: bool
+    solicitar: bool
+    validar: bool
+
     def __init__(self, modulo: str | None = None, usuario: str | None = None) -> None:
         """Inicia la clase permisos."""
         self.modulo = modulo
@@ -115,9 +132,7 @@ class Permisos:
         if not modulo:
             return False
 
-        modulos_activos = database.session.execute(
-            select(Modules.id).filter_by(enabled=True)
-        ).scalars().all()
+        modulos_activos = database.session.execute(select(Modules.id).filter_by(enabled=True)).scalars().all()
 
         return modulo in modulos_activos
 

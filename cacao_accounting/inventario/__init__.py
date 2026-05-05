@@ -11,7 +11,9 @@ from flask_login import login_required
 
 from cacao_accounting.database import Item, StockEntry, StockEntryItem, UOM, Warehouse, database
 from cacao_accounting.database.helpers import get_active_naming_series
+from cacao_accounting.contabilidad.posting import PostingError, cancel_document, submit_document
 from cacao_accounting.document_flow import revert_relations_for_target
+from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
@@ -446,16 +448,21 @@ def inventario_entrada(entry_id):
 @modulo_activo("inventory")
 @login_required
 def inventario_entrada_submit(entry_id: str):
-    """Aprueba una entrada de almacen sin generar Stock Ledger aun."""
+    """Aprueba una entrada de almacen y genera Stock Ledger/GL."""
 
     registro = database.session.get(StockEntry, entry_id)
     if not registro:
         abort(404)
     if registro.docstatus != 0:
         abort(400)
-    registro.docstatus = 1
-    database.session.commit()
-    flash("Entrada de almacén aprobada.", "success")
+    try:
+        submit_document(registro)
+        database.session.commit()
+    except PostingError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))
+    flash(_("Entrada de almacen aprobada y contabilizada."), "success")
     return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))
 
 
@@ -470,8 +477,13 @@ def inventario_entrada_cancel(entry_id: str):
         abort(404)
     if registro.docstatus != 1:
         abort(400)
-    registro.docstatus = 2
-    revert_relations_for_target("stock_entry", entry_id)
-    database.session.commit()
-    flash("Entrada de almacén cancelada.", "warning")
+    try:
+        cancel_document(registro)
+        revert_relations_for_target("stock_entry", entry_id)
+        database.session.commit()
+    except PostingError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))
+    flash(_("Entrada de almacen cancelada con reverso contable."), "warning")
     return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))

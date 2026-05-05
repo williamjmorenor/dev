@@ -73,22 +73,22 @@ MODULOS_STANDAR = [
 
 # <---------------------------------------------------------------------------------------------> #
 # Interface para agregar módulos adicionales al sistema.
-MODULOS_ADICIONALES: list[str] | None = []
+modulos_adicionales_detectados: list[str] = []
 modulos = iter_modules()
 for modulo in modulos:
     MODULO_COMO_TEXTO = str(modulo.name)
     try:
         if MODULO_COMO_TEXTO.startswith("cacao_accounting_modulo") or MODULO_COMO_TEXTO.startswith("cacao_accounting_module"):
-            MODULOS_ADICIONALES.append(MODULO_COMO_TEXTO)
+            modulos_adicionales_detectados.append(MODULO_COMO_TEXTO)
     except AttributeError:
         pass
 
-if not MODULOS_ADICIONALES:
-    MODULOS_ADICIONALES = None
+MODULOS_ADICIONALES: list[str] | None = modulos_adicionales_detectados or None
 
 
 # <---------------------------------------------------------------------------------------------> #
 # Funciones auxiliares para la administración de módulos.
+
 
 def _parse_plugin_module_name(package_name: str) -> str:
     """Extrae el nombre lógico del modulo a partir del paquete detectado."""

@@ -17,7 +17,7 @@ from sqlalchemy import delete
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
-from cacao_accounting.auth import helpers
+from cacao_accounting.auth import helpers, proteger_passwd
 from cacao_accounting.auth.forms import (
     RoleForm,
     UserCreateForm,
@@ -104,16 +104,14 @@ def _obtener_usuario(usuario_id: str) -> User | None:
 
 def _obtener_roles_disponibles() -> list[Roles]:
     """Lista los roles disponibles en el sistema."""
-    return database.session.execute(database.select(Roles).order_by(Roles.name)).scalars().all()
+    return list(database.session.execute(database.select(Roles).order_by(Roles.name)).scalars().all())
 
 
 def _obtener_roles_por_usuario(usuario_id: str) -> list[Roles]:
     """Devuelve los roles asignados a un usuario."""
-    return (
+    return list(
         database.session.execute(
-            database.select(Roles)
-            .join(RolesUser, Roles.id == RolesUser.role_id)
-            .filter(RolesUser.user_id == usuario_id)
+            database.select(Roles).join(RolesUser, Roles.id == RolesUser.role_id).filter(RolesUser.user_id == usuario_id)
         )
         .scalars()
         .all()
@@ -127,14 +125,12 @@ def _obtener_rol(role_id: str) -> Roles | None:
 
 def _obtener_permisos_por_rol(role_id: str) -> list[RolesAccess]:
     """Devuelve permisos asignados a un rol."""
-    return (
-        database.session.execute(database.select(RolesAccess).filter_by(rol_id=role_id)).scalars().all()
-    )
+    return list(database.session.execute(database.select(RolesAccess).filter_by(rol_id=role_id)).scalars().all())
 
 
 def _obtener_modulos_disponibles() -> list[Modules]:
     """Devuelve los modulos registrados en el sistema."""
-    return database.session.execute(database.select(Modules).order_by(Modules.module)).scalars().all()
+    return list(database.session.execute(database.select(Modules).order_by(Modules.module)).scalars().all())
 
 
 @admin.route("/settings/users", methods=["GET", "POST"])
@@ -160,8 +156,7 @@ def lista_usuarios():
 
     usuarios = database.session.execute(database.select(User).order_by(User.user)).scalars().all()
     roles_por_usuario = {
-        usuario.id: ", ".join([rol.name for rol in _obtener_roles_por_usuario(usuario.id)])
-        for usuario in usuarios
+        usuario.id: ", ".join([rol.name for rol in _obtener_roles_por_usuario(usuario.id)]) for usuario in usuarios
     }
 
     return render_template(
@@ -235,16 +230,12 @@ def editar_usuario(user_id: str):
     form = UserEditForm(obj=usuario)
     if form.validate_on_submit():
         existe_usuario = database.session.execute(
-            database.select(User)
-            .filter(User.user == form.usuario.data)
-            .filter(User.id != usuario.id)
+            database.select(User).filter(User.user == form.usuario.data).filter(User.id != usuario.id)
         ).scalar_one_or_none()
         existe_email = None
         if form.e_mail.data:
             existe_email = database.session.execute(
-                database.select(User)
-                .filter(User.e_mail == form.e_mail.data)
-                .filter(User.id != usuario.id)
+                database.select(User).filter(User.e_mail == form.e_mail.data).filter(User.id != usuario.id)
             ).scalar_one_or_none()
 
         if existe_usuario is not None:
@@ -325,7 +316,7 @@ def usuario_password(user_id: str):
                 "Contraseña muy débil. Use al menos 8 caracteres, mayúsculas, minúsculas, números y símbolos."
             )
         else:
-            usuario.password = helpers.proteger_passwd(form.password.data)
+            usuario.password = proteger_passwd(form.password.data)
             database.session.commit()
             flash("Contraseña actualizada correctamente.", "success")
             return redirect(url_for("admin.lista_usuarios"))
@@ -384,9 +375,7 @@ def editar_rol(role_id: str):
     form = RoleForm(obj=rol)
     if form.validate_on_submit():
         existe_rol = database.session.execute(
-            database.select(Roles)
-            .filter(Roles.name == form.name.data)
-            .filter(Roles.id != rol.id)
+            database.select(Roles).filter(Roles.name == form.name.data).filter(Roles.id != rol.id)
         ).scalar_one_or_none()
         if existe_rol is not None:
             form.name.errors.append("El nombre del rol ya está en uso.")
@@ -435,10 +424,7 @@ def rol_permisos(role_id: str):
         ("validate", "Validar"),
     ]
     permisos_existentes = {
-        perm.module_id: {
-            accion: getattr(perm, accion, False)
-            for accion, _ in acciones
-        }
+        perm.module_id: {accion: getattr(perm, accion, False) for accion, _ in acciones}
         for perm in _obtener_permisos_por_rol(role_id)
     }
 

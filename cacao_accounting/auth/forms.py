@@ -11,9 +11,8 @@
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
 from flask_wtf import FlaskForm
-from wtforms import BooleanField, Field, PasswordField, SelectMultipleField, StringField, SubmitField
+from wtforms import BooleanField, PasswordField, SelectMultipleField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional
-from wtforms.widgets import CheckboxInput, ListWidget
 from wtforms.widgets import CheckboxInput, ListWidget
 
 
@@ -93,13 +92,6 @@ class UserPasswordForm(FlaskForm):
         validators=[DataRequired(), EqualTo("password", message="Las contraseñas deben coincidir")],
     )
     cambiar_clave = SubmitField("Cambiar contraseña")
-
-
-class MultiCheckboxField(SelectMultipleField):
-    """Campo para representar una lista de opciones con checkboxes."""
-
-    widget = ListWidget(prefix_label=False)
-    option_widget = CheckboxInput()
 
 
 class MultiCheckboxField(SelectMultipleField):

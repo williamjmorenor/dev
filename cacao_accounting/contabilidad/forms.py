@@ -18,7 +18,6 @@ from wtforms.validators import DataRequired, InputRequired, NumberRange, Optiona
 # Recursos locales
 # ---------------------------------------------------------------------------------------
 from cacao_accounting.database import Entity
-from cacao_accounting.modulos import lista_tipos_documentos
 
 # <------------------------------------------------------------------------------------------------------------------------> #
 # Entidades

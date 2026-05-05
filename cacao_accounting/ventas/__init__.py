@@ -25,6 +25,7 @@ from cacao_accounting.database import (
     database,
 )
 from cacao_accounting.database.helpers import get_active_naming_series
+from cacao_accounting.contabilidad.posting import PostingError, cancel_document, submit_document
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 from cacao_accounting.document_flow import (
     DocumentFlowError,
@@ -32,6 +33,7 @@ from cacao_accounting.document_flow import (
     refresh_source_caches_for_target,
     revert_relations_for_target,
 )
+from cacao_accounting.document_flow.status import _
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
 
@@ -961,9 +963,14 @@ def ventas_factura_venta_submit(invoice_id: str):
         abort(404)
     if registro.docstatus != 0:
         abort(400)
-    registro.docstatus = 1
-    database.session.commit()
-    flash("Factura de venta aprobada.", "success")
+    try:
+        submit_document(registro)
+        database.session.commit()
+    except PostingError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("ventas.ventas_factura_venta", invoice_id=invoice_id))
+    flash(_("Factura de venta aprobada y contabilizada."), "success")
     return redirect(url_for("ventas.ventas_factura_venta", invoice_id=invoice_id))
 
 
@@ -977,9 +984,14 @@ def ventas_factura_venta_cancel(invoice_id: str):
         abort(404)
     if registro.docstatus != 1:
         abort(400)
-    registro.docstatus = 2
-    revert_relations_for_target("sales_invoice", invoice_id)
-    refresh_source_caches_for_target("sales_invoice", invoice_id)
-    database.session.commit()
-    flash("Factura de venta cancelada.", "warning")
+    try:
+        cancel_document(registro)
+        revert_relations_for_target("sales_invoice", invoice_id)
+        refresh_source_caches_for_target("sales_invoice", invoice_id)
+        database.session.commit()
+    except PostingError as exc:
+        database.session.rollback()
+        flash(_(str(exc)), "danger")
+        return redirect(url_for("ventas.ventas_factura_venta", invoice_id=invoice_id))
+    flash(_("Factura de venta cancelada con reverso contable."), "warning")
     return redirect(url_for("ventas.ventas_factura_venta", invoice_id=invoice_id))

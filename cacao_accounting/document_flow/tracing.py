@@ -95,7 +95,7 @@ def document_flow_summary(document_type: str, document_id: str) -> dict[str, Any
 
     doctype = normalize_doctype(document_type)
 
-    upstream_rows: list[DocumentRelation] = (
+    upstream_rows: list[DocumentRelation] = list(
         database.session.execute(
             database.select(DocumentRelation)
             .filter_by(target_type=doctype, target_id=document_id)
@@ -104,7 +104,7 @@ def document_flow_summary(document_type: str, document_id: str) -> dict[str, Any
         .scalars()
         .all()
     )
-    downstream_rows: list[DocumentRelation] = (
+    downstream_rows: list[DocumentRelation] = list(
         database.session.execute(
             database.select(DocumentRelation)
             .filter_by(source_type=doctype, source_id=document_id)
@@ -183,9 +183,11 @@ def _build_groups(
                 "relation_type": relation.relation_type,
                 "status": relation.status,
                 "document": doc_payload,
-                "badge_class": doc_payload.get("status", {}).get("badge_class", "text-bg-secondary")
-                if doc_payload.get("status")
-                else "text-bg-secondary",
+                "badge_class": (
+                    doc_payload.get("status", {}).get("badge_class", "text-bg-secondary")
+                    if doc_payload.get("status")
+                    else "text-bg-secondary"
+                ),
             }
         )
 

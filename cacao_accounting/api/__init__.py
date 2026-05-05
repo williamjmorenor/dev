@@ -7,6 +7,7 @@
 # Libreria estandar
 # --------------------------------------------------------------------------------------
 from functools import wraps
+from typing import Any
 
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
@@ -347,14 +348,12 @@ def document_flow_related_list(doctype: str):
         )
         target_ids = list(set(rows_as_target) | set(rows_as_source))
 
-    documents = []
+    documents: list[Any] = []
     if target_ids:
         pk_col = getattr(spec.header_model, "id", None)
         if pk_col is not None:
-            documents = (
-                database.session.execute(database.select(spec.header_model).where(pk_col.in_(target_ids)))
-                .scalars()
-                .all()
+            documents = list(
+                database.session.execute(database.select(spec.header_model).where(pk_col.in_(target_ids))).scalars().all()
             )
 
     return render_template(
