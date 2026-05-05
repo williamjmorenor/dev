@@ -17,6 +17,7 @@ from flask_login import login_required
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
+from cacao_accounting.compras.gr_ir_service import get_gr_ir_pending
 from cacao_accounting.database import (
     Item,
     Party,
@@ -411,6 +412,33 @@ def compras_factura_compra_devolucion_lista():
     )
 
 
+@compras.route("/purchase-invoice/debit-note/new", methods=["GET", "POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_factura_compra_nota_debito_nueva():
+    """Alias explicito para crear nota de débito de compra."""
+
+    return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_DEBIT_NOTE))
+
+
+@compras.route("/purchase-invoice/credit-note/new", methods=["GET", "POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_factura_compra_nota_credito_nueva():
+    """Alias explicito para crear nota de crédito de compra."""
+
+    return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_CREDIT_NOTE))
+
+
+@compras.route("/purchase-invoice/return/new", methods=["GET", "POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_factura_compra_devolucion_nueva():
+    """Alias explicito para crear devolución de compra."""
+
+    return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_RETURN))
+
+
 @compras.route("/supplier/list")
 @modulo_activo("purchases")
 @login_required
@@ -424,6 +452,18 @@ def compras_proveedor_lista():
     )
     titulo = "Listado de Proveedores - " + APPNAME
     return render_template("compras/proveedor_lista.html", consulta=consulta, titulo=titulo)
+
+
+@compras.route("/gr-ir")
+@modulo_activo("purchases")
+@login_required
+def compras_gr_ir():
+    """Reporte operativo de GR/IR pendiente por linea."""
+
+    company = request.args.get("company", "cacao")
+    rows = get_gr_ir_pending(company=company)
+    titulo = "GR/IR Pendiente - " + APPNAME
+    return render_template("compras/gr_ir.html", rows=rows, company=company, titulo=titulo)
 
 
 @compras.route("/supplier/new", methods=["GET", "POST"])
@@ -1002,9 +1042,13 @@ def compras_recepcion_submit(receipt_id: str):
         abort(404)
     if registro.docstatus != 0:
         abort(400)
-    registro.docstatus = 1
-    database.session.commit()
-    flash("Recepción de compra aprobada.", "success")
+    try:
+        submit_document(registro)
+        database.session.commit()
+        flash("Recepción de compra aprobada.", "success")
+    except PostingError as exc:
+        database.session.rollback()
+        flash(str(exc), "danger")
     return redirect(url_for("compras.compras_recepcion", receipt_id=receipt_id))
 
 
@@ -1018,11 +1062,15 @@ def compras_recepcion_cancel(receipt_id: str):
         abort(404)
     if registro.docstatus != 1:
         abort(400)
-    registro.docstatus = 2
-    revert_relations_for_target("purchase_receipt", receipt_id)
-    refresh_source_caches_for_target("purchase_receipt", receipt_id)
-    database.session.commit()
-    flash("Recepción de compra cancelada.", "warning")
+    try:
+        cancel_document(registro)
+        revert_relations_for_target("purchase_receipt", receipt_id)
+        refresh_source_caches_for_target("purchase_receipt", receipt_id)
+        database.session.commit()
+        flash("Recepción de compra cancelada.", "warning")
+    except PostingError as exc:
+        database.session.rollback()
+        flash(str(exc), "danger")
     return redirect(url_for("compras.compras_recepcion", receipt_id=receipt_id))
 
 

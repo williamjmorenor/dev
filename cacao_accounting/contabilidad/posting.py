@@ -14,9 +14,14 @@ from sqlalchemy import func, select
 from cacao_accounting.database import (
     Accounts,
     AccountingPeriod,
+    BankTransaction,
     BankAccount,
     Book,
     CompanyDefaultAccount,
+    ComprobanteContable,
+    ComprobanteContableDetalle,
+    DeliveryNote,
+    DeliveryNoteItem,
     GLEntry,
     Item,
     ItemAccount,
@@ -24,6 +29,8 @@ from cacao_accounting.database import (
     PaymentEntry,
     PurchaseInvoice,
     PurchaseInvoiceItem,
+    PurchaseReceipt,
+    PurchaseReceiptItem,
     SalesInvoice,
     SalesInvoiceItem,
     StockBin,
@@ -33,7 +40,8 @@ from cacao_accounting.database import (
     StockValuationLayer,
     database,
 )
-from cacao_accounting.document_identifiers import validate_accounting_period
+from cacao_accounting.document_identifiers import IdentifierConfigurationError, validate_accounting_period
+from cacao_accounting.tax_pricing_service import TaxCalculationResult, calculate_taxes
 
 
 class PostingError(ValueError):
@@ -83,20 +91,6 @@ def _get_voucher_type(document: Any) -> str:
 
 def _get_voucher_id(document: Any) -> str:
     return str(getattr(document, "voucher_id", None) or getattr(document, "id", ""))
-
-
-def _company_for(document: Any) -> str:
-    company = getattr(document, "company", None)
-    if not company:
-        raise PostingError("El documento no tiene compania definida.")
-    return str(company)
-
-
-def _posting_date_for(document: Any) -> Any:
-    posting_date = getattr(document, "posting_date", None)
-    if not posting_date:
-        raise PostingError("El documento no tiene fecha de contabilizacion definida.")
-    return posting_date
 
 
 def _find_period_ids(company: str, posting_date: Any) -> tuple[str | None, str | None]:
@@ -217,6 +211,24 @@ def _account_id_for_item(item: Any, company: str, account_type: str) -> str | No
         if value:
             return str(value)
     return _resolve_item_account_id(getattr(item, "item_code", None), company, account_type)
+
+
+def _account_id_for_comprobante_line(line: Any, company: str) -> str:
+    explicit_account_id = getattr(line, "account_id", None)
+    if explicit_account_id:
+        return _require_account(
+            str(explicit_account_id),
+            "No existe cuenta contable configurada para la línea del comprobante contable.",
+        )
+
+    account_code = getattr(line, "account", None)
+    if not account_code:
+        raise PostingError("La línea del comprobante contable no tiene cuenta especificada.")
+
+    account = database.session.execute(select(Accounts).filter_by(entity=company, code=account_code)).scalars().first()
+    if not account:
+        raise PostingError(f"La cuenta contable '{account_code}' no existe para la compañía.")
+    return account.id
 
 
 def _resolve_bank_gl_account_id(document: PaymentEntry, destination: bool) -> str | None:
@@ -393,6 +405,98 @@ def _invoice_items_total(items: Sequence[Any], document: Any) -> Decimal:
     return signed_total
 
 
+def _tax_result_for_document(document: Any, items: Sequence[Any]) -> TaxCalculationResult | None:
+    template_id = getattr(document, "tax_template_id", None)
+    if not template_id:
+        return None
+    setattr(document, "_tax_items", items)
+    return calculate_taxes(document, template_id)
+
+
+def _payment_has_references(payment_id: str) -> bool:
+    from cacao_accounting.database import PaymentReference
+
+    return database.session.execute(select(PaymentReference.id).filter_by(payment_id=payment_id)).scalars().first() is not None
+
+
+def _signed_tax_delta(document: Any, tax_result: TaxCalculationResult | None) -> Decimal:
+    if tax_result is None:
+        return Decimal("0")
+    return _signed_amount(document, tax_result.payable_delta)
+
+
+def _append_sales_tax_entries(
+    *,
+    entries: list[GLEntry],
+    context: LedgerContext,
+    document: SalesInvoice,
+    tax_result: TaxCalculationResult | None,
+) -> None:
+    if tax_result is None:
+        return
+    for tax_line in tax_result.lines:
+        if tax_line.is_inclusive or tax_line.amount == 0:
+            continue
+        account_id = _require_account(tax_line.account_id, "Falta la cuenta contable de impuesto de venta.")
+        amount = _signed_amount(document, tax_line.amount)
+        if tax_line.behavior == "deductive":
+            entries.append(
+                _create_gl_entry(
+                    context=context,
+                    account_id=account_id,
+                    debit=abs(amount) if amount > 0 else Decimal("0"),
+                    credit=abs(amount) if amount < 0 else Decimal("0"),
+                    entry_remarks=tax_line.name,
+                )
+            )
+        else:
+            entries.append(
+                _create_gl_entry(
+                    context=context,
+                    account_id=account_id,
+                    debit=abs(amount) if amount < 0 else Decimal("0"),
+                    credit=abs(amount) if amount > 0 else Decimal("0"),
+                    entry_remarks=tax_line.name,
+                )
+            )
+
+
+def _append_purchase_tax_entries(
+    *,
+    entries: list[GLEntry],
+    context: LedgerContext,
+    document: PurchaseInvoice,
+    tax_result: TaxCalculationResult | None,
+) -> None:
+    if tax_result is None:
+        return
+    for tax_line in tax_result.lines:
+        if tax_line.is_inclusive or tax_line.amount == 0:
+            continue
+        account_id = _require_account(tax_line.account_id, "Falta la cuenta contable de impuesto de compra.")
+        amount = _signed_amount(document, tax_line.amount)
+        if tax_line.behavior == "deductive":
+            entries.append(
+                _create_gl_entry(
+                    context=context,
+                    account_id=account_id,
+                    debit=abs(amount) if amount < 0 else Decimal("0"),
+                    credit=abs(amount) if amount > 0 else Decimal("0"),
+                    entry_remarks=tax_line.name,
+                )
+            )
+        else:
+            entries.append(
+                _create_gl_entry(
+                    context=context,
+                    account_id=account_id,
+                    debit=abs(amount) if amount > 0 else Decimal("0"),
+                    credit=abs(amount) if amount < 0 else Decimal("0"),
+                    entry_remarks=tax_line.name,
+                )
+            )
+
+
 def post_sales_invoice(document: SalesInvoice, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera GL para una factura o nota de venta aprobada."""
 
@@ -408,9 +512,10 @@ def post_sales_invoice(document: SalesInvoice, ledger_code: str | None = None) -
     if not items:
         raise PostingError("La factura de venta no contiene lineas para contabilizar.")
 
+    tax_result = _tax_result_for_document(document, items)
     entries: list[GLEntry] = []
     for context in _document_contexts(document, ledger_code=ledger_code):
-        amount_total = _invoice_items_total(items, document)
+        amount_total = _invoice_items_total(items, document) + _signed_tax_delta(document, tax_result)
         if amount_total > 0:
             entries.append(
                 _create_gl_entry(
@@ -465,6 +570,8 @@ def post_sales_invoice(document: SalesInvoice, ledger_code: str | None = None) -
                     )
                 )
 
+        _append_sales_tax_entries(entries=entries, context=context, document=document, tax_result=tax_result)
+
     return _add_entries(entries)
 
 
@@ -483,9 +590,14 @@ def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = N
     if not items:
         raise PostingError("La factura de compra no contiene lineas para contabilizar.")
 
+    tax_result = _tax_result_for_document(document, items)
+    item_amount_total = _invoice_items_total(items, document)
+    amount_total = item_amount_total + _signed_tax_delta(document, tax_result)
+    if getattr(document, "purchase_receipt_id", None):
+        _record_gr_ir_reconciliation(document, abs(item_amount_total))
+
     entries: list[GLEntry] = []
     for context in _document_contexts(document, ledger_code=ledger_code):
-        amount_total = _invoice_items_total(items, document)
         for item in items:
             amount = _signed_amount(document, _decimal_value(getattr(item, "amount", None)))
             if amount == 0:
@@ -515,6 +627,8 @@ def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = N
                         entry_remarks=getattr(item, "item_name", None) or getattr(item, "item_code", None),
                     )
                 )
+
+        _append_purchase_tax_entries(entries=entries, context=context, document=document, tax_result=tax_result)
 
         if amount_total > 0:
             entries.append(
@@ -559,9 +673,14 @@ def post_payment_entry(document: PaymentEntry, ledger_code: str | None = None) -
     entries: list[GLEntry] = []
     for context in _document_contexts(document, ledger_code=ledger_code):
         if payment_type == "pay":
+            defaults = _company_defaults(company)
+            party_account_id = _resolve_party_account_id(document.party_id, company, receivable=False)
+            account_id = party_account_id or (
+                None if _payment_has_references(document.id) else (defaults.supplier_advance_account_id if defaults else None)
+            )
             payable_account_id = _require_account(
-                _resolve_party_account_id(document.party_id, company, receivable=False),
-                "No existe cuenta por pagar configurada para el proveedor.",
+                account_id,
+                "No existe cuenta por pagar o anticipo configurada para el proveedor.",
             )
             bank_account_id = _require_account(
                 _resolve_bank_gl_account_id(document, destination=False),
@@ -575,14 +694,19 @@ def post_payment_entry(document: PaymentEntry, ledger_code: str | None = None) -
                     amount=amount,
                     party_type="supplier",
                     party_id=document.party_id,
-                    debit_remarks="Pago a proveedor",
+                    debit_remarks="Pago a proveedor" if party_account_id else "Anticipo a proveedor",
                     credit_remarks="Cuenta bancaria de pago",
                 )
             )
         elif payment_type == "receive":
+            defaults = _company_defaults(company)
+            party_account_id = _resolve_party_account_id(document.party_id, company, receivable=True)
+            account_id = party_account_id or (
+                None if _payment_has_references(document.id) else (defaults.customer_advance_account_id if defaults else None)
+            )
             receivable_account_id = _require_account(
-                _resolve_party_account_id(document.party_id, company, receivable=True),
-                "No existe cuenta por cobrar configurada para el cliente.",
+                account_id,
+                "No existe cuenta por cobrar o anticipo configurada para el cliente.",
             )
             bank_account_id = _require_account(
                 _resolve_bank_gl_account_id(document, destination=True),
@@ -604,7 +728,7 @@ def post_payment_entry(document: PaymentEntry, ledger_code: str | None = None) -
                         credit=amount,
                         party_type="customer",
                         party_id=document.party_id,
-                        entry_remarks="Cobro de cliente",
+                        entry_remarks="Cobro de cliente" if party_account_id else "Anticipo de cliente",
                     ),
                 ]
             )
@@ -633,7 +757,7 @@ def post_payment_entry(document: PaymentEntry, ledger_code: str | None = None) -
     return _add_entries(entries)
 
 
-def _stock_item_for(line: StockEntryItem) -> Item:
+def _stock_item_for(line: Any) -> Item:
     item = database.session.get(Item, line.item_code)
     if item is None:
         item = database.session.execute(select(Item).filter_by(code=line.item_code)).scalars().first()
@@ -641,17 +765,22 @@ def _stock_item_for(line: StockEntryItem) -> Item:
         raise PostingError("La linea de inventario referencia un item inexistente.")
     if item.item_type == "service" or not item.is_stock_item:
         raise PostingError("Solo los bienes inventariables pueden generar Stock Ledger.")
-    if item.has_batch and not line.batch_id:
-        raise PostingError("El item requiere lote para generar movimiento de inventario.")
-    if item.has_serial_no and not line.serial_no:
-        raise PostingError("El item requiere numero de serie para generar movimiento de inventario.")
     return item
 
 
 def _line_qty(line: StockEntryItem) -> Decimal:
-    qty = _decimal_value(line.qty_in_base_uom or line.qty)
+    from cacao_accounting.inventario.service import InventoryServiceError, convert_item_qty
+
+    item = _stock_item_for(line)
+    qty = _decimal_value(line.qty_in_base_uom)
+    if qty <= 0:
+        try:
+            qty = convert_item_qty(line.item_code, _decimal_value(line.qty), line.uom, item.default_uom)
+        except InventoryServiceError as exc:
+            raise PostingError(str(exc)) from exc
     if qty <= 0:
         raise PostingError("La cantidad de inventario debe ser mayor que cero.")
+    line.qty_in_base_uom = qty
     return qty
 
 
@@ -667,6 +796,40 @@ def _line_rate(line: StockEntryItem) -> Decimal:
     return rate
 
 
+def _line_qty_generic(line: Any) -> Decimal:
+    from cacao_accounting.inventario.service import InventoryServiceError, convert_item_qty
+
+    item = _stock_item_for(line)
+    qty = _decimal_value(getattr(line, "qty_in_base_uom", None))
+    if qty <= 0:
+        try:
+            qty = convert_item_qty(
+                getattr(line, "item_code"),
+                _decimal_value(getattr(line, "qty", None)),
+                getattr(line, "uom", None) or item.default_uom,
+                item.default_uom,
+            )
+        except InventoryServiceError as exc:
+            raise PostingError(str(exc)) from exc
+    if qty <= 0:
+        raise PostingError("La cantidad de inventario debe ser mayor que cero.")
+    if hasattr(line, "qty_in_base_uom"):
+        line.qty_in_base_uom = qty
+    return qty
+
+
+def _line_rate_generic(line: Any) -> Decimal:
+    rate = _decimal_value(getattr(line, "valuation_rate", None) or getattr(line, "rate", None))
+    if rate <= 0:
+        amount = _decimal_value(getattr(line, "amount", None))
+        qty = _line_qty_generic(line)
+        if amount > 0 and qty > 0:
+            rate = amount / qty
+    if rate <= 0:
+        raise PostingError("La linea de inventario requiere tasa de valuacion.")
+    return rate
+
+
 def _stock_qty_after(company: str, item_code: str, warehouse: str, qty_change: Decimal) -> Decimal:
     current = database.session.execute(
         select(func.coalesce(func.sum(StockLedgerEntry.qty_change), 0)).filter_by(
@@ -674,6 +837,167 @@ def _stock_qty_after(company: str, item_code: str, warehouse: str, qty_change: D
         )
     ).scalar_one()
     return _decimal_value(current) + qty_change
+
+
+def _valuation_method_for_item(item_code: str) -> str:
+    item = database.session.get(Item, item_code)
+    if item is None:
+        item = database.session.execute(select(Item).filter_by(code=item_code)).scalars().first()
+    if not item:
+        raise PostingError("El item de inventario no existe.")
+    return (getattr(item, "valuation_method", None) or "fifo").lower()
+
+
+def _valuation_queue(company: str, item_code: str, warehouse: str) -> list[tuple[Decimal, Decimal]]:
+    layers = (
+        database.session.execute(
+            select(StockValuationLayer)
+            .filter_by(company=company, item_code=item_code, warehouse=warehouse)
+            .order_by(StockValuationLayer.posting_date, StockValuationLayer.id)
+        )
+        .scalars()
+        .all()
+    )
+    queue: list[tuple[Decimal, Decimal]] = []
+    for layer in layers:
+        qty = _decimal_value(layer.qty)
+        rate = _decimal_value(layer.rate)
+        if qty > 0:
+            queue.append((qty, rate))
+            continue
+        if qty < 0:
+            remaining = abs(qty)
+            while remaining > 0 and queue:
+                available_qty, available_rate = queue[0]
+                consumed_qty = min(available_qty, remaining)
+                remaining -= consumed_qty
+                available_qty -= consumed_qty
+                if available_qty > 0:
+                    queue[0] = (available_qty, available_rate)
+                else:
+                    queue.pop(0)
+            if remaining > 0:
+                raise PostingError("El registro de valuacion de inventario esta inconsistente.")
+    return [(qty, rate) for qty, rate in queue if qty > 0]
+
+
+def _consume_stock_valuation_layers(
+    company: str, item_code: str, warehouse: str, quantity: Decimal
+) -> tuple[Decimal, Decimal]:
+    if quantity <= 0:
+        raise PostingError("La cantidad de consumo debe ser mayor que cero.")
+    available = _valuation_queue(company, item_code, warehouse)
+    total_available = sum(qty for qty, _ in available)
+    if total_available < quantity:
+        raise PostingError("No hay suficiente inventario para calcular el costo real.")
+
+    valuation_method = _valuation_method_for_item(item_code)
+    if valuation_method == "moving_average":
+        total_value = sum((qty * rate for qty, rate in available), Decimal("0"))
+        average_rate = total_value / total_available
+        return quantity * average_rate, average_rate
+
+    total_cost = Decimal("0")
+    remaining = quantity
+    queue = list(available)
+    while remaining > 0 and queue:
+        available_qty, rate = queue[0]
+        consume_qty = min(available_qty, remaining)
+        total_cost += consume_qty * rate
+        remaining -= consume_qty
+        available_qty -= consume_qty
+        if available_qty > 0:
+            queue[0] = (available_qty, rate)
+        else:
+            queue.pop(0)
+    if remaining > 0:
+        raise PostingError("No hay suficiente inventario para calcular el costo real.")
+    return total_cost, total_cost / quantity
+
+
+def _company_for(document: Any) -> str:
+    company = getattr(document, "company", None) or getattr(document, "entity", None)
+    if not company and isinstance(document, BankTransaction):
+        company = _bank_transaction_company(document)
+    if not company:
+        raise PostingError("El documento no tiene compania definida.")
+    return str(company)
+
+
+def _posting_date_for(document: Any) -> Any:
+    posting_date = getattr(document, "posting_date", None) or getattr(document, "date", None)
+    if not posting_date:
+        raise PostingError("El documento no tiene fecha de contabilizacion definida.")
+    return posting_date
+
+
+def _bank_transaction_account_id(document: BankTransaction) -> str:
+    bank_account = database.session.get(BankAccount, document.bank_account_id)
+    if not bank_account or not bank_account.gl_account_id:
+        raise PostingError("La transacción bancaria no tiene una cuenta GL bancaria configurada.")
+    return bank_account.gl_account_id
+
+
+def _bank_transaction_company(document: BankTransaction) -> str:
+    bank_account = database.session.get(BankAccount, document.bank_account_id)
+    if not bank_account or not bank_account.company:
+        raise PostingError("La transacción bancaria no esta asociada a una compañía.")
+    return str(bank_account.company)
+
+
+def _bank_transaction_offset_account_id(document: BankTransaction, credit: bool) -> str:
+    company = _bank_transaction_company(document)
+    defaults = _company_defaults(company)
+    if not defaults:
+        raise PostingError("No existe configuración contable predeterminada para la compañía.")
+    if credit:
+        return _require_account(
+            defaults.default_income,
+            "No existe cuenta de ingresos configurada para notas bancarias de depósito.",
+        )
+    return _require_account(
+        defaults.default_expense,
+        "No existe cuenta de gastos configurada para notas bancarias de retiro.",
+    )
+
+
+def post_bank_transaction(document: BankTransaction, ledger_code: str | None = None) -> list[GLEntry]:
+    """Genera GL para una nota bancaria manual."""
+
+    amount = _decimal_value(document.deposit if document.deposit is not None else document.withdrawal)
+    if amount <= 0:
+        raise PostingError("La nota bancaria no tiene un monto valido.")
+
+    bank_account_id = _bank_transaction_account_id(document)
+    credit = document.deposit is not None
+    offset_account_id = _bank_transaction_offset_account_id(document, credit=credit)
+
+    entries: list[GLEntry] = []
+    for context in _document_contexts(document, ledger_code=ledger_code):
+        if credit:
+            entries.extend(
+                _normal_entries_for_amount(
+                    context=context,
+                    debit_account_id=bank_account_id,
+                    credit_account_id=offset_account_id,
+                    amount=amount,
+                    debit_remarks="Depósito bancario",
+                    credit_remarks="Ingreso bancario",
+                )
+            )
+        else:
+            entries.extend(
+                _normal_entries_for_amount(
+                    context=context,
+                    debit_account_id=offset_account_id,
+                    credit_account_id=bank_account_id,
+                    amount=amount,
+                    debit_remarks="Gasto bancario",
+                    credit_remarks="Retiro bancario",
+                )
+            )
+
+    return _add_entries(entries)
 
 
 def _upsert_stock_bin(
@@ -700,15 +1024,32 @@ def _upsert_stock_bin(
 
 def _create_stock_movement(
     *,
-    document: StockEntry,
-    line: StockEntryItem,
+    document: Any,
+    line: Any,
     warehouse: str | None,
     qty_change: Decimal,
     valuation_rate: Decimal,
     value_change: Decimal,
 ) -> StockLedgerEntry:
+    from cacao_accounting.inventario.service import InventoryServiceError, update_serial_state, validate_batch_serial
+
     if not warehouse:
         raise PostingError("La linea de inventario requiere almacen.")
+    try:
+        validate_batch_serial(line, outgoing=qty_change < 0)
+    except InventoryServiceError as exc:
+        raise PostingError(str(exc)) from exc
+    if qty_change < 0:
+        cost_amount, cost_rate = _consume_stock_valuation_layers(
+            company=document.company,
+            item_code=line.item_code,
+            warehouse=warehouse,
+            quantity=abs(qty_change),
+        )
+        valuation_rate = cost_rate
+        value_change = -cost_amount
+        line._inventory_cost_amount = cost_amount
+    update_serial_state(line, outgoing=qty_change < 0, warehouse=warehouse)
     qty_after = _stock_qty_after(document.company, line.item_code, warehouse, qty_change)
     _upsert_stock_bin(
         company=document.company,
@@ -745,8 +1086,8 @@ def _create_stock_movement(
         stock_value=qty_after * valuation_rate,
         voucher_type=_get_voucher_type(document),
         voucher_id=_get_voucher_id(document),
-        batch_id=line.batch_id,
-        serial_no=line.serial_no,
+        batch_id=getattr(line, "batch_id", None),
+        serial_no=getattr(line, "serial_no", None),
     )
 
 
@@ -765,7 +1106,7 @@ def _create_stock_ledger(document: StockEntry) -> list[StockLedgerEntry]:
         qty = _line_qty(line)
         valuation_rate = _line_rate(line)
         value = _decimal_value(line.amount) or (qty * valuation_rate)
-        if purpose == "material_receipt":
+        if purpose in ("material_receipt", "adjustment_positive"):
             movements.append(
                 _create_stock_movement(
                     document=document,
@@ -776,7 +1117,7 @@ def _create_stock_ledger(document: StockEntry) -> list[StockLedgerEntry]:
                     value_change=value,
                 )
             )
-        elif purpose == "material_issue":
+        elif purpose in ("material_issue", "adjustment_negative"):
             movements.append(
                 _create_stock_movement(
                     document=document,
@@ -808,11 +1149,367 @@ def _create_stock_ledger(document: StockEntry) -> list[StockLedgerEntry]:
                     value_change=value,
                 )
             )
+        elif purpose == "stock_reconciliation":
+            warehouse = line.target_warehouse or line.source_warehouse or document.to_warehouse or document.from_warehouse
+            if not warehouse:
+                raise PostingError("La conciliación requiere bodega origen o destino.")
+            qty_change = qty if (line.target_warehouse or document.to_warehouse) else -qty
+            value_change = value if qty_change >= 0 else -value
+            movements.append(
+                _create_stock_movement(
+                    document=document,
+                    line=line,
+                    warehouse=warehouse,
+                    qty_change=qty_change,
+                    valuation_rate=valuation_rate,
+                    value_change=value_change,
+                )
+            )
         else:
             raise PostingError("Proposito de inventario no soportado para Stock Ledger.")
 
     database.session.add_all(movements)
     return movements
+
+
+def _document_items(document: Any) -> list[Any]:
+    if isinstance(document, PurchaseReceipt):
+        return list(
+            database.session.execute(select(PurchaseReceiptItem).filter_by(purchase_receipt_id=document.id)).scalars().all()
+        )
+    if isinstance(document, DeliveryNote):
+        return list(database.session.execute(select(DeliveryNoteItem).filter_by(delivery_note_id=document.id)).scalars().all())
+    raise PostingError("El documento no contiene lineas de inventario compatibles.")
+
+
+def _comprobante_lines(document: ComprobanteContable) -> list[ComprobanteContableDetalle]:
+    return list(
+        database.session.execute(
+            select(ComprobanteContableDetalle).filter_by(transaction=document.__tablename__, transaction_id=document.id)
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _create_stock_ledger_for_document(
+    document: Any,
+    qty_change: Decimal,
+    value_change: Decimal,
+    warehouse: str | None,
+    line: Any,
+) -> StockLedgerEntry:
+    from cacao_accounting.inventario.service import InventoryServiceError, update_serial_state, validate_batch_serial
+
+    _stock_item_for(line)
+    if qty_change < 0:
+        if not warehouse:
+            raise PostingError("La linea de inventario requiere almacen.")
+        try:
+            validate_batch_serial(line, outgoing=True)
+        except InventoryServiceError as exc:
+            raise PostingError(str(exc)) from exc
+        cost_amount, cost_rate = _consume_stock_valuation_layers(
+            company=document.company,
+            item_code=line.item_code,
+            warehouse=warehouse,
+            quantity=abs(qty_change),
+        )
+        valuation_rate = cost_rate
+        value_change = -cost_amount
+        line._inventory_cost_amount = cost_amount
+    else:
+        if not warehouse:
+            raise PostingError("La linea de inventario requiere almacen.")
+        try:
+            validate_batch_serial(line, outgoing=False)
+        except InventoryServiceError as exc:
+            raise PostingError(str(exc)) from exc
+        valuation_rate = (
+            value_change / qty_change
+            if qty_change != 0
+            else _decimal_value(line.valuation_rate or getattr(line, "rate", None) or 0)
+        )
+
+    update_serial_state(line, outgoing=qty_change < 0, warehouse=warehouse)
+    qty_after = _stock_qty_after(document.company, line.item_code, warehouse, qty_change)
+    _upsert_stock_bin(
+        company=document.company,
+        item_code=line.item_code,
+        warehouse=warehouse,
+        qty_change=qty_change,
+        valuation_rate=valuation_rate,
+        value_change=value_change,
+    )
+    database.session.add(
+        StockValuationLayer(
+            item_code=line.item_code,
+            warehouse=warehouse,
+            company=document.company,
+            qty=qty_change,
+            rate=valuation_rate,
+            stock_value_difference=value_change,
+            remaining_qty=max(qty_after, Decimal("0")),
+            remaining_stock_value=max(qty_after * valuation_rate, Decimal("0")),
+            voucher_type=_get_voucher_type(document),
+            voucher_id=_get_voucher_id(document),
+            posting_date=document.posting_date,
+        )
+    )
+    return StockLedgerEntry(
+        posting_date=document.posting_date,
+        item_code=line.item_code,
+        warehouse=warehouse,
+        company=document.company,
+        qty_change=qty_change,
+        qty_after_transaction=qty_after,
+        valuation_rate=valuation_rate,
+        stock_value_difference=value_change,
+        stock_value=qty_after * valuation_rate,
+        voucher_type=_get_voucher_type(document),
+        voucher_id=_get_voucher_id(document),
+        batch_id=getattr(line, "batch_id", None),
+        serial_no=getattr(line, "serial_no", None),
+    )
+
+
+def _create_stock_ledger_for_document_type(document: Any, sign: Decimal) -> list[StockLedgerEntry]:
+    if _has_stock_ledger_entries(document):
+        raise PostingError("Este documento ya tiene movimientos de inventario contabilizados.")
+
+    items = _document_items(document)
+    if not items:
+        raise PostingError("El documento no contiene lineas de inventario para contabilizar.")
+
+    movements: list[StockLedgerEntry] = []
+    for line in items:
+        qty = _line_qty_generic(line)
+        rate = _line_rate_generic(line)
+        amount = _decimal_value(getattr(line, "amount", None)) or (qty * rate)
+        qty_change = _signed_amount(document, sign * qty)
+        value_change = _signed_amount(document, sign * amount)
+        warehouse = getattr(line, "warehouse", None)
+        if not warehouse:
+            raise PostingError("La linea de inventario requiere almacen.")
+        movements.append(
+            _create_stock_ledger_for_document(
+                document=document,
+                line=line,
+                warehouse=warehouse,
+                qty_change=qty_change,
+                value_change=value_change,
+            )
+        )
+    database.session.add_all(movements)
+    return movements
+
+
+def _receipt_total(document: PurchaseReceipt) -> Decimal:
+    items = _document_items(document)
+    total = sum(
+        (
+            _decimal_value(getattr(item, "amount", None)) or (_line_qty_generic(item) * _line_rate_generic(item))
+            for item in items
+        ),
+        Decimal("0"),
+    )
+    if total <= 0:
+        raise PostingError("La recepción de compra no tiene monto conciliable.")
+    return total
+
+
+def _record_gr_ir_reconciliation(document: PurchaseInvoice, matched_amount: Decimal) -> None:
+    from cacao_accounting.compras.gr_ir_service import GRIRServiceError, reconcile_gr_ir_invoice
+
+    if not getattr(document, "purchase_receipt_id", None):
+        return
+
+    purchase_receipt = database.session.get(PurchaseReceipt, document.purchase_receipt_id)
+    if not purchase_receipt:
+        raise PostingError("La recepción de compra referenciada no existe.")
+    if purchase_receipt.company != document.company:
+        raise PostingError("La factura de compra y la recepción de compra deben pertenecer a la misma compañía.")
+    if getattr(purchase_receipt, "docstatus", 0) != 1:
+        raise PostingError("La recepción de compra referenciada debe estar aprobada.")
+    if not _has_active_gl_entries(purchase_receipt) or not _has_stock_ledger_entries(purchase_receipt):
+        raise PostingError("La recepción de compra referenciada debe estar contabilizada antes de facturarse.")
+
+    try:
+        reconcile_gr_ir_invoice(document.id)
+    except GRIRServiceError as exc:
+        raise PostingError(str(exc)) from exc
+
+
+def _create_stock_reversal(document: Any, movement: StockLedgerEntry) -> StockLedgerEntry:
+    qty_change = -_decimal_value(movement.qty_change)
+    value_change = -_decimal_value(movement.stock_value_difference)
+    valuation_rate = _decimal_value(movement.valuation_rate)
+    posting_date = _posting_date_for(document)
+    qty_after = _stock_qty_after(movement.company, movement.item_code, movement.warehouse, qty_change)
+
+    _upsert_stock_bin(
+        company=movement.company,
+        item_code=movement.item_code,
+        warehouse=movement.warehouse,
+        qty_change=qty_change,
+        valuation_rate=valuation_rate,
+        value_change=value_change,
+    )
+    database.session.add(
+        StockValuationLayer(
+            item_code=movement.item_code,
+            warehouse=movement.warehouse,
+            company=movement.company,
+            qty=qty_change,
+            rate=valuation_rate,
+            stock_value_difference=value_change,
+            remaining_qty=max(qty_after, Decimal("0")),
+            remaining_stock_value=max(qty_after * valuation_rate, Decimal("0")),
+            voucher_type=movement.voucher_type,
+            voucher_id=movement.voucher_id,
+            posting_date=posting_date,
+        )
+    )
+    return StockLedgerEntry(
+        posting_date=posting_date,
+        item_code=movement.item_code,
+        warehouse=movement.warehouse,
+        company=movement.company,
+        qty_change=qty_change,
+        qty_after_transaction=qty_after,
+        valuation_rate=valuation_rate,
+        stock_value_difference=value_change,
+        stock_value=qty_after * valuation_rate,
+        voucher_type=movement.voucher_type,
+        voucher_id=movement.voucher_id,
+        batch_id=movement.batch_id,
+        serial_no=movement.serial_no,
+    )
+
+
+def post_purchase_receipt(document: PurchaseReceipt, ledger_code: str | None = None) -> list[GLEntry]:
+    """Genera Stock Ledger y GL para una recepción de compra aprobada."""
+
+    if getattr(document, "docstatus", 0) != 1:
+        raise PostingError("Solo se puede contabilizar una recepción de compra aprobada.")
+
+    company = _company_for(document)
+    gr_ir_account_id = _require_account(
+        _resolve_item_account_id(None, company, "gr_ir"),
+        "Falta la cuenta GR/IR configurada para la compañia.",
+    )
+    movements = _create_stock_ledger_for_document_type(document, Decimal("1"))
+    if not movements:
+        raise PostingError("No se generaron movimientos de inventario para esta recepción de compra.")
+
+    entries: list[GLEntry] = []
+    for context in _document_contexts(document, ledger_code=ledger_code):
+        for line in _document_items(document):
+            qty = _line_qty_generic(line)
+            rate = _line_rate_generic(line)
+            amount = _decimal_value(getattr(line, "amount", None)) or (qty * rate)
+            value = _signed_amount(document, amount)
+            inventory_account_id = _require_account(
+                _account_id_for_item(line, company, "inventory"),
+                "Falta la cuenta de inventario para una linea de recepcion de compra.",
+            )
+            entries.extend(
+                _normal_entries_for_amount(
+                    context=context,
+                    debit_account_id=inventory_account_id,
+                    credit_account_id=gr_ir_account_id,
+                    amount=value,
+                    party_type="supplier",
+                    party_id=document.supplier_id,
+                    debit_remarks="Recepción de compra",
+                    credit_remarks="GR/IR",
+                )
+            )
+    return _add_entries(entries)
+
+
+def post_delivery_note(document: DeliveryNote, ledger_code: str | None = None) -> list[GLEntry]:
+    """Genera Stock Ledger y GL para una nota de entrega aprobada."""
+
+    if getattr(document, "docstatus", 0) != 1:
+        raise PostingError("Solo se puede contabilizar una nota de entrega aprobada.")
+
+    company = _company_for(document)
+    movements = _create_stock_ledger_for_document_type(document, Decimal("-1"))
+    if not movements:
+        raise PostingError("No se generaron movimientos de inventario para esta nota de entrega.")
+
+    entries: list[GLEntry] = []
+    for context in _document_contexts(document, ledger_code=ledger_code):
+        for line in _document_items(document):
+            qty = _line_qty_generic(line)
+            rate = _line_rate_generic(line)
+            amount = _decimal_value(getattr(line, "amount", None)) or (qty * rate)
+            cost_amount = getattr(line, "_inventory_cost_amount", None)
+            value = _signed_amount(document, cost_amount if cost_amount is not None else amount)
+            inventory_account_id = _require_account(
+                _account_id_for_item(line, company, "inventory"),
+                "Falta la cuenta de inventario para una linea de nota de entrega.",
+            )
+            expense_account_id = _require_account(
+                _account_id_for_item(line, company, "expense"),
+                "Falta la cuenta de gasto para una linea de nota de entrega.",
+            )
+            entries.extend(
+                _normal_entries_for_amount(
+                    context=context,
+                    debit_account_id=expense_account_id,
+                    credit_account_id=inventory_account_id,
+                    amount=value,
+                    debit_remarks="Costo de ventas",
+                )
+            )
+    return _add_entries(entries)
+
+
+def post_comprobante_contable(document: ComprobanteContable, ledger_code: str | None = None) -> list[GLEntry]:
+    """Genera GL para un comprobante contable manual."""
+
+    company = _company_for(document)
+    lines = _comprobante_lines(document)
+    if not lines:
+        raise PostingError("El comprobante contable no contiene lineas.")
+
+    entries: list[GLEntry] = []
+    for context in _document_contexts(document, ledger_code=ledger_code):
+        for line in lines:
+            value = _decimal_value(getattr(line, "value", None))
+            if value == 0:
+                raise PostingError("Las lineas del comprobante contable deben tener un valor distinto de cero.")
+
+            account_id = _account_id_for_comprobante_line(line, company)
+            if value > 0:
+                debit = value
+                credit = Decimal("0")
+            else:
+                debit = Decimal("0")
+                credit = abs(value)
+
+            entries.append(
+                _create_gl_entry(
+                    context=context,
+                    account_id=account_id,
+                    debit=debit,
+                    credit=credit,
+                    party_type=getattr(line, "third_type", None),
+                    party_id=getattr(line, "third_code", None),
+                    cost_center_code=getattr(line, "cost_center", None),
+                    unit_code=getattr(line, "unit", None),
+                    project_code=getattr(line, "project", None),
+                    entry_remarks=getattr(line, "memo", None) or getattr(line, "line_memo", None),
+                )
+            )
+
+    total_value = sum((_decimal_value(getattr(line, "value", None)) for line in lines), Decimal("0"))
+    if total_value != 0:
+        raise PostingError("El comprobante contable no está balanceado.")
+
+    return _add_entries(entries)
 
 
 def post_stock_entry(document: StockEntry, ledger_code: str | None = None) -> list[GLEntry]:
@@ -840,12 +1537,12 @@ def post_stock_entry(document: StockEntry, ledger_code: str | None = None) -> li
                 _account_id_for_item(line, company, "inventory"),
                 "Falta la cuenta de inventario para la linea de stock.",
             )
-            offset_type = "gr_ir" if purpose == "material_receipt" else "expense"
+            offset_type = "gr_ir" if purpose in ("material_receipt", "adjustment_positive") else "expense"
             offset_account_id = _require_account(
                 _account_id_for_item(line, company, offset_type),
                 "Falta la cuenta de contrapartida para la linea de stock.",
             )
-            if purpose == "material_receipt":
+            if purpose in ("material_receipt", "adjustment_positive"):
                 entries.extend(
                     _normal_entries_for_amount(
                         context=context,
@@ -883,10 +1580,18 @@ def post_document_to_gl(document: Any, ledger_code: str | None = None) -> list[G
         return post_sales_invoice(document, ledger_code=ledger_code)
     if isinstance(document, PurchaseInvoice):
         return post_purchase_invoice(document, ledger_code=ledger_code)
+    if isinstance(document, PurchaseReceipt):
+        return post_purchase_receipt(document, ledger_code=ledger_code)
+    if isinstance(document, DeliveryNote):
+        return post_delivery_note(document, ledger_code=ledger_code)
     if isinstance(document, PaymentEntry):
         return post_payment_entry(document, ledger_code=ledger_code)
     if isinstance(document, StockEntry):
         return post_stock_entry(document, ledger_code=ledger_code)
+    if isinstance(document, BankTransaction):
+        return post_bank_transaction(document, ledger_code=ledger_code)
+    if isinstance(document, ComprobanteContable):
+        return post_comprobante_contable(document, ledger_code=ledger_code)
     raise PostingError("Tipo de documento no soportado para posting contable.")
 
 
@@ -908,6 +1613,10 @@ def cancel_document(document: Any) -> list[GLEntry]:
         raise PostingError("Solo se puede cancelar un documento aprobado.")
 
     company = _company_for(document)
+    try:
+        validate_accounting_period(company, _posting_date_for(document))
+    except IdentifierConfigurationError as exc:
+        raise PostingError(str(exc)) from exc
     voucher_type = _get_voucher_type(document)
     voucher_id = _get_voucher_id(document)
     original_entries = (
@@ -962,23 +1671,29 @@ def cancel_document(document: Any) -> list[GLEntry]:
         )
         entry.is_cancelled = True
 
-    if isinstance(document, StockEntry):
-        for movement in database.session.execute(
-            select(StockLedgerEntry).filter_by(
-                company=company,
-                voucher_type=voucher_type,
-                voucher_id=voucher_id,
-                is_cancelled=False,
+    if isinstance(document, (StockEntry, PurchaseReceipt, DeliveryNote)):
+        stock_reversals: list[StockLedgerEntry] = []
+        original_movements = (
+            database.session.execute(
+                select(StockLedgerEntry).filter_by(
+                    company=company,
+                    voucher_type=voucher_type,
+                    voucher_id=voucher_id,
+                    is_cancelled=False,
+                )
             )
-        ).scalars():
-            _upsert_stock_bin(
-                company=movement.company,
-                item_code=movement.item_code,
-                warehouse=movement.warehouse,
-                qty_change=-_decimal_value(movement.qty_change),
-                valuation_rate=_decimal_value(movement.valuation_rate),
-                value_change=-_decimal_value(movement.stock_value_difference),
-            )
-            movement.is_cancelled = True
+            .scalars()
+            .all()
+        )
+        if not original_movements:
+            raise PostingError("El documento no tiene movimientos de inventario para reversar.")
+        for movement in original_movements:
+            stock_reversals.append(_create_stock_reversal(document, movement))
+        database.session.add_all(stock_reversals)
+
+    if isinstance(document, PurchaseInvoice) and getattr(document, "purchase_receipt_id", None):
+        from cacao_accounting.compras.gr_ir_service import cancel_gr_ir_for_invoice
+
+        cancel_gr_ir_for_invoice(document.id)
 
     return _add_entries(reversals)

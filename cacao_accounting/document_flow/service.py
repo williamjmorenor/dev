@@ -4,13 +4,22 @@
 """Servicios de flujo documental y parcialidades."""
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
 from flask_login import current_user
+from sqlalchemy import or_, select
 
-from cacao_accounting.database import AuditLog, DocumentRelation, PaymentEntry, PaymentReference, database
+from cacao_accounting.database import (
+    AuditLog,
+    DocumentRelation,
+    PaymentEntry,
+    PaymentReference,
+    PurchaseInvoice,
+    SalesInvoice,
+    database,
+)
 from cacao_accounting.document_flow.registry import (
     ALLOWED_FLOWS,
     get_document_type,
@@ -71,6 +80,102 @@ def _audit(entity_type: str, entity_id: str, action: str, before: dict[str, Any]
             user_id=_current_user_id(),
         )
     )
+
+
+def _document_payment_references(document: Any, as_of_date: date | None = None) -> list[PaymentReference]:
+    """Devuelve las referencias de pago asociadas a una factura."""
+
+    raw_document_type = getattr(document, "document_type", None) or getattr(document, "__tablename__", "")
+    document_type = normalize_doctype(str(raw_document_type or ""))
+    if document_type not in {"sales_invoice", "purchase_invoice"}:
+        return []
+    query = select(PaymentReference).filter_by(reference_type=document_type, reference_id=getattr(document, "id", ""))
+    if as_of_date is not None:
+        query = query.where(
+            or_(
+                PaymentReference.allocation_date.is_(None),
+                PaymentReference.allocation_date <= as_of_date,
+            )
+        )
+    return list(database.session.execute(query).scalars().all())
+
+
+def compute_outstanding_amount(document: Any, as_of_date: date | None = None) -> Decimal:
+    """Calcula el saldo vivo de una factura usando las referencias de pago."""
+
+    if as_of_date is None:
+        as_of_date = date.today()
+    grand_total = decimal_or_zero(getattr(document, "grand_total", None))
+    allocated = sum(
+        decimal_or_zero(reference.allocated_amount)
+        for reference in _document_payment_references(document, as_of_date=as_of_date)
+    )
+    outstanding = grand_total - allocated
+    return outstanding if outstanding > 0 else Decimal("0")
+
+
+def refresh_outstanding_amount_cache(document: Any, as_of_date: date | None = None) -> Decimal:
+    """Sincroniza el campo cacheado `outstanding_amount` con el valor calculado."""
+
+    outstanding = compute_outstanding_amount(document, as_of_date=as_of_date)
+    if hasattr(document, "outstanding_amount"):
+        document.outstanding_amount = outstanding
+    if hasattr(document, "base_outstanding_amount"):
+        document.base_outstanding_amount = outstanding
+    return outstanding
+
+
+def apply_advance_to_invoice(
+    payment_entry_id: str,
+    invoice_id: str,
+    amount: Decimal,
+    allocation_date: date,
+) -> PaymentReference:
+    """Aplica un anticipo existente contra una factura AR/AP."""
+
+    payment = database.session.get(PaymentEntry, payment_entry_id)
+    if not payment:
+        raise DocumentFlowError("El pago/anticipo no existe.")
+    invoice: SalesInvoice | PurchaseInvoice | None = database.session.get(SalesInvoice, invoice_id)
+    reference_type = "sales_invoice"
+    party_id = getattr(invoice, "customer_id", None) if invoice else None
+    if invoice is None:
+        invoice = database.session.get(PurchaseInvoice, invoice_id)
+        reference_type = "purchase_invoice"
+        party_id = getattr(invoice, "supplier_id", None) if invoice else None
+    if invoice is None:
+        raise DocumentFlowError("La factura no existe.")
+    if payment.company != invoice.company:
+        raise DocumentFlowError("El anticipo y la factura pertenecen a companias distintas.")
+    if payment.party_id and party_id and payment.party_id != party_id:
+        raise DocumentFlowError("El anticipo pertenece a otro tercero.")
+    allocated_before = sum(
+        (
+            decimal_or_zero(reference.allocated_amount)
+            for reference in database.session.execute(select(PaymentReference).filter_by(payment_id=payment.id)).scalars()
+        ),
+        Decimal("0"),
+    )
+    payment_total = decimal_or_zero(payment.paid_amount or payment.received_amount)
+    outstanding = compute_outstanding_amount(invoice, as_of_date=allocation_date)
+    if amount <= 0:
+        raise DocumentFlowError("El monto aplicado debe ser mayor que cero.")
+    if amount > payment_total - allocated_before:
+        raise DocumentFlowError("El monto excede el remanente del anticipo.")
+    if amount > outstanding:
+        raise DocumentFlowError("El monto excede el saldo pendiente de la factura.")
+    reference = PaymentReference(
+        payment_id=payment.id,
+        reference_type=reference_type,
+        reference_id=invoice.id,
+        total_amount=getattr(invoice, "grand_total", None),
+        outstanding_amount=outstanding,
+        allocated_amount=amount,
+        allocation_date=allocation_date,
+    )
+    database.session.add(reference)
+    refresh_outstanding_amount_cache(invoice, as_of_date=allocation_date)
+    return reference
 
 
 def _state_quantities(

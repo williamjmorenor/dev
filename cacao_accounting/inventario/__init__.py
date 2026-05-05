@@ -176,6 +176,96 @@ def inventario_material_transfer_lista():
     )
 
 
+@inventario.route("/stock-entry/adjustment/list")
+@modulo_activo("inventory")
+@login_required
+def inventario_ajuste_lista():
+    """Listado de ajustes de inventario."""
+
+    consulta = database.paginate(
+        database.select(StockEntry).filter_by(purpose="stock_adjustment"),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Ajustes de Inventario - " + APPNAME
+    new_url = url_for("inventario.inventario_ajuste_nuevo")
+    return render_template(
+        "inventario/entrada_lista.html",
+        consulta=consulta,
+        titulo=titulo,
+        vista="inventario.inventario_ajuste_lista",
+        new_url=new_url,
+    )
+
+
+@inventario.route("/stock-entry/reconciliation/list")
+@modulo_activo("inventory")
+@login_required
+def inventario_reconciliacion_lista():
+    """Listado de conciliaciones físicas de inventario."""
+
+    consulta = database.paginate(
+        database.select(StockEntry).filter_by(purpose="stock_reconciliation"),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Conciliaciones de Inventario - " + APPNAME
+    new_url = url_for("inventario.inventario_reconciliacion_nueva")
+    return render_template(
+        "inventario/entrada_lista.html",
+        consulta=consulta,
+        titulo=titulo,
+        vista="inventario.inventario_reconciliacion_lista",
+        new_url=new_url,
+    )
+
+
+@inventario.route("/stock-entry/adjustment-positive/list")
+@modulo_activo("inventory")
+@login_required
+def inventario_ajuste_positivo_lista():
+    """Listado de ajustes positivos de inventario."""
+
+    consulta = database.paginate(
+        database.select(StockEntry).filter_by(purpose="adjustment_positive"),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Ajustes Positivos - " + APPNAME
+    return render_template(
+        "inventario/entrada_lista.html",
+        consulta=consulta,
+        titulo=titulo,
+        vista="inventario.inventario_ajuste_positivo_lista",
+        new_url=url_for("inventario.inventario_ajuste_positivo_nuevo"),
+    )
+
+
+@inventario.route("/stock-entry/adjustment-negative/list")
+@modulo_activo("inventory")
+@login_required
+def inventario_ajuste_negativo_lista():
+    """Listado de ajustes negativos de inventario."""
+
+    consulta = database.paginate(
+        database.select(StockEntry).filter_by(purpose="adjustment_negative"),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Ajustes Negativos - " + APPNAME
+    return render_template(
+        "inventario/entrada_lista.html",
+        consulta=consulta,
+        titulo=titulo,
+        vista="inventario.inventario_ajuste_negativo_lista",
+        new_url=url_for("inventario.inventario_ajuste_negativo_nuevo"),
+    )
+
+
 @inventario.route("/item/new", methods=["GET", "POST"])
 @modulo_activo("inventory")
 @login_required
@@ -333,6 +423,10 @@ def _save_stock_entry_items(entry: StockEntry) -> Decimal:
 @inventario.route("/stock-entry/material-receipt/new", methods=["GET", "POST"])
 @inventario.route("/stock-entry/material-issue/new", methods=["GET", "POST"])
 @inventario.route("/stock-entry/material-transfer/new", methods=["GET", "POST"])
+@inventario.route("/stock-entry/adjustment/new", methods=["GET", "POST"])
+@inventario.route("/stock-entry/reconciliation/new", methods=["GET", "POST"])
+@inventario.route("/stock-entry/adjustment-positive/new", methods=["GET", "POST"])
+@inventario.route("/stock-entry/adjustment-negative/new", methods=["GET", "POST"])
 @modulo_activo("inventory")
 @login_required
 def inventario_entrada_nuevo():
@@ -405,6 +499,14 @@ def _infer_stock_entry_purpose(path: str) -> str | None:
         return "material_issue"
     if path.endswith("/material-transfer/new"):
         return "material_transfer"
+    if path.endswith("/adjustment/new"):
+        return "stock_adjustment"
+    if path.endswith("/reconciliation/new"):
+        return "stock_reconciliation"
+    if path.endswith("/adjustment-positive/new"):
+        return "adjustment_positive"
+    if path.endswith("/adjustment-negative/new"):
+        return "adjustment_negative"
     return None
 
 
@@ -414,8 +516,48 @@ def _stock_entry_title(purpose: str | None) -> str:
         "material_receipt": "Nueva Recepción de Material",
         "material_issue": "Nueva Salida de Material",
         "material_transfer": "Nueva Transferencia de Material",
+        "stock_adjustment": "Nuevo Ajuste de Inventario",
+        "stock_reconciliation": "Nueva Conciliación de Inventario",
+        "adjustment_positive": "Nuevo Ajuste Positivo de Inventario",
+        "adjustment_negative": "Nuevo Ajuste Negativo de Inventario",
     }
     return labels.get(purpose or "", "Nueva Entrada de Almacén") + " - " + APPNAME
+
+
+@inventario.route("/stock-entry/adjustment/new-shortcut")
+@modulo_activo("inventory")
+@login_required
+def inventario_ajuste_nuevo():
+    """Alias para crear ajuste de inventario."""
+
+    return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="stock_adjustment"))
+
+
+@inventario.route("/stock-entry/reconciliation/new-shortcut")
+@modulo_activo("inventory")
+@login_required
+def inventario_reconciliacion_nueva():
+    """Alias para crear conciliación física de inventario."""
+
+    return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="stock_reconciliation"))
+
+
+@inventario.route("/stock-entry/adjustment-positive/new-shortcut")
+@modulo_activo("inventory")
+@login_required
+def inventario_ajuste_positivo_nuevo():
+    """Alias para crear ajuste positivo."""
+
+    return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="adjustment_positive"))
+
+
+@inventario.route("/stock-entry/adjustment-negative/new-shortcut")
+@modulo_activo("inventory")
+@login_required
+def inventario_ajuste_negativo_nuevo():
+    """Alias para crear ajuste negativo."""
+
+    return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="adjustment_negative"))
 
 
 def _source_context(source_type: str | None, source_id: str | None) -> tuple[str | None, str]:
