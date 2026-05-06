@@ -31,6 +31,15 @@ SETUP_COUNTRY = "SETUP_COUNTRY"
 SETUP_CURRENCY = "SETUP_CURRENCY"
 SETUP_COMPLETED = "SETUP_COMPLETE"
 SETUP_ENTITY = "SETUP_DEFAULT_ENTITY"
+CATALOG_FILE_ALIASES = {
+    "base_es.csv": "Predeterminado - ES",
+    "base_en.csv": "Default - EN",
+}
+
+
+def catalog_display_name(filename: str) -> str:
+    """Devuelve el alias visible de un catalogo o su nombre de archivo."""
+    return CATALOG_FILE_ALIASES.get(filename, filename)
 
 
 def available_catalog_files() -> list[tuple[str, str]]:
@@ -39,7 +48,7 @@ def available_catalog_files() -> list[tuple[str, str]]:
     for filename in sorted(listdir(DIRECTORIO_CTAS), key=str.lower):
         path = join(DIRECTORIO_CTAS, filename)
         if isfile(path) and filename.lower().endswith(".csv") and catalog_has_default_mapping(path):
-            choices.append((filename, filename))
+            choices.append((filename, catalog_display_name(filename)))
     return choices
 
 

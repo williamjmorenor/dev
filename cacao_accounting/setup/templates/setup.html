@@ -134,11 +134,11 @@
             </div>
           </div>
 
-          <fieldset class="mt-4">
+          <fieldset class="mt-4" x-data="{ catalogo: '{{ form.catalogo.data or "preexistente" }}' }">
             <legend class="fs-6">Catálogo contable</legend>
             {% for option in form.catalogo %}
             <div class="form-check mb-2">
-              {{ option(class="form-check-input") }}
+              {{ option(class="form-check-input", **{"x-model": "catalogo"}) }}
               <label class="form-check-label" for="{{ option.id }}">{{ option.label.text }}</label>
             </div>
             {% endfor %}
@@ -148,7 +148,7 @@
 
             <div class="mt-3">
               <label class="form-label" for="catalogo_origen">Catálogo existente</label>
-              {{ form.catalogo_origen(class="form-select", id="catalogo_origen") }}
+              {{ form.catalogo_origen(class="form-select", id="catalogo_origen", **{"x-bind:disabled": "catalogo === 'en_cero'"}) }}
               {% if form.catalogo_origen.errors %}
               <div class="text-danger small">{{ form.catalogo_origen.errors[0] }}</div>
               {% endif %}

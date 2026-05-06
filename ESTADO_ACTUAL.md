@@ -64,6 +64,7 @@ El sistema está diseñado con soporte nativo para:
 - Lista y activación/desactivación de módulos del sistema.
 - Administración básica de usuarios, roles, asignación de roles y permisos por módulo.
 - CRUD de cuentas por defecto por compañía en `/settings/default-accounts`, con validación de compañía, tipo de cuenta compatible y selección asistida Smart Select filtrada por compañía/tipo.
+- Asistente de configuración inicial con selección de catálogo predefinido o catálogo en blanco; al elegir catálogo en blanco se deshabilita el selector de archivo, y los catálogos predefinidos muestran alias de usuario (`Predeterminado - ES`, `Default - EN`) manteniendo el filename como valor técnico.
 - Pendiente: configuración funcional avanzada de compañía, workflows y auditoría operativa.
 
 ### `api` — API REST y Selección Asistida

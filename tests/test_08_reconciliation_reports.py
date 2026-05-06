@@ -435,8 +435,8 @@ def test_setup_with_predefined_catalog_creates_complete_company_defaults(app_ctx
     from cacao_accounting.database import CompanyDefaultAccount, database
     from cacao_accounting.setup.service import available_catalog_files, finalize_setup
 
-    assert ("base_es.csv", "base_es.csv") in available_catalog_files()
-    assert ("base_en.csv", "base_en.csv") in available_catalog_files()
+    assert ("base_es.csv", "Predeterminado - ES") in available_catalog_files()
+    assert ("base_en.csv", "Default - EN") in available_catalog_files()
 
     finalize_setup(
         {

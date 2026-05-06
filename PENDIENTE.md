@@ -379,6 +379,8 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 
 ### 15.1 Wizard de Configuración Inicial
 - [ ] Flujo guiado para crear compañía → catálogo de cuentas → libro contable → año fiscal → período → usuario admin → series → cuentas por defecto.
+- [x] Selector de catálogo contable deshabilitado al elegir catálogo en blanco.
+- [x] Alias visibles para catálogos disponibles (`Predeterminado - ES`, `Default - EN`) sin cambiar el filename usado internamente.
 - [ ] Creación automática de series por defecto al crear una compañía.
 - [ ] Validación de que los pasos mínimos están completados antes de permitir transacciones.
 

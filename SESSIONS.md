@@ -1130,3 +1130,29 @@ Implementar un framework transversal robusto para campos select/autocomplete, si
 - `mypy cacao_accounting` -> Success: no issues found in 66 source files.
 - `pytest -q tests/test_03webactions.py::test_inventory_stock_entry_routes --slow=True -vv` -> passed.
 - `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True` -> falla antes de ejecutar las pruebas nuevas: `tests/test_03webactions.py::test_inventory_stock_entry_routes` recibe 404 en `/buying/purchase-receipt/REC-DEMO-0000001`; el mismo test pasa aislado, por lo que queda como fallo de interacción/estado de la suite lenta no relacionado con Smart Select.
+
+## 2026-05-06 (alias y estado del selector de catálogos en setup)
+
+### Peticion del usuario
+En el último paso del setup inicial, deshabilitar el selector de catálogos de cuentas cuando el usuario seleccione catálogo en blanco. Además, mantener el nombre de archivo como valor técnico del selector, pero mostrar alias al usuario: `Predeterminado - ES` para `base_es.csv` y `Default - EN` para `base_en.csv`.
+
+### Plan implementado
+1. Agregar un mapping explícito de alias en el servicio que enumera catálogos disponibles.
+2. Mantener el filename como value del `SelectField` para no romper la carga de catálogos ni `finalize_setup`.
+3. Usar Alpine.js en el paso 3 del setup para deshabilitar `catalogo_origen` cuando `catalogo == "en_cero"`.
+4. Actualizar la prueba que valida los catálogos ofrecidos y sincronizar documentación de estado/backlog.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/setup/service.py`: nuevo `CATALOG_FILE_ALIASES` y `catalog_display_name`; `available_catalog_files()` devuelve `(filename, alias)`.
+- `cacao_accounting/setup/templates/setup.html`: el fieldset de catálogo usa estado Alpine y deshabilita el select de catálogo existente al elegir catálogo en cero.
+- `tests/test_08_reconciliation_reports.py`: expectativa actualizada para alias visibles.
+- `ESTADO_ACTUAL.md` y `PENDIENTE.md`: documentan el comportamiento del setup.
+
+### Verificacion ejecutada
+- `black cacao_accounting/setup/service.py tests/test_08_reconciliation_reports.py` -> sin cambios pendientes.
+- `python -m py_compile cacao_accounting/setup/service.py cacao_accounting/setup/forms.py` -> sin errores.
+- `ruff check cacao_accounting/setup/service.py cacao_accounting/setup/forms.py tests/test_08_reconciliation_reports.py` -> passed.
+- `flake8 cacao_accounting/setup tests/test_08_reconciliation_reports.py --max-line-length=130` -> passed.
+- `mypy cacao_accounting/setup/service.py cacao_accounting/setup/forms.py` -> passed.
+- `pytest -q tests/test_08_reconciliation_reports.py::test_setup_with_predefined_catalog_creates_complete_company_defaults -q` -> passed.
+- `git diff --check` -> passed.
