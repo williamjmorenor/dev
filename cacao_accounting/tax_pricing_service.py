@@ -85,7 +85,6 @@ def _document_items_total(document: Any) -> Decimal:
 
 def calculate_taxes(document: Any, template_id: str) -> TaxCalculationResult:
     """Calcula impuestos/cargos de un documento usando una plantilla."""
-
     template = database.session.get(TaxTemplate, template_id)
     if not template or not template.is_active:
         raise TaxPricingError("La plantilla de impuestos no existe o esta inactiva.")
@@ -157,7 +156,6 @@ def get_item_price(
     posting_date: date,
 ) -> PriceSuggestion:
     """Obtiene el precio vigente mas especifico de una lista de precios."""
-
     price_list = database.session.get(PriceList, price_list_id)
     if not price_list or not price_list.is_active:
         raise TaxPricingError("La lista de precios no existe o esta inactiva.")
@@ -186,7 +184,6 @@ def get_item_price(
 
 def validate_price_tolerance(document_type: str, line: Any, user_id: str | None = None) -> PriceToleranceResult:
     """Valida tolerancia de precio con politica conservadora del 10%."""
-
     del user_id
     suggested = getattr(line, "suggested_rate", None)
     if suggested is None:

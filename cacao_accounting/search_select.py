@@ -27,6 +27,7 @@ class SearchSelectError(ValueError):
     """Error validado para busquedas de campos seleccionables."""
 
     def __init__(self, message: str, status_code: int = 400) -> None:
+        """Initialize SearchSelectError with a message and HTTP status code."""
         super().__init__(message)
         self.status_code = status_code
 
@@ -140,7 +141,6 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
 
 def search_select(doctype: str, query: str, filters: dict[str, list[str]], limit: int | None = None) -> dict[str, Any]:
     """Busca opciones para un doctype registrado y devuelve un payload uniforme."""
-
     spec = SEARCH_SELECT_REGISTRY.get(doctype)
     if spec is None:
         raise SearchSelectError("Tipo de seleccion no registrado.", 404)

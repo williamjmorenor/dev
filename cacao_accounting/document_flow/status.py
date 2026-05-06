@@ -77,7 +77,6 @@ BADGE_ICONS = {
 
 def _status(code: str, label: str, tone: str, full_label: str | None = None) -> DocumentStatusInfo:
     """Construye un estado de documento consistente para templates y API."""
-
     return DocumentStatusInfo(
         code=code,
         label=_(label),
@@ -90,7 +89,6 @@ def _status(code: str, label: str, tone: str, full_label: str | None = None) -> 
 
 def calculate_document_status(document_type: str, document_or_id: Any) -> DocumentStatusInfo:
     """Calcula el estado principal visible de un documento."""
-
     doctype = normalize_doctype(document_type)
     document = document_or_id if not isinstance(document_or_id, str) else get_document(doctype, document_or_id)
     if document is None:
@@ -117,7 +115,6 @@ def calculate_document_status(document_type: str, document_or_id: Any) -> Docume
 
 def _payment_status(doctype: str, document: Any) -> DocumentStatusInfo | None:
     """Calcula estados de pago para facturas y pagos."""
-
     if doctype == "payment_entry":
         return _status("paid", "Pagado", "green")
 
@@ -140,7 +137,6 @@ def _payment_status(doctype: str, document: Any) -> DocumentStatusInfo | None:
 
 def _primary_flow_progress(doctype: str, document: Any) -> FlowProgress | None:
     """Devuelve el flujo operativo que debe gobernar el estado principal."""
-
     target_priority = {
         "purchase_order": ["purchase_receipt", "purchase_invoice"],
         "purchase_receipt": ["purchase_invoice"],
@@ -168,7 +164,6 @@ def _primary_flow_progress(doctype: str, document: Any) -> FlowProgress | None:
 
 def _flow_progress(source_type: str, source_id: str, target_type: str) -> FlowProgress | None:
     """Calcula avance por cantidades para un flujo fuente -> destino."""
-
     items = get_document_items(source_type, source_id)
     if not items:
         return None
@@ -197,7 +192,6 @@ def _flow_progress(source_type: str, source_id: str, target_type: str) -> FlowPr
 
 def _status_from_progress(progress: FlowProgress) -> DocumentStatusInfo:
     """Mapea avance operativo a un estado visible unico."""
-
     if progress.pending_qty == 0:
         return _status("completed", "Completado", "green")
 
@@ -233,7 +227,6 @@ def _status_from_progress(progress: FlowProgress) -> DocumentStatusInfo:
 
 def document_status_payload(document_type: str, document_or_id: Any) -> dict[str, str]:
     """Serializa el estado calculado para API JSON."""
-
     status = calculate_document_status(document_type, document_or_id)
     return {
         "code": status.code,

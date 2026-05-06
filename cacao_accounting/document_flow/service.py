@@ -46,19 +46,18 @@ class DocumentFlowError(ValueError):
     """Error controlado del motor de flujo documental."""
 
     def __init__(self, message: str, status_code: int = 400) -> None:
+        """Initialize DocumentFlowError with a message and HTTP status code."""
         super().__init__(message)
         self.status_code = status_code
 
 
 def _to_json_number(value: Any) -> float:
     """Convierte Decimal/None a float para JSON y templates."""
-
     return float(decimal_or_zero(value))
 
 
 def _current_user_id() -> str | None:
     """Devuelve el usuario actual cuando existe un request autenticado."""
-
     try:
         if current_user and current_user.is_authenticated:
             return str(current_user.id)
@@ -69,7 +68,6 @@ def _current_user_id() -> str | None:
 
 def _audit(entity_type: str, entity_id: str, action: str, before: dict[str, Any] | None, after: dict[str, Any] | None) -> None:
     """Registra auditoria generica del flujo documental."""
-
     database.session.add(
         AuditLog(
             entity_type=entity_type,
@@ -84,7 +82,6 @@ def _audit(entity_type: str, entity_id: str, action: str, before: dict[str, Any]
 
 def _document_payment_references(document: Any, as_of_date: date | None = None) -> list[PaymentReference]:
     """Devuelve las referencias de pago asociadas a una factura."""
-
     raw_document_type = getattr(document, "document_type", None) or getattr(document, "__tablename__", "")
     document_type = normalize_doctype(str(raw_document_type or ""))
     if document_type not in {"sales_invoice", "purchase_invoice"}:
@@ -102,7 +99,6 @@ def _document_payment_references(document: Any, as_of_date: date | None = None) 
 
 def compute_outstanding_amount(document: Any, as_of_date: date | None = None) -> Decimal:
     """Calcula el saldo vivo de una factura usando las referencias de pago."""
-
     if as_of_date is None:
         as_of_date = date.today()
     grand_total = decimal_or_zero(getattr(document, "grand_total", None))
@@ -116,7 +112,6 @@ def compute_outstanding_amount(document: Any, as_of_date: date | None = None) ->
 
 def refresh_outstanding_amount_cache(document: Any, as_of_date: date | None = None) -> Decimal:
     """Sincroniza el campo cacheado `outstanding_amount` con el valor calculado."""
-
     outstanding = compute_outstanding_amount(document, as_of_date=as_of_date)
     if hasattr(document, "outstanding_amount"):
         document.outstanding_amount = outstanding
@@ -132,7 +127,6 @@ def apply_advance_to_invoice(
     allocation_date: date,
 ) -> PaymentReference:
     """Aplica un anticipo existente contra una factura AR/AP."""
-
     payment = database.session.get(PaymentEntry, payment_entry_id)
     if not payment:
         raise DocumentFlowError("El pago/anticipo no existe.")
@@ -185,7 +179,6 @@ def _state_quantities(
     target_type: str | None,
 ) -> tuple[Decimal, Decimal]:
     """Obtiene cantidades canceladas/cerradas para una linea si existe estado cacheado."""
-
     if not target_type:
         return Decimal("0"), Decimal("0")
     state = get_line_flow_state(source_type, source_id, source_item_id, target_type)
@@ -196,7 +189,6 @@ def _state_quantities(
 
 def _line_payload(source_type: str, source_id: str, item: Any, target_type: str | None = None) -> dict[str, Any]:
     """Construye la respuesta estandar para una linea origen."""
-
     qty = decimal_or_zero(getattr(item, "qty", 0))
     consumed = consumed_qty_for_source(source_type, source_id, item.id, target_type)
     cancelled, closed = _state_quantities(source_type, source_id, item.id, target_type)
@@ -228,7 +220,6 @@ def _line_payload(source_type: str, source_id: str, item: Any, target_type: str 
 
 def get_source_items(source_type: str, source_id: str, target_type: str | None = None) -> list[dict[str, Any]]:
     """Devuelve lineas disponibles desde un documento origen."""
-
     source_key = normalize_doctype(source_type)
     target_key = normalize_doctype(target_type) if target_type else None
     if target_key and not is_allowed_flow(source_key, target_key):
@@ -248,7 +239,6 @@ def get_source_items(source_type: str, source_id: str, target_type: str | None =
 
 def get_document_flow_items(target_type: str, source_values: list[str]) -> list[dict[str, Any]]:
     """Devuelve lineas pendientes para uno o mas documentos origen."""
-
     target_key = normalize_doctype(target_type)
     items: list[dict[str, Any]] = []
     for value in source_values:
@@ -261,7 +251,6 @@ def get_document_flow_items(target_type: str, source_values: list[str]) -> list[
 
 def pending_qty(source_type: str, source_id: str, source_item_id: str, target_type: str) -> Decimal:
     """Calcula la cantidad pendiente para una linea origen hacia un target."""
-
     source_item = get_document_item(source_type, source_item_id)
     if not source_item:
         raise DocumentFlowError("Linea origen no encontrada.", 404)
@@ -274,7 +263,6 @@ def pending_qty(source_type: str, source_id: str, source_item_id: str, target_ty
 
 def _assert_same_company(source_type: str, source_id: str, target_type: str, target_id: str) -> None:
     """Valida aislamiento por compania."""
-
     source_company = get_document_company(source_type, source_id)
     target_company = get_document_company(target_type, target_id)
     if source_company and target_company and source_company != target_company:
@@ -283,7 +271,6 @@ def _assert_same_company(source_type: str, source_id: str, target_type: str, tar
 
 def _update_source_cache(source_type: str, source_id: str, source_item_id: str, target_type: str) -> None:
     """Actualiza campos cache de consumo cuando existen en la linea origen."""
-
     source_key = normalize_doctype(source_type)
     target_key = normalize_doctype(target_type)
     source_item = get_document_item(source_key, source_item_id)
@@ -302,7 +289,6 @@ def _update_source_cache(source_type: str, source_id: str, source_item_id: str, 
 
 def refresh_source_caches_for_target(target_type: str, target_id: str) -> None:
     """Recalcula caches de origen afectados por un documento destino."""
-
     target_key = normalize_doctype(target_type)
     relations = database.session.execute(
         database.select(DocumentRelation).filter_by(target_type=target_key, target_id=target_id)
@@ -325,7 +311,6 @@ def create_document_relation(
     amount: Any = None,
 ) -> DocumentRelation:
     """Crea una relacion entre lineas validando parcialidad y compania."""
-
     source_key = normalize_doctype(source_type)
     target_key = normalize_doctype(target_type)
     if not is_allowed_flow(source_key, target_key):
@@ -373,7 +358,6 @@ def create_document_relation(
 
 def revert_relations_for_target(target_type: str, target_id: str, reason: str = "target_cancelled") -> int:
     """Revierte relaciones activas de un documento destino y libera saldos."""
-
     target_key = normalize_doctype(target_type)
     relations = (
         database.session.execute(
@@ -417,7 +401,6 @@ def close_line_balance(
     reason: str = "",
 ) -> dict[str, Any]:
     """Cierra manualmente saldo pendiente de una linea fuente."""
-
     source_key = normalize_doctype(source_type)
     target_key = normalize_doctype(target_type)
     if not reason.strip():
@@ -458,7 +441,6 @@ def close_document_balances(
     reason: str,
 ) -> list[dict[str, Any]]:
     """Cierra todo el saldo pendiente de un documento fuente hacia un target."""
-
     closed: list[dict[str, Any]] = []
     for item in get_document_items(source_type, source_id):
         available = pending_qty(source_type, source_id, item.id, target_type)
@@ -478,7 +460,6 @@ def close_document_balances(
 
 def _state_payload(state: Any) -> dict[str, Any]:
     """Serializa estado de linea para API."""
-
     return {
         "source_type": state.source_type,
         "source_id": state.source_id,
@@ -495,7 +476,6 @@ def _state_payload(state: Any) -> dict[str, Any]:
 
 def list_source_documents(target_type: str, company: str | None = None) -> list[dict[str, Any]]:
     """Lista documentos fuente aprobados con saldo para un destino."""
-
     target_key = normalize_doctype(target_type)
     sources = sorted(source for source, target in ALLOWED_FLOWS if target == target_key)
     rows: list[dict[str, Any]] = []
@@ -528,7 +508,6 @@ def get_pending_lines(
     company: str | None = None,
 ) -> list[dict[str, Any]]:
     """Obtiene lineas pendientes desde uno o varios documentos fuente."""
-
     lines: list[dict[str, Any]] = []
     for source_id in source_document_ids:
         source_company = get_document_company(source_document_type, source_id)
@@ -544,7 +523,6 @@ def get_pending_lines(
 
 def create_target_document(payload: dict[str, Any]) -> dict[str, Any]:
     """Crea un documento destino generico a partir de lineas fuente."""
-
     target_type = normalize_doctype(str(payload.get("target_document_type", "")))
     company = payload.get("company") or payload.get("company_id")
     posting_date = payload.get("posting_date")
@@ -634,7 +612,6 @@ def create_target_document(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _create_payment_target(payload: dict[str, Any]) -> dict[str, Any]:
     """Crea un pago generico desde facturas fuente."""
-
     company = payload.get("company") or payload.get("company_id")
     posting_date = payload.get("posting_date")
     payment = PaymentEntry(

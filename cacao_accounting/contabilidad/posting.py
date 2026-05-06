@@ -515,7 +515,6 @@ def _append_purchase_tax_entries(
 
 def post_sales_invoice(document: SalesInvoice, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera GL para una factura o nota de venta aprobada."""
-
     if getattr(document, "docstatus", 0) != 1:
         raise PostingError("Solo se puede contabilizar una factura de venta aprobada.")
 
@@ -593,7 +592,6 @@ def post_sales_invoice(document: SalesInvoice, ledger_code: str | None = None) -
 
 def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera GL para una factura o nota de compra aprobada."""
-
     if getattr(document, "docstatus", 0) != 1:
         raise PostingError("Solo se puede contabilizar una factura de compra aprobada.")
 
@@ -693,7 +691,6 @@ def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = N
 
 def post_payment_entry(document: PaymentEntry, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera GL para cobros, pagos y transferencias internas."""
-
     if getattr(document, "docstatus", 0) != 1:
         raise PostingError("Solo se puede contabilizar un pago aprobado.")
 
@@ -996,7 +993,6 @@ def _bank_transaction_offset_account_id(document: BankTransaction, credit: bool)
 
 def post_bank_transaction(document: BankTransaction, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera GL para una nota bancaria manual."""
-
     amount = _decimal_value(document.deposit if document.deposit is not None else document.withdrawal)
     if amount <= 0:
         raise PostingError("La nota bancaria no tiene un monto valido.")
@@ -1431,7 +1427,6 @@ def _create_stock_reversal(document: Any, movement: StockLedgerEntry) -> StockLe
 
 def post_purchase_receipt(document: PurchaseReceipt, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera Stock Ledger y GL para una recepción de compra aprobada."""
-
     if getattr(document, "docstatus", 0) != 1:
         raise PostingError("Solo se puede contabilizar una recepción de compra aprobada.")
 
@@ -1490,7 +1485,6 @@ def post_purchase_receipt(document: PurchaseReceipt, ledger_code: str | None = N
 
 def post_delivery_note(document: DeliveryNote, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera Stock Ledger y GL para una nota de entrega aprobada."""
-
     if getattr(document, "docstatus", 0) != 1:
         raise PostingError("Solo se puede contabilizar una nota de entrega aprobada.")
 
@@ -1529,7 +1523,6 @@ def post_delivery_note(document: DeliveryNote, ledger_code: str | None = None) -
 
 def post_comprobante_contable(document: ComprobanteContable, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera GL para un comprobante contable manual."""
-
     company = _company_for(document)
     lines = _comprobante_lines(document)
     if not lines:
@@ -1574,7 +1567,6 @@ def post_comprobante_contable(document: ComprobanteContable, ledger_code: str | 
 
 def post_stock_entry(document: StockEntry, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera Stock Ledger y GL para movimientos de inventario valuado."""
-
     if getattr(document, "docstatus", 0) != 1:
         raise PostingError("Solo se puede contabilizar una entrada de stock aprobada.")
     if _has_active_gl_entries(document):
@@ -1633,7 +1625,6 @@ def post_stock_entry(document: StockEntry, ledger_code: str | None = None) -> li
 
 def post_document_to_gl(document: Any, ledger_code: str | None = None) -> list[GLEntry]:
     """Genera entradas contables para un documento ya aprobado."""
-
     if not isinstance(document, StockEntry) and _has_active_gl_entries(document):
         raise PostingError("Este documento ya tiene entradas GL contabilizadas.")
     if isinstance(document, SalesInvoice):
@@ -1657,7 +1648,6 @@ def post_document_to_gl(document: Any, ledger_code: str | None = None) -> list[G
 
 def submit_document(document: Any, ledger_code: str | None = None) -> list[GLEntry]:
     """Aprueba y contabiliza un documento operativo de forma idempotente."""
-
     if getattr(document, "docstatus", 0) != 0:
         raise PostingError("Solo se puede aprobar un documento en borrador.")
     if _has_active_gl_entries(document):
@@ -1668,7 +1658,6 @@ def submit_document(document: Any, ledger_code: str | None = None) -> list[GLEnt
 
 def cancel_document(document: Any) -> list[GLEntry]:
     """Cancela un documento aprobado mediante reversos append-only."""
-
     if getattr(document, "docstatus", 0) != 1:
         raise PostingError("Solo se puede cancelar un documento aprobado.")
 

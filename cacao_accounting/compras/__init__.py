@@ -70,7 +70,6 @@ DOCUMENT_TYPE_LABELS: dict[str, str] = {
 
 def _series_choices(entity_type: str, company: str | None) -> list[tuple[str, str]]:
     """Construye las opciones de series activas para un doctype y compania."""
-
     if not company:
         return [("", "")]
 
@@ -420,7 +419,6 @@ def compras_factura_compra_devolucion_lista():
 @login_required
 def compras_factura_compra_nota_debito_nueva():
     """Alias explicito para crear nota de débito de compra."""
-
     return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_DEBIT_NOTE))
 
 
@@ -429,7 +427,6 @@ def compras_factura_compra_nota_debito_nueva():
 @login_required
 def compras_factura_compra_nota_credito_nueva():
     """Alias explicito para crear nota de crédito de compra."""
-
     return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_CREDIT_NOTE))
 
 
@@ -438,7 +435,6 @@ def compras_factura_compra_nota_credito_nueva():
 @login_required
 def compras_factura_compra_devolucion_nueva():
     """Alias explicito para crear devolución de compra."""
-
     return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_RETURN))
 
 
@@ -462,7 +458,6 @@ def compras_proveedor_lista():
 @login_required
 def compras_purchase_reconciliation():
     """Reporte operativo de conciliaciones de compra pendientes por linea."""
-
     company = request.args.get("company", "cacao")
     rows = get_purchase_reconciliation_pending(company=company)
     titulo = _("Conciliacion de Compras Pendiente") + " - " + APPNAME
@@ -474,7 +469,6 @@ def compras_purchase_reconciliation():
 @login_required
 def compras_reconciliation_panel():
     """Panel de conciliacion de compras agrupado por orden de compra."""
-
     company = request.args.get("company", "cacao")
     groups = get_purchase_reconciliation_panel_groups(company=company)
     titulo = _("Panel de Conciliacion de Compras") + " - " + APPNAME
@@ -525,14 +519,12 @@ def compras_proveedor(supplier_id):
 
 def _form_decimal(field_name: str, default: str = "0") -> Decimal:
     """Convierte un valor de formulario a Decimal."""
-
     value = request.form.get(field_name)
     return Decimal(str(value if value not in (None, "") else default))
 
 
 def _line_amount(index: int) -> Decimal:
     """Obtiene o calcula el monto de una linea."""
-
     amount = request.form.get(f"amount_{index}")
     if amount not in (None, ""):
         return Decimal(str(amount))
@@ -550,7 +542,6 @@ def _create_line_relation(
     amount: Decimal,
 ) -> None:
     """Crea relacion documental para una linea importada desde un origen."""
-
     source_type = request.form.get(f"source_type_{index}")
     source_id = request.form.get(f"source_id_{index}")
     source_item_id = request.form.get(f"source_item_id_{index}")
@@ -572,7 +563,6 @@ def _create_line_relation(
 
 def _save_purchase_order_items(order_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una orden de compra desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -600,7 +590,6 @@ def _save_purchase_order_items(order_id: str) -> tuple[Decimal, Decimal]:
 
 def _save_purchase_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una solicitud de cotización de compra desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -628,7 +617,6 @@ def _save_purchase_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]
 
 def _save_purchase_request_items(request_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una solicitud de compra desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -656,7 +644,6 @@ def _save_purchase_request_items(request_id: str) -> tuple[Decimal, Decimal]:
 
 def _save_supplier_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una cotización de proveedor desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -684,7 +671,6 @@ def _save_supplier_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]
 
 def _save_purchase_receipt_items(receipt_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una recepción de compra desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -716,7 +702,6 @@ def _save_purchase_receipt_items(receipt_id: str) -> tuple[Decimal, Decimal]:
 
 def _save_purchase_invoice_items(invoice_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una factura de compra desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
