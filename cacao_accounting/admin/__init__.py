@@ -49,7 +49,6 @@ from cacao_accounting.contabilidad.default_accounts import (
     DEFAULT_ACCOUNT_DEFINITIONS,
     DEFAULT_ACCOUNT_FIELDS,
     DefaultAccountError,
-    accounts_for_company,
     default_account_rows,
     get_company_default_accounts,
     upsert_company_default_accounts,
@@ -379,7 +378,6 @@ def cuentas_predeterminadas():
         return redirect(url_for("admin.cuentas_predeterminadas", company=selected_company))
 
     config = get_company_default_accounts(selected_company) if selected_company else None
-    accounts = accounts_for_company(selected_company) if selected_company else []
     configs = (
         database.session.execute(database.select(CompanyDefaultAccount).order_by(CompanyDefaultAccount.company))
         .scalars()
@@ -388,7 +386,6 @@ def cuentas_predeterminadas():
 
     return render_template(
         "admin/default_accounts.html",
-        accounts=accounts,
         companies=companies,
         configs=configs,
         definitions=DEFAULT_ACCOUNT_DEFINITIONS,

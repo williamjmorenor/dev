@@ -32,8 +32,9 @@ from cacao_accounting.document_flow import (
 from cacao_accounting.document_flow.registry import DOCUMENT_TYPES, normalize_doctype
 from cacao_accounting.document_flow.repository import get_document
 from cacao_accounting.document_flow.service import get_source_items
-from cacao_accounting.document_flow.status import document_status_payload
+from cacao_accounting.document_flow.status import _, document_status_payload
 from cacao_accounting.document_flow.tracing import document_flow_tree
+from cacao_accounting.search_select import SearchSelectError, search_select
 
 api = Blueprint("api", __name__, template_folder="templates")
 
@@ -91,6 +92,28 @@ def test_appy():
     }
 
     return jsonify(responde_data)
+
+
+@api.route("/api/search-select")
+@login_required
+def api_search_select():
+    """Devuelve opciones para campos de seleccion asistida."""
+
+    doctype = request.args.get("doctype", "").strip()
+    query = request.args.get("q", "").strip()
+    raw_limit = request.args.get("limit")
+    reserved_params = {"doctype", "q", "limit"}
+    filters = {
+        key: request.args.getlist(key) for key in request.args if key not in reserved_params and request.args.getlist(key)
+    }
+    try:
+        limit = int(raw_limit) if raw_limit else None
+        payload = search_select(doctype=doctype, query=query, filters=filters, limit=limit)
+    except ValueError as exc:
+        if not isinstance(exc, SearchSelectError):
+            return jsonify({"error": _("Parametro invalido."), "message": str(exc)}), 400
+        return jsonify({"error": _(str(exc)), "message": _(str(exc))}), exc.status_code
+    return jsonify(payload)
 
 
 @api.route("/api/buying/purchase-order/<order_id>/items")

@@ -1,224 +1,219 @@
-Requerimiento Técnico
-Framework de Conciliación de Compras (Alternativa Moderna a GR/IR)
+Requerimiento técnico: Framework unificado de campos seleccionables inteligentes
 1. Objetivo
 
-Diseñar e implementar un framework desacoplado de conciliación de compras que:
+Implementar un framework reutilizable de frontend y backend para campos HTML de selección asistida, tipo autocomplete/search-select, que permita buscar registros dinámicamente mediante API, aplicar filtros contextuales y ofrecer una experiencia consistente en escritorio y dispositivos móviles.
 
-Modele correctamente el flujo real del negocio
-Separe completamente:
-Operación (documentos)
-Conciliación (matching)
-Contabilidad (registro financiero)
-Permita alta configurabilidad sin introducir rigidez estructural
-2. Principios de Diseño
-2.1 Process-first (obligatorio)
+El framework debe sustituir el uso de <select> tradicionales en catálogos grandes o contextuales.
 
-El sistema debe modelar primero los eventos del negocio antes de generar cualquier impacto contable.
+2. Problema a resolver
 
-2.2 Event-driven architecture
+Los campos <select> básicos generan mala experiencia cuando existen muchos registros, por ejemplo:
 
-Cada documento genera eventos económicos inmutables.
+Catálogo de cuentas con cientos de cuentas.
+Lista amplia de clientes, proveedores o empleados.
+Centros de costo, unidades, proyectos o documentos operativos.
+Mal comportamiento en Android, donde el selector nativo obliga a navegar manualmente muchas opciones.
 
-2.3 Desacoplamiento fuerte
+El usuario no debe ver todas las opciones inicialmente. El campo debe consultar opciones solamente cuando el usuario escriba suficientes caracteres.
 
-Separación estricta entre:
+3. Alcance funcional
 
-Capa	Responsabilidad
-Operacional	Documentos (OC, Recepción, Factura)
-Conciliación	Matching y control
-Contable	Generación de asientos
-2.4 Auditabilidad total
+El framework debe permitir:
 
-Todos los eventos deben ser:
+Buscar registros por código, nombre, descripción o campos configurados.
+Consultar opciones mediante una API unificada.
+Definir el tipo de documento/catálogo desde el HTML.
+Aplicar filtros estáticos y dinámicos.
+Actualizar filtros cuando cambien otros campos del formulario.
+Validar que el valor seleccionado sea válido.
+Usarse en múltiples formularios sin duplicar lógica JavaScript.
+Mantener una experiencia consistente en desktop y móvil.
+4. Concepto propuesto
 
-Inmutables
-Trazables
-Reproducibles
-3. Modelo de Entidades
-3.1 Documentos Operativos (core)
-Orden de Compra (OC)
-id
-proveedor_id
-moneda
-líneas (producto, cantidad, precio)
-estado
-Recepción de Bienes
-id
-oc_id
-líneas (producto, cantidad recibida)
-fecha
-Factura de Proveedor
-id
-proveedor_id
-referencia externa
-líneas (producto, cantidad, precio facturado)
-impuestos
+Cada campo seleccionable inteligente será un componente Alpine.js reutilizable.
 
-⚠️ Restricción:
+Ejemplo conceptual:
 
-Estas entidades NO deben contener lógica de conciliación ni contabilidad.
+<div
+    x-data="smartSelect({
+        doctype: 'account',
+        minChars: 2,
+        valueField: 'id',
+        labelField: 'display_name',
+        filters: {
+            company: () => document.querySelector('[name=company_id]').value,
+            account_type: 'bank',
+            is_active: true
+        }
+    })"
+>
+    <input
+        type="text"
+        x-model="search"
+        @input.debounce.300ms="fetchOptions"
+        placeholder="Buscar cuenta..."
+    >
 
-3.2 Entidad de Conciliación (core del diseño)
-Conciliación
-id
-oc_id
-estado
-tipo_matching (2-way | 3-way)
-tolerancia_precio
-tolerancia_cantidad
-fecha_creación
-Relaciones
-conciliacion_receipts
-conciliacion_invoices
-Métricas calculadas
-cantidad_ordenada
-cantidad_recibida
-cantidad_facturada
-monto_ordenado
-monto_facturado
-diferencias
-4. Estados de Conciliación
+    <input type="hidden" name="account_id" x-model="selectedValue">
 
-El sistema debe soportar únicamente los siguientes estados:
+    <template x-if="options.length">
+        <ul>
+            <template x-for="option in options" :key="option.id">
+                <li @click="selectOption(option)" x-text="option.display_name"></li>
+            </template>
+        </ul>
+    </template>
+</div>
+5. Atributos HTML recomendados
 
-Pendiente Recepción
-Pendiente Factura
-Parcial
-Conciliado
-En Disputa
-Reglas
-Estado derivado automáticamente (no editable manualmente)
-Basado en comparación de cantidades y montos
-5. Motor de Matching
-5.1 Configuración
+Para simplificar el uso en formularios, el sistema podrá usar atributos declarativos:
 
-Debe ser totalmente configurable por compañía:
+<div
+    x-smart-select
+    x-doctype="account"
+    x-filter-company="#company_id"
+    x-filter-account-type="bank"
+    x-filter-active="true"
+    x-min-chars="2"
+    x-target-name="bank_account_id"
+></div>
 
-tipo_matching:
-2-way (OC vs Factura)
-3-way (OC vs Recepción vs Factura)
-tolerancia_precio:
-porcentaje (%)
-monto absoluto
-tolerancia_cantidad:
-porcentaje (%)
-cantidad absoluta
-5.2 Lógica de Evaluación
+Atributos propuestos:
 
-El motor debe:
+Atributo	Descripción
+x-doctype	Tipo de catálogo o documento a consultar. Ejemplo: account, customer, supplier, employee, journal.
+x-min-chars	Cantidad mínima de caracteres antes de consultar la API.
+x-filter-company	Filtro por compañía. Puede ser valor fijo o referencia a otro campo.
+x-filter-account-type	Filtro por tipo de cuenta contable.
+x-filter-party-type	Filtro por tipo de tercero: cliente, proveedor, empleado.
+x-filter-status	Filtro por estado del registro.
+x-target-name	Nombre del campo oculto que almacenará el ID seleccionado.
+x-label-field	Campo que se mostrará al usuario.
+x-value-field	Campo que se enviará al backend al guardar el formulario.
+6. API backend unificada
 
-Agrupar líneas por producto
-Comparar:
-OC vs Recepción
-OC vs Factura
-Recepción vs Factura (en 3-way)
-Calcular desviaciones:
-Δ cantidad
-Δ precio
-Δ monto
-Evaluar contra tolerancias
-5.3 Resultado del Matching
-MATCH_OK
-MATCH_PARTIAL
-MATCH_FAILED
-6. Eventos Económicos (clave del diseño)
+Endpoint sugerido:
 
-Cada acción genera un evento:
+GET /api/search-select
 
-Tipos de eventos
-GOODS_RECEIVED
-INVOICE_RECEIVED
-MATCH_COMPLETED
-MATCH_FAILED
-Estructura
-id
-tipo_evento
-referencia_documento
-payload (JSON)
-timestamp
-estado_procesamiento
+Parámetros:
 
-⚠️ Restricción:
+/api/search-select?doctype=account&q=bank&company_id=COMP001&account_type=bank
 
-Los eventos son inmutables.
+Respuesta esperada:
 
-7. Motor Contable (desacoplado)
-7.1 Principio
+{
+  "doctype": "account",
+  "query": "bank",
+  "results": [
+    {
+      "id": "ACC001",
+      "code": "1101",
+      "name": "Banco BAC",
+      "display_name": "1101 - Banco BAC"
+    }
+  ],
+  "has_more": false
+}
+7. Registro backend de doctypes
 
-La contabilidad NO se genera en el momento del documento.
+El backend no debe permitir consultar cualquier tabla libremente. Debe existir un registro explícito de doctypes permitidos.
 
-Se genera en función de eventos.
+Ejemplo conceptual:
 
-7.2 Reglas configurables
+SEARCH_SELECT_REGISTRY = {
+    "account": {
+        "model": Account,
+        "search_fields": ["code", "name"],
+        "label": lambda row: f"{row.code} - {row.name}",
+        "allowed_filters": ["company_id", "account_type", "is_active"],
+        "default_filters": {"is_active": True},
+        "limit": 20
+    },
+    "customer": {
+        "model": Customer,
+        "search_fields": ["code", "name", "tax_id"],
+        "label": lambda row: f"{row.code} - {row.name}",
+        "allowed_filters": ["company_id", "is_active"],
+        "default_filters": {"is_active": True},
+        "limit": 20
+    }
+}
+8. Reglas de búsqueda
 
-Ejemplos:
+La búsqueda debe:
 
-Evento	Acción
-GOODS_RECEIVED	Débito inventario / Crédito cuenta puente
-INVOICE_RECEIVED	Débito cuenta puente / Crédito cuentas por pagar
-MATCH_FAILED	No generar asiento
-7.3 Cuenta Puente (GR/IR)
-Implementación opcional
-Configurable por compañía
-No debe estar hardcodeada al flujo
-8. Flujo Operativo
-Escenario estándar (3-way matching)
-Crear OC
-Registrar Recepción → genera evento
-Registrar Factura → genera evento
-Ejecutar Matching automático
-Actualizar estado de conciliación
-Motor contable evalúa eventos y genera asientos
-9. Reglas de Negocio Críticas
-9.1 No duplicidad
-Una línea no puede ser conciliada más allá de su cantidad disponible
-9.2 Reversión
-Anulación de recepción:
-Genera evento inverso
-Libera cantidades
-Anulación de factura:
-Reabre conciliación
-10. UI/UX (alineado a tu visión ERPNext-like)
-Panel de Conciliación
-Vista colapsable por documento
-Contadores:
-Recepciones: N
-Facturas: N
-Indicadores visuales (badges):
-Estado	Color
-Conciliado	Verde
-Parcial	Azul
-Pendiente	Gris
-Disputa	Rojo
-11. Diferenciación Estratégica
-ERP tradicionales
-Sistema	Enfoque
-SAP ERP	Contabilidad-first
-Oracle ERP Cloud	Contabilidad configurable
-Microsoft Dynamics 365	Documento-first con límites
-Tu enfoque
+Iniciar solo cuando el usuario escriba al menos minChars.
+Buscar por código y descripción.
+Soportar coincidencia parcial.
+Priorizar coincidencias que comienzan con el texto digitado.
+Limitar resultados, por ejemplo 20 registros.
+No devolver registros inactivos salvo que el doctype lo permita.
+Respetar permisos del usuario.
+Respetar compañía activa, si aplica.
+9. Filtros dinámicos
 
-Process-first + Event-driven + Contabilidad desacoplada
+El framework debe permitir que un campo dependa de otros campos del formulario.
 
-12. Beneficios Esperados
-Técnicos
-Bajo acoplamiento
-Alta extensibilidad
-Testing más simple
-Funcionales
-Mayor claridad para usuario
-Mejor trazabilidad
-Flexibilidad en reglas
-Contables
-Igual nivel de auditoría que GR/IR tradicional
-Mayor control en timing de reconocimiento
-13. Riesgos y Consideraciones
-Requiere disciplina en modelado de eventos
-Necesita motor contable robusto
-Debe evitar duplicación de lógica entre capas
-14. Criterios de Aceptación
-Se puede ejecutar matching sin generar asientos contables
-Se puede cambiar tolerancias sin alterar datos históricos
-Se pueden reconstruir estados desde eventos
-El sistema soporta 2-way y 3-way sin cambios estructurales
-La cuenta puente es configurable, no obligatoria
+Ejemplo:
+
+El usuario selecciona compañía.
+Luego el campo cuenta contable solo muestra cuentas de esa compañía.
+Si el usuario cambia la compañía, el valor previamente seleccionado debe invalidarse si ya no corresponde.
+
+Casos esperados:
+
+Campo	Depende de	Resultado
+Cuenta bancaria	Compañía	Solo cuentas bancarias de la compañía seleccionada
+Cuenta por cobrar	Compañía + tipo de tercero cliente	Solo cuentas AR válidas
+Proveedor	Compañía	Solo proveedores activos de esa compañía
+Cliente	Compañía	Solo clientes activos de esa compañía
+Líneas de documento	Documento origen	Solo líneas pendientes/no completadas
+10. Validaciones
+Frontend
+No permitir valor libre si el campo requiere selección válida.
+Mostrar estado visual cuando el valor seleccionado ya no es válido.
+Limpiar selección si cambia un filtro padre.
+Mostrar mensaje cuando no existan resultados.
+Mostrar indicador de carga durante la búsqueda.
+Backend
+Validar que el doctype exista en el registry.
+Validar que los filtros enviados estén permitidos.
+Validar permisos del usuario.
+Validar compañía, sucursal o entidad activa.
+No confiar únicamente en filtros enviados por frontend.
+Aplicar límites de resultados.
+Evitar exposición de datos sensibles.
+11. Librería frontend
+
+Debe existir una única librería JavaScript, por ejemplo:
+
+<script src="/static/js/smart-select.js"></script>
+
+Esta librería debe:
+
+Registrar el componente Alpine.js.
+Manejar debounce.
+Manejar loading state.
+Manejar errores.
+Manejar selección.
+Manejar limpieza del campo.
+Resolver filtros dinámicos.
+Ser cacheable por navegador.
+No duplicarse por formulario.
+12. Criterios de aceptación
+
+El requerimiento se considera cumplido cuando:
+
+Un campo de cuenta contable puede buscar por código o nombre.
+El campo no carga opciones antes de que el usuario escriba.
+La API devuelve resultados filtrados por compañía y tipo de cuenta.
+Cambiar la compañía limpia o invalida selecciones dependientes.
+El componente funciona en móvil y escritorio.
+El mismo componente puede usarse para cuentas, clientes, proveedores, empleados y documentos.
+El backend impide consultar doctypes o filtros no registrados.
+El formulario guarda el ID real del registro, no solo el texto mostrado.
+La experiencia es superior al <select> tradicional para catálogos grandes.
+13. Nombre sugerido del feature
+
+Smart Select Framework

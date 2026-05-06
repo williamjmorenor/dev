@@ -52,14 +52,84 @@
     {% for row in rows %}
     <div class="col-lg-6">
       <label class="form-label" for="{{ row.field }}">{{ _(row.label) }}</label>
-      <select class="form-select" id="{{ row.field }}" name="{{ row.field }}">
-        <option value="">{{ _("Sin configurar") }}</option>
-        {% for account in accounts %}
-        <option value="{{ account.id }}" {% if row.account and row.account.id == account.id %}selected{% endif %}>
-          {{ account.code }} - {{ account.name }}
-        </option>
-        {% endfor %}
-      </select>
+      <div
+        class="ca-smart-select"
+        :class="{ 'is-invalid': invalid }"
+        x-data='smartSelect({
+          doctype: "account",
+          name: {{ row.field | tojson }},
+          minChars: 2,
+          initialValue: {{ (row.account.id if row.account else "") | tojson }},
+          initialLabel: {{ ((row.account.code ~ " - " ~ row.account.name) if row.account else "") | tojson }},
+          filters: {
+            company: {{ selected_company | tojson }},
+            account_type: {{ row.allowed_account_types | list | tojson }},
+            is_active: true
+          },
+          messages: {
+            placeholder: {{ _("Buscar por código o nombre...") | tojson }},
+            loading: {{ _("Buscando opciones...") | tojson }},
+            noResults: {{ _("No hay resultados compatibles.") | tojson }},
+            minChars: {{ _("Escriba al menos 2 caracteres para buscar.") | tojson }},
+            clear: {{ _("Limpiar selección") | tojson }},
+            invalid: {{ _("Seleccione una opción válida de la lista.") | tojson }},
+            error: {{ _("No se pudieron cargar las opciones.") | tojson }}
+          }
+        })'
+      >
+        <input type="hidden" :name="name" x-model="selectedValue">
+        <div class="ca-smart-select-input-wrap">
+          <input
+            class="form-control ca-smart-select-input"
+            id="{{ row.field }}"
+            type="text"
+            x-model="search"
+            @input.debounce.300ms="onInput"
+            @focus="fetchOptions"
+            @blur="closeSoon"
+            :placeholder="messages.placeholder"
+            autocomplete="off"
+            autocapitalize="none"
+            autocorrect="off"
+            spellcheck="false"
+          >
+          <button
+            class="ca-smart-select-clear"
+            type="button"
+            x-show="selectedValue || search"
+            @click="clearSelection"
+            :title="messages.clear"
+            :aria-label="messages.clear"
+            x-cloak
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="ca-smart-select-menu" x-show="open" x-cloak>
+          <div class="ca-smart-select-state" x-show="loading">
+            <span class="spinner-border spinner-border-sm me-1"></span><span x-text="messages.loading"></span>
+          </div>
+          <template x-for="option in options" :key="option.id">
+            <button class="ca-smart-select-option" type="button" @mousedown.prevent="selectOption(option)">
+              <span x-text="option.display_name"></span>
+            </button>
+          </template>
+          <div
+            class="ca-smart-select-state"
+            x-show="!loading && !error && search.trim().length < minChars"
+            x-text="messages.minChars"
+          ></div>
+          <div
+            class="ca-smart-select-state"
+            x-show="!loading && !error && search.trim().length >= minChars && options.length === 0"
+            x-text="messages.noResults"
+          ></div>
+          <div class="ca-smart-select-state text-danger" x-show="error" x-text="error"></div>
+        </div>
+        <template x-if="invalid">
+          <div class="text-danger small mt-1" x-text="messages.invalid"></div>
+        </template>
+      </div>
       <div class="form-text">{{ _("Tipos permitidos") }}: {{ row.allowed_account_types | join(", ") }}</div>
     </div>
     {% endfor %}

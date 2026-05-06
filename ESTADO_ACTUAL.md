@@ -63,8 +63,13 @@ El sistema está diseñado con soporte nativo para:
 - Dashboard de administración.
 - Lista y activación/desactivación de módulos del sistema.
 - Administración básica de usuarios, roles, asignación de roles y permisos por módulo.
-- CRUD de cuentas por defecto por compañía en `/settings/default-accounts`, con validación de compañía y tipo de cuenta compatible.
+- CRUD de cuentas por defecto por compañía en `/settings/default-accounts`, con validación de compañía, tipo de cuenta compatible y selección asistida Smart Select filtrada por compañía/tipo.
 - Pendiente: configuración funcional avanzada de compañía, workflows y auditoría operativa.
+
+### `api` — API REST y Selección Asistida
+- Items de documentos operativos (PO, SO, Receipt, Invoice, etc.).
+- Endpoints de flujo documental (tree, summary, pending-lines, create-target, close-line/document).
+- Endpoint autenticado `/api/search-select` para campos Smart Select, con registry explícito de doctypes (`account`, `customer`, `supplier`, `item`, `warehouse`, `bank_account`, `naming_series`), filtros permitidos y límites de resultados.
 
 ### `contabilidad` — Módulo Contable Central
 Rutas implementadas:
@@ -205,10 +210,6 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 - Validación de período contable cerrado por `posting_date`.
 - Soporte de contadores externos (`ExternalCounter`) con auditoría.
 - Log de identificadores generados (`GeneratedIdentifierLog`).
-
-### `api` — API REST
-- Items de documentos operativos (PO, SO, Receipt, Invoice, etc.).
-- Endpoints de flujo documental (tree, summary, pending-lines, create-target, close-line/document).
 
 ---
 

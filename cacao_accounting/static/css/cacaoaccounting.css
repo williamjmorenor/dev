@@ -618,6 +618,85 @@ nav[aria-label="breadcrumb"] {
   color: var(--ca-text) !important;
 }
 
+[x-cloak] {
+  display: none !important;
+}
+
+.ca-smart-select {
+  position: relative;
+}
+
+.ca-smart-select-input-wrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.ca-smart-select-input {
+  padding-right: 2.2rem !important;
+}
+
+.ca-smart-select-clear {
+  position: absolute;
+  right: .35rem;
+  border: 0;
+  background: transparent;
+  color: var(--ca-text-muted);
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ca-radius);
+}
+
+.ca-smart-select-clear:hover {
+  background: var(--ca-surface-hover);
+  color: var(--ca-text);
+}
+
+.ca-smart-select-menu {
+  position: absolute;
+  z-index: 1050;
+  left: 0;
+  right: 0;
+  top: calc(100% + .2rem);
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--ca-surface);
+  border: 1px solid var(--ca-border);
+  border-radius: var(--ca-radius);
+  box-shadow: var(--ca-shadow-sm);
+  padding: .25rem;
+}
+
+.ca-smart-select-option,
+.ca-smart-select-state {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ca-text);
+  display: block;
+  text-align: left;
+  padding: .4rem .5rem;
+  border-radius: var(--ca-radius);
+  font-size: .875rem;
+}
+
+.ca-smart-select-option:hover,
+.ca-smart-select-option:focus {
+  background: var(--ca-surface-hover);
+  outline: none;
+}
+
+.ca-smart-select-state {
+  color: var(--ca-text-muted);
+}
+
+.ca-smart-select.is-invalid .form-control {
+  border-color: var(--bs-danger) !important;
+}
+
 /* ═══════════════════════════════════════════════════════
    13. BREADCRUMB
    ═══════════════════════════════════════════════════════ */

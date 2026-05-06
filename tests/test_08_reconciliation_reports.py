@@ -526,6 +526,126 @@ def test_default_account_admin_crud_rejects_incompatible_types(app_ctx):
     assert response.status_code == 200
 
 
+def test_search_select_account_filters_and_validates_registry(app_ctx):
+    from cacao_accounting.database import Accounts, database
+    from cacao_accounting.search_select import SearchSelectError, search_select
+
+    bank = Accounts(
+        entity="cacao", code="BAN-001", name="Banco Central", active=True, enabled=True, group=False, account_type="bank"
+    )
+    expense = Accounts(
+        entity="cacao", code="EXP-001", name="Banco Gastos", active=True, enabled=True, group=False, account_type="expense"
+    )
+    disabled = Accounts(
+        entity="cacao",
+        code="BAN-002",
+        name="Banco Deshabilitado",
+        active=True,
+        enabled=False,
+        group=False,
+        account_type="bank",
+    )
+    inactive = Accounts(
+        entity="cacao", code="BAN-003", name="Banco Inactivo", active=False, enabled=True, group=False, account_type="bank"
+    )
+    group = Accounts(
+        entity="cacao", code="BAN-004", name="Banco Grupo", active=True, enabled=True, group=True, account_type="bank"
+    )
+    database.session.add_all([bank, expense, disabled, inactive, group])
+    database.session.commit()
+
+    payload = search_select("account", "ban", {"company": ["cacao"], "account_type": ["bank"]}, limit=10)
+
+    assert [item["id"] for item in payload["results"]] == [bank.id]
+    assert payload["results"][0]["display_name"] == "BAN-001 - Banco Central"
+    assert payload["results"][0]["account_type"] == "bank"
+
+    mixed_types = search_select("account", "ban", {"company": ["cacao"], "account_type": ["bank", "expense"]}, limit=10)
+    assert [item["id"] for item in mixed_types["results"]] == [bank.id, expense.id]
+
+    limited = search_select("account", "ban", {"company": ["cacao"], "account_type": ["bank", "expense"]}, limit=1)
+    assert len(limited["results"]) == 1
+    assert limited["has_more"] is True
+
+    with pytest.raises(SearchSelectError):
+        search_select("unknown", "ban", {}, limit=10)
+
+    with pytest.raises(SearchSelectError):
+        search_select("account", "ban", {"not_allowed": ["x"]}, limit=10)
+
+
+def test_search_select_api_requires_login_and_returns_filtered_accounts(app_ctx):
+    from cacao_accounting.database import Accounts, User, database
+
+    bank = Accounts(
+        entity="cacao", code="BANK-API", name="Banco API", active=True, enabled=True, group=False, account_type="bank"
+    )
+    expense = Accounts(
+        entity="cacao", code="BANK-EXP", name="Gasto Banco", active=True, enabled=True, group=False, account_type="expense"
+    )
+    user = User(user="api-admin", name="API Admin", password=b"x", classification="admin", active=True)
+    database.session.add_all([bank, expense, user])
+    database.session.commit()
+
+    app_ctx.config["SECRET_KEY"] = "testing"
+    client = app_ctx.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = user.id
+        session["_fresh"] = True
+
+    response = client.get("/api/search-select?doctype=account&q=BANK&company=cacao&account_type=bank")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["doctype"] == "account"
+    assert [item["id"] for item in payload["results"]] == [bank.id]
+
+    response = client.get("/api/search-select?doctype=account&q=BANK&company=cacao&account_type=bank&account_type=expense")
+    assert response.status_code == 200
+    assert {item["id"] for item in response.get_json()["results"]} == {bank.id, expense.id}
+
+    response = client.get("/api/search-select?doctype=account&q=BANK&company=cacao&bad_filter=x")
+    assert response.status_code == 400
+
+
+def test_default_accounts_view_uses_smart_select_without_rendering_full_account_options(app_ctx):
+    from cacao_accounting.contabilidad.default_accounts import upsert_company_default_accounts
+    from cacao_accounting.database import Accounts, Modules, User, database
+
+    bank = Accounts(
+        entity="cacao", code="BANK-VIEW", name="Banco Vista", active=True, enabled=True, group=False, account_type="bank"
+    )
+    receivable = Accounts(
+        entity="cacao",
+        code="AR-VIEW",
+        name="Cuenta por Cobrar",
+        active=True,
+        enabled=True,
+        group=False,
+        account_type="receivable",
+    )
+    admin_user = User(user="view-admin", name="View Admin", password=b"x", classification="admin", active=True)
+    admin_module = Modules(module="admin", default=True, enabled=True)
+    database.session.add_all([bank, receivable, admin_user, admin_module])
+    database.session.flush()
+    upsert_company_default_accounts("cacao", {"default_bank": bank.id, "default_receivable": receivable.id})
+    database.session.commit()
+
+    app_ctx.config["SECRET_KEY"] = "testing"
+    client = app_ctx.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = admin_user.id
+        session["_fresh"] = True
+
+    response = client.get("/settings/default-accounts?company=cacao")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "x-data='smartSelect({" in html
+    assert 'account_type: ["bank"]' in html
+    assert "BANK-VIEW - Banco Vista" in html
+    assert f'<option value="{bank.id}"' not in html
+    assert f'<option value="{receivable.id}"' not in html
+
+
 def test_manual_journal_rejects_restricted_account_types_but_allows_untyped_accounts(app_ctx):
     from cacao_accounting.contabilidad.posting import PostingError, post_document_to_gl
     from cacao_accounting.database import Accounts, ComprobanteContable, ComprobanteContableDetalle, GLEntry, database

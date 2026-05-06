@@ -226,9 +226,18 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Cada catálogo ofrecido por el setup debe tener mapping JSON compañero; `base_es.csv` se acompaña por `base_es.json` y `base_en.csv` se acompaña por `base_en.json`.
 - [x] El setup inicial aplica el mapping JSON y crea `CompanyDefaultAccount` completo al seleccionar un catálogo predefinido.
 - [x] CRUD administrativo `/settings/default-accounts` para crear, editar y eliminar cuentas predeterminadas por compañía.
+- [x] `/settings/default-accounts` usa Smart Select para buscar cuentas por código/nombre, sin renderizar todo el catálogo y filtrando por compañía + tipos compatibles.
 - [x] `Accounts.account_type` tiene enforcement estricto en posting: cuentas sin tipo permiten afectación libre; cuentas tipadas se restringen por origen/módulo.
 - [x] `CompanyDefaultAccount` cubre las cuentas actuales requeridas por bancos, compras, ventas, inventario, impuestos, anticipos, diferidos, redondeo, diferencias cambiarias, resultado del período y resultados acumulados.
 - [ ] Crear migración formal para instalaciones existentes cuando el proyecto adopte un flujo de migraciones.
+
+## 🟡 BLOQUE 6.2 — Smart Select Framework
+
+- [x] Backend genérico `/api/search-select` con registry explícito de doctypes permitidos y filtros validados.
+- [x] Frontend Alpine.js reutilizable en `static/js/smart-select.js` para búsqueda, loading, errores, limpieza, valor inicial y filtros dinámicos.
+- [x] Instrucción permanente `.github/instructions/search-select-fields.instructions.md` para migraciones futuras.
+- [ ] Migrar progresivamente selects de catálogos grandes/contextuales en compras, ventas, bancos, inventario y GL.
+- [ ] Añadir cobertura específica por cada formulario migrado para confirmar filtros de compañía, permisos y valores guardados.
 
 ---
 
@@ -380,7 +389,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [ ] Pantalla de usuarios activos con sus roles.
 
 ### 15.3 Cuentas por Defecto de Compañía
-- [ ] UI para configurar `CompanyDefaultAccount` (AR, AP, bancos, descuentos, impuestos, GI/IR, anticipos).
+- [x] UI para configurar `CompanyDefaultAccount` (AR, AP, bancos, descuentos, impuestos, cuenta puente, anticipos) con selección asistida filtrada.
 
 ### 15.4 Gestión de Contactos y Direcciones
 - [ ] CRUD de `Contact` y `Address` como entidades independientes.

@@ -1089,3 +1089,44 @@ Implementar un catálogo base completo para las cuentas que el sistema requiere,
 - `flake8 cacao_accounting tests --max-line-length=130` -> passed.
 - `mypy cacao_accounting` -> Success: no issues found in 65 source files.
 - `pytest -q` -> 312 passed, 7 warnings externas/deprecación.
+
+## 2026-05-06 (Smart Select Framework y cuentas por defecto)
+
+### Peticion del usuario
+Implementar un framework transversal robusto para campos select/autocomplete, sin migrar todos los formularios de una vez, usando `/settings/default-accounts` como primer formulario piloto. Tambien crear instrucciones permanentes para futuras migraciones y actualizar la bitacora/documentacion del proyecto.
+
+### Decisiones de diseño
+- El backend usa un registry explicito de doctypes permitidos y rechaza doctypes/filtros no registrados.
+- El primer corte migra solo `/settings/default-accounts`; compras, ventas, bancos, inventario y GL quedan para migracion progresiva.
+- El frontend usa una unica libreria Alpine.js (`smart-select.js`) y no renderiza catalogos grandes dentro del HTML.
+- La validacion final sigue en servicios backend (`upsert_company_default_accounts`); Smart Select mejora UX y reduce opciones invalidas, pero no sustituye reglas de negocio.
+- Se agrego versionado de URL del asset JS para evitar que el navegador conserve una version anterior del componente.
+
+### Plan implementado
+1. Crear `cacao_accounting/search_select.py` con servicio generico, registry, filtros permitidos, busqueda por campos configurados y serializacion uniforme.
+2. Agregar `GET /api/search-select` autenticado para devolver opciones filtradas.
+3. Crear `cacao_accounting/static/js/smart-select.js` como componente Alpine reusable con loading, errores, sin resultados, valor inicial, limpieza y filtros dinamicos.
+4. Agregar estilos genericos `.ca-smart-select*` en `cacao_accounting/static/css/cacaoaccounting.css`.
+5. Refactorizar `admin/default_accounts.html` para usar Smart Select por cada cuenta predeterminada, filtrando por compania y tipos compatibles.
+6. Crear `.github/instructions/search-select-fields.instructions.md` para guiar futuras implementaciones.
+7. Agregar pruebas de servicio, API y vista para el caso piloto.
+8. Actualizar `ESTADO_ACTUAL.md` y `PENDIENTE.md`.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/search_select.py`: registry inicial para `account`, `customer`, `supplier`, `item`, `warehouse`, `bank_account` y `naming_series`.
+- `cacao_accounting/api/__init__.py`: endpoint `/api/search-select`.
+- `cacao_accounting/static/js/smart-select.js`: componente Alpine con seleccion asistida y manejo de valores iniciales validos.
+- `cacao_accounting/templates/macros.html`: carga global del componente con version de asset.
+- `cacao_accounting/admin/templates/admin/default_accounts.html`: reemplazo de selects de cuentas por Smart Select filtrado.
+- `tests/test_08_reconciliation_reports.py`: cobertura de busqueda, filtros, limites, errores de registry/API y renderizado sin opciones masivas.
+
+### Verificacion ejecutada
+- `python -m py_compile cacao_accounting/search_select.py cacao_accounting/api/__init__.py cacao_accounting/admin/__init__.py` -> sin errores.
+- `ruff check cacao_accounting/search_select.py cacao_accounting/api/__init__.py cacao_accounting/admin/__init__.py tests/test_08_reconciliation_reports.py` -> passed.
+- `pytest -q tests/test_08_reconciliation_reports.py -k 'search_select or default_accounts_view or default_account_admin'` -> 4 passed, 4 warnings externas/deprecación.
+- `black cacao_accounting/search_select.py cacao_accounting/api/__init__.py cacao_accounting/admin/__init__.py tests/test_08_reconciliation_reports.py` -> sin cambios pendientes tras formateo.
+- `ruff check .` -> passed.
+- `flake8 cacao_accounting tests --max-line-length=130` -> passed.
+- `mypy cacao_accounting` -> Success: no issues found in 66 source files.
+- `pytest -q tests/test_03webactions.py::test_inventory_stock_entry_routes --slow=True -vv` -> passed.
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True` -> falla antes de ejecutar las pruebas nuevas: `tests/test_03webactions.py::test_inventory_stock_entry_routes` recibe 404 en `/buying/purchase-receipt/REC-DEMO-0000001`; el mismo test pasa aislado, por lo que queda como fallo de interacción/estado de la suite lenta no relacionado con Smart Select.
