@@ -118,7 +118,6 @@ def _payment_allocations(reference_type: str, reference_id: str, as_of_date: dat
 
 def get_ar_ap_subledger(filters: SubledgerFilters) -> PaginatedReport:
     """Devuelve subledger AR/AP basado en documentos y aplicaciones de pago."""
-
     if filters.party_type == "customer":
         document_type = "sales_invoice"
         document_model = SalesInvoice
@@ -175,7 +174,6 @@ def get_ar_ap_subledger(filters: SubledgerFilters) -> PaginatedReport:
 
 def get_aging_report(filters: AgingFilters) -> AgingReport:
     """Devuelve aging AR/AP con buckets fijos."""
-
     subledger = get_ar_ap_subledger(
         SubledgerFilters(
             company=filters.company,
@@ -213,7 +211,6 @@ def get_aging_report(filters: AgingFilters) -> AgingReport:
 
 def get_kardex(filters: KardexFilters) -> PaginatedReport:
     """Devuelve Kardex desde StockLedgerEntry."""
-
     query = select(StockLedgerEntry).filter_by(company=filters.company, is_cancelled=False)
     if filters.item_code:
         query = query.filter_by(item_code=filters.item_code)
@@ -263,7 +260,6 @@ def get_kardex(filters: KardexFilters) -> PaginatedReport:
 
 def get_reconciliation_report(company: str, as_of_date: date | None = None) -> PaginatedReport:
     """Devuelve reconciliaciones bancarias y conciliaciones de compras pendientes."""
-
     query = (
         select(Reconciliation, ReconciliationItem)
         .join(
@@ -320,7 +316,6 @@ def get_reconciliation_report(company: str, as_of_date: date | None = None) -> P
 
 def get_purchases_by_supplier(filters: OperationalReportFilters) -> PaginatedReport:
     """Compras agregadas por proveedor."""
-
     query = select(PurchaseInvoice).filter_by(company=filters.company)
     if filters.party_id:
         query = query.filter_by(supplier_id=filters.party_id)
@@ -338,7 +333,6 @@ def get_purchases_by_supplier(filters: OperationalReportFilters) -> PaginatedRep
 
 def get_purchases_by_item(filters: OperationalReportFilters) -> PaginatedReport:
     """Compras agregadas por item."""
-
     query = (
         select(PurchaseInvoice, PurchaseInvoiceItem)
         .join(PurchaseInvoiceItem, PurchaseInvoiceItem.purchase_invoice_id == PurchaseInvoice.id)
@@ -370,7 +364,6 @@ def get_purchases_by_item(filters: OperationalReportFilters) -> PaginatedReport:
 
 def get_sales_by_customer(filters: OperationalReportFilters) -> PaginatedReport:
     """Ventas agregadas por cliente."""
-
     query = select(SalesInvoice).filter_by(company=filters.company)
     if filters.party_id:
         query = query.filter_by(customer_id=filters.party_id)
@@ -388,7 +381,6 @@ def get_sales_by_customer(filters: OperationalReportFilters) -> PaginatedReport:
 
 def get_sales_by_item(filters: OperationalReportFilters) -> PaginatedReport:
     """Ventas agregadas por item."""
-
     query = (
         select(SalesInvoice, SalesInvoiceItem)
         .join(SalesInvoiceItem, SalesInvoiceItem.sales_invoice_id == SalesInvoice.id)
@@ -420,7 +412,6 @@ def get_sales_by_item(filters: OperationalReportFilters) -> PaginatedReport:
 
 def get_gross_margin(filters: OperationalReportFilters) -> PaginatedReport:
     """Margen bruto basado en GL: ingresos menos COGS."""
-
     query = select(GLEntry).filter_by(company=filters.company, is_cancelled=False)
     if filters.date_from:
         query = query.where(GLEntry.posting_date >= filters.date_from)
@@ -443,7 +434,6 @@ def get_gross_margin(filters: OperationalReportFilters) -> PaginatedReport:
 
 def get_stock_balance(filters: OperationalReportFilters) -> PaginatedReport:
     """Existencia actual desde StockBin."""
-
     query = select(StockBin).filter_by(company=filters.company)
     if filters.item_code:
         query = query.filter_by(item_code=filters.item_code)
@@ -468,7 +458,6 @@ def get_stock_balance(filters: OperationalReportFilters) -> PaginatedReport:
 
 def get_inventory_valuation(filters: OperationalReportFilters) -> PaginatedReport:
     """Valoracion de inventario desde capas de valuacion."""
-
     query = select(StockValuationLayer).filter_by(company=filters.company)
     if filters.item_code:
         query = query.filter_by(item_code=filters.item_code)
@@ -495,7 +484,6 @@ def get_inventory_valuation(filters: OperationalReportFilters) -> PaginatedRepor
 
 def get_batch_report(filters: OperationalReportFilters) -> PaginatedReport:
     """Reporte de lotes."""
-
     query = select(Batch)
     if filters.item_code:
         query = query.filter_by(item_code=filters.item_code)
@@ -515,7 +503,6 @@ def get_batch_report(filters: OperationalReportFilters) -> PaginatedReport:
 
 def get_serial_report(filters: OperationalReportFilters) -> PaginatedReport:
     """Reporte de numeros de serie."""
-
     query = select(SerialNumber)
     if filters.item_code:
         query = query.filter_by(item_code=filters.item_code)

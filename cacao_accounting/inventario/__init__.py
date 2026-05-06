@@ -23,7 +23,6 @@ inventario = Blueprint("inventario", __name__, template_folder="templates")
 
 def _series_choices(entity_type: str, company: str | None) -> list[tuple[str, str]]:
     """Construye las opciones de series activas para un doctype y compania."""
-
     if not company:
         return [("", "")]
 
@@ -181,7 +180,6 @@ def inventario_material_transfer_lista():
 @login_required
 def inventario_ajuste_lista():
     """Listado de ajustes de inventario."""
-
     consulta = database.paginate(
         database.select(StockEntry).filter_by(purpose="stock_adjustment"),
         page=request.args.get("page", default=1, type=int),
@@ -204,7 +202,6 @@ def inventario_ajuste_lista():
 @login_required
 def inventario_reconciliacion_lista():
     """Listado de conciliaciones físicas de inventario."""
-
     consulta = database.paginate(
         database.select(StockEntry).filter_by(purpose="stock_reconciliation"),
         page=request.args.get("page", default=1, type=int),
@@ -227,7 +224,6 @@ def inventario_reconciliacion_lista():
 @login_required
 def inventario_ajuste_positivo_lista():
     """Listado de ajustes positivos de inventario."""
-
     consulta = database.paginate(
         database.select(StockEntry).filter_by(purpose="adjustment_positive"),
         page=request.args.get("page", default=1, type=int),
@@ -249,7 +245,6 @@ def inventario_ajuste_positivo_lista():
 @login_required
 def inventario_ajuste_negativo_lista():
     """Listado de ajustes negativos de inventario."""
-
     consulta = database.paginate(
         database.select(StockEntry).filter_by(purpose="adjustment_negative"),
         page=request.args.get("page", default=1, type=int),
@@ -378,14 +373,12 @@ def inventario_bodega(warehouse_id):
 
 def _form_decimal(field_name: str, default: str = "0") -> Decimal:
     """Convierte un valor de formulario a Decimal."""
-
     value = request.form.get(field_name)
     return Decimal(str(value if value not in (None, "") else default))
 
 
 def _line_amount(index: int) -> Decimal:
     """Obtiene o calcula el monto de una linea."""
-
     amount = request.form.get(f"amount_{index}")
     if amount not in (None, ""):
         return Decimal(str(amount))
@@ -394,7 +387,6 @@ def _line_amount(index: int) -> Decimal:
 
 def _save_stock_entry_items(entry: StockEntry) -> Decimal:
     """Guarda lineas de un movimiento de inventario."""
-
     i = 0
     total = Decimal("0")
     while request.form.get(f"item_code_{i}"):
@@ -529,7 +521,6 @@ def _stock_entry_title(purpose: str | None) -> str:
 @login_required
 def inventario_ajuste_nuevo():
     """Alias para crear ajuste de inventario."""
-
     return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="stock_adjustment"))
 
 
@@ -538,7 +529,6 @@ def inventario_ajuste_nuevo():
 @login_required
 def inventario_reconciliacion_nueva():
     """Alias para crear conciliación física de inventario."""
-
     return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="stock_reconciliation"))
 
 
@@ -547,7 +537,6 @@ def inventario_reconciliacion_nueva():
 @login_required
 def inventario_ajuste_positivo_nuevo():
     """Alias para crear ajuste positivo."""
-
     return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="adjustment_positive"))
 
 
@@ -556,7 +545,6 @@ def inventario_ajuste_positivo_nuevo():
 @login_required
 def inventario_ajuste_negativo_nuevo():
     """Alias para crear ajuste negativo."""
-
     return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="adjustment_negative"))
 
 
@@ -591,7 +579,6 @@ def inventario_entrada(entry_id):
 @login_required
 def inventario_entrada_submit(entry_id: str):
     """Aprueba una entrada de almacen y genera Stock Ledger/GL."""
-
     registro = database.session.get(StockEntry, entry_id)
     if not registro:
         abort(404)
@@ -613,7 +600,6 @@ def inventario_entrada_submit(entry_id: str):
 @login_required
 def inventario_entrada_cancel(entry_id: str):
     """Cancela una entrada de almacen."""
-
     registro = database.session.get(StockEntry, entry_id)
     if not registro:
         abort(404)

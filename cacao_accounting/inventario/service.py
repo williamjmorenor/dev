@@ -44,7 +44,6 @@ def _decimal_value(value: Any) -> Decimal:
 
 def convert_item_qty(item_code: str, qty: Decimal, from_uom: str, to_uom: str) -> Decimal:
     """Convierte cantidad de un item entre UOM configuradas."""
-
     if from_uom == to_uom:
         return qty
     conversion = (
@@ -69,7 +68,6 @@ def convert_item_qty(item_code: str, qty: Decimal, from_uom: str, to_uom: str) -
 
 def validate_batch_serial(line: Any, *, outgoing: bool) -> None:
     """Valida obligatoriedad y disponibilidad de lote/serial en una linea."""
-
     item = database.session.get(Item, getattr(line, "item_code", None))
     if not item or not item.is_stock_item:
         return
@@ -96,7 +94,6 @@ def validate_batch_serial(line: Any, *, outgoing: bool) -> None:
 
 def update_serial_state(line: Any, *, outgoing: bool, warehouse: str | None) -> None:
     """Actualiza estado y bodega del serial despues del movimiento."""
-
     serial_no = getattr(line, "serial_no", None)
     if not serial_no:
         return
@@ -117,7 +114,6 @@ def update_serial_state(line: Any, *, outgoing: bool, warehouse: str | None) -> 
 
 def rebuild_stock_bins(company: str, item_code: str | None = None, warehouse: str | None = None) -> StockRebuildResult:
     """Reconstruye StockBin desde StockLedgerEntry append-only."""
-
     query = select(StockLedgerEntry.company, StockLedgerEntry.item_code, StockLedgerEntry.warehouse).filter_by(
         company=company, is_cancelled=False
     )

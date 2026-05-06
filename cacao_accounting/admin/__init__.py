@@ -61,7 +61,6 @@ admin = Blueprint("admin", __name__, template_folder="templates")
 
 def _require_system_admin() -> None:
     """Restringe configuracion global al administrador del sistema."""
-
     if not current_user or not current_user.is_authenticated:
         abort(403)
     if getattr(current_user, "classification", None) == "admin":
@@ -158,7 +157,6 @@ def lista_modulos():
 @modulo_activo("admin")
 def lista_impuestos():
     """Administra impuestos y cargos de compra/venta."""
-
     _require_system_admin()
     if request.method == "POST":
         tax = Tax(
@@ -184,7 +182,6 @@ def lista_impuestos():
 @modulo_activo("admin")
 def lista_plantillas_impuesto():
     """Administra plantillas de impuestos."""
-
     _require_system_admin()
     if request.method == "POST":
         template = TaxTemplate(
@@ -207,7 +204,6 @@ def lista_plantillas_impuesto():
 @modulo_activo("admin")
 def items_plantilla_impuesto(template_id: str):
     """Administra lineas de una plantilla de impuestos."""
-
     _require_system_admin()
     template = database.session.get(TaxTemplate, template_id)
     if not template:
@@ -241,7 +237,6 @@ def items_plantilla_impuesto(template_id: str):
 @modulo_activo("admin")
 def lista_precios():
     """Administra listas de precios."""
-
     _require_system_admin()
     if request.method == "POST":
         price_list = PriceList(
@@ -265,7 +260,6 @@ def lista_precios():
 @modulo_activo("admin")
 def precios_item():
     """Administra precios por item."""
-
     _require_system_admin()
     if request.method == "POST":
         item_price = ItemPrice(
@@ -295,7 +289,6 @@ def precios_item():
 @modulo_activo("admin")
 def config_conciliacion_compras():
     """Administra la configuracion de conciliacion de compras por compania."""
-
     _require_system_admin()
     from cacao_accounting.database import Entity
     from cacao_accounting.compras.purchase_reconciliation_service import seed_matching_config_for_company
@@ -347,7 +340,6 @@ def config_conciliacion_compras():
 @modulo_activo("admin")
 def cuentas_predeterminadas():
     """Administra cuentas contables predeterminadas por compania."""
-
     _require_system_admin()
     companies = database.session.execute(database.select(Entity).order_by(Entity.code)).scalars().all()
     selected_company = request.form.get("company") or request.args.get("company") or (companies[0].code if companies else "")
