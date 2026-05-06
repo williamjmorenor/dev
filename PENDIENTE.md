@@ -1,6 +1,6 @@
 # PENDIENTE — Cacao Accounting
 
-**Fecha de análisis:** 2026-05-05  
+**Fecha de análisis:** 2026-05-06
 **Base:** definición de módulos en `modulos/` y estado actual del código.
 
 Este documento registra todo lo que está pendiente de implementar para cumplir la especificación completa de los módulos del sistema.
@@ -15,7 +15,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Al hacer submit, generar `GLEntry` por cada libro activo (`Book`):
   - Débito: Cuentas por cobrar (AR) — `PartyAccount` del cliente.
   - Crédito: Ingreso de ventas — cuenta de ingreso del ítem.
-- [ ] Líneas de impuesto: según `TaxTemplate` aplicada.
+- [x] Líneas de impuesto: según `TaxTemplate` aplicada, con fallback a cuenta predeterminada de ventas si el impuesto no define cuenta.
 - [ ] Costo de ventas (COGS) si el ítem es inventariable y se entrega/factura.
 - [x] Respetar `posting_date` y período abierto.
 - [x] Registrar `voucher_type` y `voucher_id` en cada `GLEntry`.
@@ -28,7 +28,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
   - Débito: gasto, inventario o impuesto acreditable según tipo de ítem.
   - Crédito: Cuentas por pagar (AP) — `PartyAccount` del proveedor.
   - Si hay recepción previa: descarga cuenta puente de conciliación de compras.
-- [ ] Separar impuestos acreditables en cuentas fiscales.
+- [x] Separar impuestos acreditables en cuentas fiscales predeterminadas cuando el impuesto no define cuenta específica.
 - [ ] Calcular `outstanding_amount` inicial de forma centralizada al submit.
 - [x] Soportar multimoneda cuando el documento trae moneda/tasa.
 - [x] Generar reverso contable append-only al cancelar.
@@ -57,7 +57,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Actualizar `StockBin`.
 - [x] Generar `GLEntry` con cuenta de inventario vs contrapartida según propósito.
 - [x] Registrar `StockValuationLayer`.
-- [ ] Soportar ajustes de inventario/reconciliación física.
+- [x] Soportar ajustes de inventario/reconciliación física con cuenta predeterminada de ajuste.
 - [ ] Implementar FIFO y Moving Average reales para consumo de capas.
 
 ### 1.6 Comprobante Contable Manual (Journal Entry)
@@ -91,7 +91,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [ ] Aplicar anticipo contra factura mediante `PaymentReference` con `allocation_date`.
 - [ ] Soportar aplicación parcial: el remanente queda como saldo a favor.
 - [ ] Aplicar un anticipo a múltiples facturas del mismo tercero.
-- [ ] Configuración de cuentas contables de anticipos por compañía en `CompanyDefaultAccount`.
+- [x] Configuración de cuentas contables de anticipos por compañía en `CompanyDefaultAccount`.
 
 ### 2.4 Aging AR/AP
 - [x] Implementar cálculo de aging por buckets (0-30, 31-60, 61-90, +90 días) basado en `posting_date`.
@@ -217,6 +217,18 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Permitir posting operativo de recepción sin cuenta puente cuando `bridge_account_required=False`.
 - [x] Reporte de conciliación de compras pendiente por proveedor/ítem/documento.
 - [ ] Definir cuenta de ajuste y flujo contable para diferencias de precio conciliación de compras.
+
+---
+
+## 🟡 BLOQUE 6.1 — Catálogo base y cuentas predeterminadas
+
+- [x] `base_es.csv` incluye columna `account_type` en inglés y conserva compatibilidad de importación con cabeceras en español.
+- [x] Cada catálogo ofrecido por el setup debe tener mapping JSON compañero; `base_es.csv` se acompaña por `base_es.json` y `base_en.csv` se acompaña por `base_en.json`.
+- [x] El setup inicial aplica el mapping JSON y crea `CompanyDefaultAccount` completo al seleccionar un catálogo predefinido.
+- [x] CRUD administrativo `/settings/default-accounts` para crear, editar y eliminar cuentas predeterminadas por compañía.
+- [x] `Accounts.account_type` tiene enforcement estricto en posting: cuentas sin tipo permiten afectación libre; cuentas tipadas se restringen por origen/módulo.
+- [x] `CompanyDefaultAccount` cubre las cuentas actuales requeridas por bancos, compras, ventas, inventario, impuestos, anticipos, diferidos, redondeo, diferencias cambiarias, resultado del período y resultados acumulados.
+- [ ] Crear migración formal para instalaciones existentes cuando el proyecto adopte un flujo de migraciones.
 
 ---
 

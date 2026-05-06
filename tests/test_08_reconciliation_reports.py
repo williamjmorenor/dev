@@ -380,6 +380,280 @@ def test_tax_template_posts_sales_tax_and_price_suggestion(app_ctx):
     assert any(entry.account_id == tax_account.id and entry.credit == Decimal("15.0000") for entry in entries)
 
 
+def test_catalog_loader_accepts_spanish_and_english_headers(app_ctx, tmp_path):
+    from cacao_accounting.contabilidad.ctas import CatalogoCtas, cargar_catalogos
+    from cacao_accounting.database import Accounts, Entity, database
+
+    database.session.add(Entity(code="eng", name="English", company_name="English", tax_id="J-ENG", currency="NIO"))
+    database.session.commit()
+
+    english_catalog = tmp_path / "english.csv"
+    english_catalog.write_text(
+        "code,name,parent,group,classification,type,account_type\n"
+        "1,Assets,,true,Asset,,\n"
+        "1.01,Bank,1,false,Asset,,bank\n",
+        encoding="utf-8",
+    )
+    cargar_catalogos(CatalogoCtas(file=str(english_catalog), pais=None, idioma="EN"), "eng")
+    database.session.commit()
+
+    account = database.session.execute(database.select(Accounts).filter_by(entity="eng", code="1.01")).scalar_one()
+    assert account.account_type == "bank"
+    assert account.group is False
+
+
+def test_base_catalog_mapping_covers_required_default_accounts(app_ctx):
+    import csv
+    import json
+    from pathlib import Path
+
+    from cacao_accounting.contabilidad.default_accounts import DEFAULT_ACCOUNT_FIELDS
+
+    catalog_path = Path("cacao_accounting/contabilidad/ctas/catalogos/base_es.csv")
+    mapping_path = Path("cacao_accounting/contabilidad/ctas/catalogos/base_es.json")
+    rows = list(csv.DictReader(catalog_path.open(encoding="utf-8")))
+    codes = {row["codigo"] for row in rows}
+    mapping = json.loads(mapping_path.read_text(encoding="utf-8"))["default_accounts"]
+
+    assert set(DEFAULT_ACCOUNT_FIELDS) == set(mapping)
+    assert all(code in codes for code in mapping.values())
+    assert len(codes) == len(rows)
+
+    catalog_path_en = Path("cacao_accounting/contabilidad/ctas/catalogos/base_en.csv")
+    mapping_path_en = Path("cacao_accounting/contabilidad/ctas/catalogos/base_en.json")
+    rows_en = list(csv.DictReader(catalog_path_en.open(encoding="utf-8")))
+    codes_en = {row["codigo"] for row in rows_en}
+    mapping_en = json.loads(mapping_path_en.read_text(encoding="utf-8"))["default_accounts"]
+
+    assert set(DEFAULT_ACCOUNT_FIELDS) == set(mapping_en)
+    assert all(code in codes_en for code in mapping_en.values())
+    assert len(codes_en) == len(rows_en)
+
+
+def test_setup_with_predefined_catalog_creates_complete_company_defaults(app_ctx):
+    from cacao_accounting.contabilidad.default_accounts import DEFAULT_ACCOUNT_FIELDS
+    from cacao_accounting.database import CompanyDefaultAccount, database
+    from cacao_accounting.setup.service import available_catalog_files, finalize_setup
+
+    assert ("base_es.csv", "base_es.csv") in available_catalog_files()
+    assert ("base_en.csv", "base_en.csv") in available_catalog_files()
+
+    finalize_setup(
+        {
+            "id": "mapco",
+            "razon_social": "Mapping Company",
+            "nombre_comercial": "Mapping Company",
+            "id_fiscal": "J-MAP",
+            "moneda": "NIO",
+            "tipo_entidad": "Sociedad Anonima",
+        },
+        catalogo_tipo="preexistente",
+        country="NI",
+        idioma="ES",
+        catalogo_archivo="base_es.csv",
+    )
+    database.session.commit()
+
+    defaults = database.session.execute(database.select(CompanyDefaultAccount).filter_by(company="mapco")).scalar_one()
+    assert all(getattr(defaults, field) for field in DEFAULT_ACCOUNT_FIELDS)
+
+
+def test_example_seed_creates_company_default_accounts(app_ctx):
+    from cacao_accounting.contabilidad.default_accounts import DEFAULT_ACCOUNT_FIELDS
+    from cacao_accounting.database.helpers import inicia_base_de_datos
+    from cacao_accounting.database import CompanyDefaultAccount, database
+
+    app = create_app(
+        {
+            **configuracion,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+            "WTF_CSRF_ENABLED": False,
+            "TESTING": True,
+        }
+    )
+    with app.app_context():
+        database.drop_all()
+        database.create_all()
+        assert inicia_base_de_datos(app=app, user="cacao", passwd="cacao", with_examples=True)
+
+        for company in ("cacao", "dulce", "cafe"):
+            defaults = database.session.execute(
+                database.select(CompanyDefaultAccount).filter_by(company=company)
+            ).scalar_one_or_none()
+            assert defaults is not None
+            assert all(getattr(defaults, field) for field in DEFAULT_ACCOUNT_FIELDS)
+
+
+def test_default_account_admin_crud_rejects_incompatible_types(app_ctx):
+    from cacao_accounting.database import Accounts, Entity, Modules, User, database
+
+    bank = Accounts(entity="cacao", code="BANK-CRUD", name="Banco", active=True, enabled=True, account_type="bank")
+    expense = Accounts(entity="cacao", code="EXP-CRUD", name="Gasto", active=True, enabled=True, account_type="expense")
+    admin_user = User(user="admin", name="Admin", password=b"x", classification="admin", active=True)
+    admin_module = Modules(module="admin", default=True, enabled=True)
+    database.session.add_all([bank, expense, admin_user, admin_module])
+    database.session.commit()
+
+    app_ctx.config["SECRET_KEY"] = "testing"
+    client = app_ctx.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = admin_user.id
+        session["_fresh"] = True
+
+    response = client.post(
+        "/settings/default-accounts",
+        data={"company": "cacao", "default_bank": expense.id, "action": "save"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "debe ser de tipo" in response.get_data(as_text=True)
+
+    response = client.post(
+        "/settings/default-accounts",
+        data={"company": "cacao", "default_bank": bank.id, "action": "save"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Cuentas predeterminadas guardadas correctamente" in response.get_data(as_text=True)
+    assert database.session.execute(database.select(Entity).filter_by(code="cacao")).scalar_one()
+
+    response = client.post(
+        "/settings/default-accounts",
+        data={"company": "cacao", "action": "delete"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+
+def test_manual_journal_rejects_restricted_account_types_but_allows_untyped_accounts(app_ctx):
+    from cacao_accounting.contabilidad.posting import PostingError, post_document_to_gl
+    from cacao_accounting.database import Accounts, ComprobanteContable, ComprobanteContableDetalle, GLEntry, database
+
+    bank = Accounts(entity="cacao", code="BANK-M", name="Banco", active=True, enabled=True, account_type="bank")
+    free = Accounts(entity="cacao", code="FREE-M", name="Libre", active=True, enabled=True)
+    database.session.add_all([bank, free])
+    database.session.flush()
+
+    blocked_journal = ComprobanteContable(entity="cacao", date=date(2026, 5, 6), memo="Manual bloqueado")
+    database.session.add(blocked_journal)
+    database.session.flush()
+    database.session.add_all(
+        [
+            ComprobanteContableDetalle(
+                entity="cacao",
+                account=bank.code,
+                date=blocked_journal.date,
+                transaction=blocked_journal.__tablename__,
+                transaction_id=blocked_journal.id,
+                value=Decimal("10.00"),
+            ),
+            ComprobanteContableDetalle(
+                entity="cacao",
+                account=free.code,
+                date=blocked_journal.date,
+                transaction=blocked_journal.__tablename__,
+                transaction_id=blocked_journal.id,
+                value=Decimal("-10.00"),
+            ),
+        ]
+    )
+    database.session.commit()
+
+    with pytest.raises(PostingError):
+        post_document_to_gl(blocked_journal)
+    database.session.rollback()
+
+    free_journal = ComprobanteContable(entity="cacao", date=date(2026, 5, 6), memo="Manual libre")
+    database.session.add(free_journal)
+    database.session.flush()
+    database.session.add_all(
+        [
+            ComprobanteContableDetalle(
+                entity="cacao",
+                account=free.code,
+                date=free_journal.date,
+                transaction=free_journal.__tablename__,
+                transaction_id=free_journal.id,
+                value=Decimal("10.00"),
+            ),
+            ComprobanteContableDetalle(
+                entity="cacao",
+                account=free.code,
+                date=free_journal.date,
+                transaction=free_journal.__tablename__,
+                transaction_id=free_journal.id,
+                value=Decimal("-10.00"),
+            ),
+        ]
+    )
+    database.session.commit()
+
+    entries = post_document_to_gl(free_journal)
+    assert len(entries) == 2
+    assert database.session.execute(database.select(GLEntry)).scalars().all()
+
+
+def test_sales_tax_uses_default_account_when_tax_has_no_account(app_ctx):
+    from cacao_accounting.contabilidad.posting import post_document_to_gl
+    from cacao_accounting.database import (
+        Accounts,
+        CompanyDefaultAccount,
+        GLEntry,
+        PartyAccount,
+        SalesInvoice,
+        SalesInvoiceItem,
+        Tax,
+        TaxTemplate,
+        TaxTemplateItem,
+        database,
+    )
+
+    receivable = Accounts(entity="cacao", code="AR-DF", name="AR", active=True, enabled=True, account_type="receivable")
+    income = Accounts(entity="cacao", code="INC-DF", name="Ingreso", active=True, enabled=True, account_type="income")
+    tax_account = Accounts(entity="cacao", code="TAX-DF", name="IVA", active=True, enabled=True, account_type="tax")
+    database.session.add_all([receivable, income, tax_account])
+    database.session.flush()
+    template = TaxTemplate(name="IVA Default", company="cacao", template_type="selling")
+    tax = Tax(name="IVA 15", rate=Decimal("15.00"), tax_type="percentage", applies_to="sales", account_id=None)
+    database.session.add_all([template, tax])
+    database.session.flush()
+    database.session.add_all(
+        [
+            TaxTemplateItem(tax_template_id=template.id, tax_id=tax.id, sequence=1, behavior="additive"),
+            PartyAccount(party_id="CUST-DF", company="cacao", receivable_account_id=receivable.id),
+            CompanyDefaultAccount(company="cacao", default_sales_tax_account_id=tax_account.id),
+        ]
+    )
+    invoice = SalesInvoice(
+        company="cacao",
+        posting_date=date(2026, 5, 6),
+        customer_id="CUST-DF",
+        tax_template_id=template.id,
+        total=Decimal("100.00"),
+        grand_total=Decimal("115.00"),
+        docstatus=1,
+    )
+    database.session.add(invoice)
+    database.session.flush()
+    database.session.add(
+        SalesInvoiceItem(
+            sales_invoice_id=invoice.id,
+            item_code="ITEM-DF",
+            qty=Decimal("1"),
+            uom="EA",
+            rate=Decimal("100.00"),
+            amount=Decimal("100.00"),
+            income_account_id=income.id,
+        )
+    )
+    database.session.commit()
+
+    post_document_to_gl(invoice)
+    entries = database.session.execute(database.select(GLEntry)).scalars().all()
+    assert any(entry.account_id == tax_account.id and entry.credit == Decimal("15.0000") for entry in entries)
+
+
 def test_inventory_uom_batch_serial_and_rebuild_stock_bins(app_ctx):
     from cacao_accounting.contabilidad.posting import post_document_to_gl
     from cacao_accounting.database import (

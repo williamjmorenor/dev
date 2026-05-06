@@ -532,6 +532,54 @@ class TestAccountsSchema(unittest.TestCase):
         self.assertIn("account_type", self.columns)
 
 
+class TestCompanyDefaultAccountExtendedSchema(unittest.TestCase):
+    """Verifica campos completos de cuentas predeterminadas."""
+
+    def setUp(self):
+        self.app = create_app({**configuracion, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        from cacao_accounting.database import database
+        from sqlalchemy import inspect
+
+        database.create_all()
+        inspector = inspect(database.engine)
+        self.columns = {c["name"] for c in inspector.get_columns("company_default_account")}
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_company_default_account_has_required_account_fields(self):
+        expected = {
+            "default_cash",
+            "default_bank",
+            "default_receivable",
+            "default_payable",
+            "default_income",
+            "default_expense",
+            "default_inventory",
+            "default_cogs",
+            "inventory_adjustment_account_id",
+            "bridge_account_id",
+            "customer_advance_account_id",
+            "supplier_advance_account_id",
+            "bank_difference_account_id",
+            "default_sales_tax_account_id",
+            "default_purchase_tax_account_id",
+            "default_rounding_account_id",
+            "exchange_gain_account_id",
+            "exchange_loss_account_id",
+            "unrealized_exchange_gain_account_id",
+            "unrealized_exchange_loss_account_id",
+            "deferred_income_account_id",
+            "deferred_expense_account_id",
+            "payment_discount_account_id",
+            "period_profit_loss_account_id",
+            "retained_earnings_account_id",
+        }
+        assert expected.issubset(self.columns)
+
+
 # -------------------------------------------------------------------------------------
 # Tests: Unit como dimension analitica
 # -------------------------------------------------------------------------------------

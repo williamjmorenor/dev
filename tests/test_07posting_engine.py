@@ -80,7 +80,6 @@ def test_post_sales_invoice_creates_balanced_gl_entries(app_ctx):
         active=True,
         enabled=True,
         classification="asset",
-        account_type="receivable",
     )
     income_account = Accounts(
         entity="cacao",
@@ -157,7 +156,6 @@ def test_post_comprobante_contable_creates_balanced_gl_entries(app_ctx):
         active=True,
         enabled=True,
         classification="asset",
-        account_type="receivable",
     )
     revenue_account = Accounts(
         entity="cacao",

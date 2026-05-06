@@ -88,11 +88,12 @@ def demo_unidades():
 def cargar_catalogo_de_cuentas():
     """Catalogo de cuentas de demostración."""
     from cacao_accounting.contabilidad.ctas import base, cargar_catalogos
+    from cacao_accounting.contabilidad.default_accounts import apply_catalog_default_mapping
 
     log.debug("Cargando catalogos de cuentas.")
-    cargar_catalogos(base, "cacao")
-    cargar_catalogos(base, "dulce")
-    cargar_catalogos(base, "cafe")
+    for company in ("cacao", "dulce", "cafe"):
+        cargar_catalogos(base, company)
+        apply_catalog_default_mapping(company, base.file)
 
     for c in CUENTAS:
         database.session.add(c)

@@ -1043,3 +1043,49 @@ Implementar el plan para completar lo pendiente de `requerimiento.md`: matching 
 - `mypy cacao_accounting` -> Success: no issues found in 64 source files.
 - `pytest -q tests/test_08_reconciliation_reports.py tests/test_07posting_engine.py tests/test_04database_schema.py` -> 230 passed.
 - `pytest -q` -> 305 passed, 4 warnings externas de Flask-Caching/deprecación.
+
+## 2026-05-06 (catálogo base, cuentas predeterminadas y tipos de cuenta)
+
+### Peticion del usuario
+Implementar un catálogo base completo para las cuentas que el sistema requiere, agregar mapping JSON por catálogo predefinido, aplicar ese mapping al crear compañías desde setup, crear CRUD administrativo de cuentas por defecto y aplicar restricción estricta por `account_type`.
+
+### Decisiones de diseño
+- Los tipos de cuenta son strings en inglés sobre `Accounts.account_type`.
+- Una cuenta sin `account_type` explícito permite afectación libre.
+- Una cuenta con tipo especial se valida contra el origen del posting antes de persistir `GLEntry`.
+- Cada catálogo ofrecido por el setup debe tener un JSON compañero con el mismo nombre base; para `base_es.csv` se creó `base_es.json` y para `base_en.csv` se creó `base_en.json`.
+- La cuenta puente de compras sigue nombrada como `bridge`; no se reintroduce GR/IR como nombre funcional.
+
+### Lista de cuentas predeterminadas requeridas
+`default_cash`, `default_bank`, `default_receivable`, `default_payable`, `default_income`, `default_expense`, `default_inventory`, `default_cogs`, `inventory_adjustment_account_id`, `bridge_account_id`, `customer_advance_account_id`, `supplier_advance_account_id`, `bank_difference_account_id`, `default_sales_tax_account_id`, `default_purchase_tax_account_id`, `default_rounding_account_id`, `exchange_gain_account_id`, `exchange_loss_account_id`, `unrealized_exchange_gain_account_id`, `unrealized_exchange_loss_account_id`, `deferred_income_account_id`, `deferred_expense_account_id`, `payment_discount_account_id`, `period_profit_loss_account_id`, `retained_earnings_account_id`.
+
+### Plan implementado
+1. Extender `CompanyDefaultAccount` con todos los campos de cuenta requeridos por el motor actual.
+2. Crear `contabilidad/default_accounts.py` con definiciones, validación de asignaciones, carga de mapping JSON y enforcement de uso por `account_type`.
+3. Actualizar el cargador de catálogos para aceptar cabeceras en inglés y español, incluyendo `account_type` / `tipo_cuenta`.
+4. Actualizar `base_es.csv`: columna `account_type`, cuentas nuevas faltantes, tipos en inglés y eliminación de códigos duplicados.
+5. Crear `base_es.json` con el mapping completo para inicialización automática y `base_en.json` como mapping equivalente para el catálogo inglés.
+6. Cambiar setup para ofrecer únicamente catálogos con JSON compañero y aplicar defaults al finalizar.
+7. Agregar `/settings/default-accounts` con UI en dos columnas y CRUD de configuración por compañía.
+8. Conectar posting a la validación estricta de tipos y a los nuevos defaults para COGS, ajustes de inventario e impuestos por defecto.
+9. Agregar pruebas de catálogo bilingüe, mapping completo, setup, CRUD admin, enforcement manual y fallback de impuestos.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/default_accounts.py`: servicio central para campos requeridos, compatibilidad de tipos, mapping JSON y validación de GL.
+- `cacao_accounting/contabilidad/ctas/catalogos/base_es.csv` y `base_es.json`: catálogo base completo en español y mapping predeterminado. `cacao_accounting/contabilidad/ctas/catalogos/base_en.csv` y `base_en.json`: catálogo base completo en inglés y mapping predeterminado.
+- `cacao_accounting/setup/service.py`: solo ofrece catálogos con mapping y aplica `CompanyDefaultAccount`.
+- `cacao_accounting/admin/__init__.py` y `admin/default_accounts.html`: CRUD de cuentas por defecto.
+- `cacao_accounting/contabilidad/posting.py`: enforcement por `account_type`, COGS/defaults de inventario e impuestos con fallback.
+- `tests/test_04database_schema.py`, `tests/test_07posting_engine.py`, `tests/test_08_reconciliation_reports.py`: cobertura de esquema, enforcement y configuración.
+
+### Verificacion ejecutada
+- `python -m py_compile` sobre archivos tocados -> sin errores.
+- `ruff check` sobre archivos tocados -> passed.
+- `flake8` sobre archivos tocados con `--max-line-length=130` -> passed.
+- `mypy cacao_accounting/contabilidad/default_accounts.py cacao_accounting/setup/service.py cacao_accounting/admin/__init__.py cacao_accounting/contabilidad/posting.py` -> passed.
+- `pytest -q tests/test_08_reconciliation_reports.py tests/test_07posting_engine.py tests/test_04database_schema.py` -> 237 passed, 3 warnings externas/deprecación.
+- `black .` -> 4 archivos reformateados (`default_accounts.py`, `admin/__init__.py`, `run.py`, `wsgi.py`).
+- `ruff check .` -> passed.
+- `flake8 cacao_accounting tests --max-line-length=130` -> passed.
+- `mypy cacao_accounting` -> Success: no issues found in 65 source files.
+- `pytest -q` -> 312 passed, 7 warnings externas/deprecación.

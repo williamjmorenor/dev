@@ -30,6 +30,8 @@ from cacao_accounting.auth.forms import (
 )
 from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.database import (
+    CompanyDefaultAccount,
+    Entity,
     ItemPrice,
     Modules,
     PriceList,
@@ -42,6 +44,15 @@ from cacao_accounting.database import (
     TaxTemplateItem,
     User,
     database,
+)
+from cacao_accounting.contabilidad.default_accounts import (
+    DEFAULT_ACCOUNT_DEFINITIONS,
+    DEFAULT_ACCOUNT_FIELDS,
+    DefaultAccountError,
+    accounts_for_company,
+    default_account_rows,
+    get_company_default_accounts,
+    upsert_company_default_accounts,
 )
 from cacao_accounting.document_flow.status import _
 from cacao_accounting.modulos import listado_modulos, obtener_modulos_disponibles, sincronizar_modulos
@@ -329,6 +340,62 @@ def config_conciliacion_compras():
         configs=configs,
         companies=companies,
         titulo=_("Configuracion de Conciliacion de Compras"),
+    )
+
+
+@admin.route("/settings/default-accounts", methods=["GET", "POST"])
+@login_required
+@modulo_activo("admin")
+def cuentas_predeterminadas():
+    """Administra cuentas contables predeterminadas por compania."""
+
+    _require_system_admin()
+    companies = database.session.execute(database.select(Entity).order_by(Entity.code)).scalars().all()
+    selected_company = request.form.get("company") or request.args.get("company") or (companies[0].code if companies else "")
+
+    if request.method == "POST":
+        action = request.form.get("action") or "save"
+        if not selected_company:
+            flash(_("Debe seleccionar una compania."), "danger")
+            return redirect(url_for("admin.cuentas_predeterminadas"))
+
+        if action == "delete":
+            config = get_company_default_accounts(selected_company)
+            if config:
+                database.session.delete(config)
+                database.session.commit()
+                flash(_("Configuracion de cuentas predeterminadas eliminada correctamente."), "success")
+            return redirect(url_for("admin.cuentas_predeterminadas", company=selected_company))
+
+        values = {field: request.form.get(field) or None for field in DEFAULT_ACCOUNT_FIELDS}
+        try:
+            upsert_company_default_accounts(selected_company, values)
+        except DefaultAccountError as exc:
+            database.session.rollback()
+            flash(_(str(exc)), "danger")
+            return redirect(url_for("admin.cuentas_predeterminadas", company=selected_company))
+        database.session.commit()
+        flash(_("Cuentas predeterminadas guardadas correctamente."), "success")
+        return redirect(url_for("admin.cuentas_predeterminadas", company=selected_company))
+
+    config = get_company_default_accounts(selected_company) if selected_company else None
+    accounts = accounts_for_company(selected_company) if selected_company else []
+    configs = (
+        database.session.execute(database.select(CompanyDefaultAccount).order_by(CompanyDefaultAccount.company))
+        .scalars()
+        .all()
+    )
+
+    return render_template(
+        "admin/default_accounts.html",
+        accounts=accounts,
+        companies=companies,
+        configs=configs,
+        definitions=DEFAULT_ACCOUNT_DEFINITIONS,
+        rows=default_account_rows(config),
+        selected_company=selected_company,
+        config=config,
+        titulo=_("Cuentas por defecto"),
     )
 
 

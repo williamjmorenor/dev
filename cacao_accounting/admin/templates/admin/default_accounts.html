@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block contenido %}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb lh-sm">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> {{ _("Inicio") }}</a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('admin.admin_') }}" class="link-dark">{{ _("Administración") }}</a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">{{ _("Cuentas por defecto") }}</li>
+  </ol>
+</nav>
+
+<div class="ca-page-header">
+  <h4><i class="bi bi-journal-check me-2" style="color:#78BF30"></i>{{ _("Configuración de cuentas") }}</h4>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ _('Cerrar') }}"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-md-4">
+    <label class="form-label fw-semibold" for="company">{{ _("Compañía") }}</label>
+    <select class="form-select" id="company" name="company">
+      {% for company in companies %}
+      <option value="{{ company.code }}" {% if company.code == selected_company %}selected{% endif %}>
+        {{ company.code }} - {{ company.name or company.company_name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-primary" type="submit">
+      <i class="bi bi-arrow-clockwise me-1"></i>{{ _("Actualizar") }}
+    </button>
+  </div>
+</form>
+
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="company" value="{{ selected_company }}">
+
+  <div class="row g-4">
+    {% for row in rows %}
+    <div class="col-lg-6">
+      <label class="form-label" for="{{ row.field }}">{{ _(row.label) }}</label>
+      <select class="form-select" id="{{ row.field }}" name="{{ row.field }}">
+        <option value="">{{ _("Sin configurar") }}</option>
+        {% for account in accounts %}
+        <option value="{{ account.id }}" {% if row.account and row.account.id == account.id %}selected{% endif %}>
+          {{ account.code }} - {{ account.name }}
+        </option>
+        {% endfor %}
+      </select>
+      <div class="form-text">{{ _("Tipos permitidos") }}: {{ row.allowed_account_types | join(", ") }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="d-flex gap-2 mt-4 pt-3 border-top">
+    <button class="btn btn-primary" type="submit" name="action" value="save">
+      <i class="bi bi-floppy me-1"></i>{{ _("Guardar") }}
+    </button>
+    {% if config %}
+    <button class="btn btn-outline-danger" type="submit" name="action" value="delete">
+      <i class="bi bi-trash me-1"></i>{{ _("Eliminar configuración") }}
+    </button>
+    {% endif %}
+  </div>
+</form>
+
+<div class="ca-card mt-4">
+  <div class="ca-card-header">
+    <h6 class="ca-card-title mb-0"><i class="bi bi-list-ul me-1"></i>{{ _("Compañías configuradas") }}</h6>
+  </div>
+  <div class="p-2">
+    {% if configs %}
+    <table class="ca-table">
+      <caption style="display:none;">{{ _("Listado de cuentas predeterminadas") }}</caption>
+      <thead>
+        <tr>
+          <th>{{ _("Compañía") }}</th>
+          <th>{{ _("Cuentas configuradas") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cfg in configs %}
+        <tr>
+          <td><a href="{{ url_for('admin.cuentas_predeterminadas', company=cfg.company) }}">{{ cfg.company }}</a></td>
+          <td>{{ definitions | length }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="p-3 text-muted text-center">{{ _("No hay configuraciones de cuentas predeterminadas.") }}</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

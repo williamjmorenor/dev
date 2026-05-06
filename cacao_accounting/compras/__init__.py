@@ -480,7 +480,7 @@ def compras_reconciliation_panel():
     titulo = _("Panel de Conciliacion de Compras") + " - " + APPNAME
     return render_template(
         "compras/purchase_reconciliation_panel.html",
-        groups=list(groups.values()),
+        groups=groups,
         company=company,
         titulo=titulo,
     )

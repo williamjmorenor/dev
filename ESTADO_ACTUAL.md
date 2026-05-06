@@ -1,6 +1,6 @@
 # ESTADO ACTUAL DEL PROYECTO
 
-**Fecha de análisis:** 2026-05-05  
+**Fecha de análisis:** 2026-05-06
 **Rama analizada:** `copilot/analyze-modules-and-create-docs`
 
 ---
@@ -63,7 +63,8 @@ El sistema está diseñado con soporte nativo para:
 - Dashboard de administración.
 - Lista y activación/desactivación de módulos del sistema.
 - Administración básica de usuarios, roles, asignación de roles y permisos por módulo.
-- Pendiente: configuración funcional de compañía, cuentas por defecto, workflows y auditoría operativa.
+- CRUD de cuentas por defecto por compañía en `/settings/default-accounts`, con validación de compañía y tipo de cuenta compatible.
+- Pendiente: configuración funcional avanzada de compañía, workflows y auditoría operativa.
 
 ### `contabilidad` — Módulo Contable Central
 Rutas implementadas:
@@ -82,6 +83,7 @@ Rutas implementadas:
 - **Contadores externos (`ExternalCounter`):** lista, nuevo, ajuste con auditoría, log de auditoría.
 - **Sub-blueprint GL:** lista (`/gl/list`) y nuevo (`/gl/new`), sin posting real al GL.
 - **Servicio de posting operativo:** `contabilidad/posting.py` genera `GLEntry` desde facturas, pagos y movimientos de inventario.
+- **Catálogos contables predefinidos:** `contabilidad/ctas/catalogos/base_es.csv` incluye `account_type` en inglés y las cuentas requeridas por el motor; `base_es.json` mapea las cuentas predeterminadas para inicializar compañías completas. También se creó `contabilidad/ctas/catalogos/base_en.csv` con nombres de cuentas en inglés y su JSON compañero `base_en.json`.
 
 El posting contable actual:
 - Aprueba y contabiliza documentos operativos con `submit_document`.
@@ -89,6 +91,7 @@ El posting contable actual:
 - Es idempotente: rechaza documentos ya contabilizados para evitar duplicar `GLEntry`.
 - Genera entradas por cada `Book` activo de la compañía y valida balance por libro.
 - Usa `PartyAccount`, `ItemAccount` y `CompanyDefaultAccount` para resolver cuentas.
+- Valida `Accounts.account_type` de forma estricta antes de persistir `GLEntry`: cuentas sin tipo explícito permiten afectación libre; cuentas tipadas se restringen al módulo/origen autorizado.
 - Mantiene trazabilidad con `voucher_type`, `voucher_id`, `document_no`, `naming_series_id`, tercero y período.
 
 Pendiente en contabilidad:
@@ -96,6 +99,7 @@ Pendiente en contabilidad:
 - No hay reportes financieros construidos sobre `GLEntry`.
 - Dimensiones adicionales y reglas diferenciales entre libros aún no están conectadas al posting.
 - Impuestos/cargos ya tienen configuración admin, cálculo de plantilla y posting GL básico en facturas de compra/venta.
+- `CompanyDefaultAccount` cubre efectivo, bancos, AR, AP, ingresos, gastos, inventario, COGS, ajustes de inventario, cuenta puente de compras, anticipos, diferencias bancarias, impuestos, redondeo, diferencias cambiarias, diferidos, descuentos de pago, resultado del período y resultados acumulados.
 
 Modelos en DB disponibles (implementados pero sin UI completa):  
 `GLEntry`, `ComprobanteContable`, `ComprobanteContableDetalle`, `GLEntryDimension`, `DimensionType`, `DimensionValue`, `LedgerMappingRule`, `ExchangeRevaluation`, `ExchangeRevaluationItem`, `PeriodCloseRun`, `PeriodCloseCheck`, `ItemAccount`, `PartyAccount`, `CompanyDefaultAccount`, `Tax`, `TaxTemplate`, `TaxTemplateItem`, `AccountBalanceSnapshot`.

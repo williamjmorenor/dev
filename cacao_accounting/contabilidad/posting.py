@@ -40,6 +40,7 @@ from cacao_accounting.database import (
     StockValuationLayer,
     database,
 )
+from cacao_accounting.contabilidad.default_accounts import DefaultAccountError, validate_gl_account_usage
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, validate_accounting_period
 from cacao_accounting.tax_pricing_service import TaxCalculationResult, calculate_taxes
 
@@ -200,6 +201,8 @@ def _resolve_item_account_id(item_code: str | None, company: str, account_type: 
         "income": defaults.default_income,
         "expense": defaults.default_expense,
         "inventory": defaults.default_inventory,
+        "cogs": defaults.default_cogs or defaults.default_expense,
+        "inventory_adjustment": defaults.inventory_adjustment_account_id or defaults.default_expense,
         "bridge": defaults.bridge_account_id,
     }.get(account_type)
 
@@ -336,6 +339,11 @@ def _add_entries(entries: list[GLEntry]) -> list[GLEntry]:
     if not entries:
         return []
     _assert_entries_balance(entries)
+    for entry in entries:
+        try:
+            validate_gl_account_usage(entry.account_id, entry.voucher_type)
+        except DefaultAccountError as exc:
+            raise PostingError(str(exc)) from exc
     database.session.add_all(entries)
     return entries
 
@@ -437,7 +445,11 @@ def _append_sales_tax_entries(
     for tax_line in tax_result.lines:
         if tax_line.is_inclusive or tax_line.amount == 0:
             continue
-        account_id = _require_account(tax_line.account_id, "Falta la cuenta contable de impuesto de venta.")
+        defaults = _company_defaults(_company_for(document))
+        account_id = _require_account(
+            tax_line.account_id or (defaults.default_sales_tax_account_id if defaults else None),
+            "Falta la cuenta contable de impuesto de venta.",
+        )
         amount = _signed_amount(document, tax_line.amount)
         if tax_line.behavior == "deductive":
             entries.append(
@@ -473,7 +485,11 @@ def _append_purchase_tax_entries(
     for tax_line in tax_result.lines:
         if tax_line.is_inclusive or tax_line.amount == 0:
             continue
-        account_id = _require_account(tax_line.account_id, "Falta la cuenta contable de impuesto de compra.")
+        defaults = _company_defaults(_company_for(document))
+        account_id = _require_account(
+            tax_line.account_id or (defaults.default_purchase_tax_account_id if defaults else None),
+            "Falta la cuenta contable de impuesto de compra.",
+        )
         amount = _signed_amount(document, tax_line.amount)
         if tax_line.behavior == "deductive":
             entries.append(
@@ -1496,8 +1512,8 @@ def post_delivery_note(document: DeliveryNote, ledger_code: str | None = None) -
                 "Falta la cuenta de inventario para una linea de nota de entrega.",
             )
             expense_account_id = _require_account(
-                _account_id_for_item(line, company, "expense"),
-                "Falta la cuenta de gasto para una linea de nota de entrega.",
+                _account_id_for_item(line, company, "cogs"),
+                "Falta la cuenta de costo de ventas para una linea de nota de entrega.",
             )
             entries.extend(
                 _normal_entries_for_amount(
@@ -1581,7 +1597,7 @@ def post_stock_entry(document: StockEntry, ledger_code: str | None = None) -> li
                 _account_id_for_item(line, company, "inventory"),
                 "Falta la cuenta de inventario para la linea de stock.",
             )
-            offset_type = "bridge" if purpose in ("material_receipt", "adjustment_positive") else "expense"
+            offset_type = "bridge" if purpose == "material_receipt" else "inventory_adjustment"
             offset_account_id = _require_account(
                 _account_id_for_item(line, company, offset_type),
                 "Falta la cuenta de contrapartida para la linea de stock.",

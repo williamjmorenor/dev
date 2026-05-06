@@ -1721,11 +1721,25 @@ class CompanyDefaultAccount(database.Model, BaseTabla):  # type: ignore[name-def
     default_income = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
     default_expense = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
     default_inventory = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    default_cogs = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    inventory_adjustment_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
     # Cuenta puente para conciliacion de recepciones con facturas de compra
     bridge_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
     customer_advance_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
     supplier_advance_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
     bank_difference_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    default_sales_tax_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    default_purchase_tax_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    default_rounding_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    exchange_gain_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    exchange_loss_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    unrealized_exchange_gain_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    unrealized_exchange_loss_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    deferred_income_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    deferred_expense_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    payment_discount_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    period_profit_loss_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
+    retained_earnings_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
 
 
 # <---------------------------------------------------------------------------------------------> #
