@@ -263,15 +263,15 @@ class TestSchemaTableCreation(unittest.TestCase):
     def test_item_price_table_exists(self):
         self.assertIn("item_price", self.tables)
 
-    # Reconciliation & GR/IR
+    # Reconciliation & Conciliacion de Compras
     def test_reconciliation_table_exists(self):
         self.assertIn("reconciliation", self.tables)
 
     def test_reconciliation_item_table_exists(self):
         self.assertIn("reconciliation_item", self.tables)
 
-    def test_gr_ir_reconciliation_table_exists(self):
-        self.assertIn("gr_ir_reconciliation", self.tables)
+    def test_purchase_reconciliation_table_exists(self):
+        self.assertIn("purchase_reconciliation", self.tables)
 
     # Multi-Ledger
     def test_ledger_mapping_rule_table_exists(self):
@@ -1175,8 +1175,8 @@ def test_all_domain_models_importable():
         # Reconciliation
         Reconciliation,
         ReconciliationItem,
-        # GR/IR
-        GRIRReconciliation,
+        # Conciliacion de Compras
+        PurchaseReconciliation,
         # Multi-ledger
         LedgerMappingRule,
         # Revaluation & Period Close

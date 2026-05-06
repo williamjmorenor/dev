@@ -27,7 +27,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Al hacer submit, generar `GLEntry` por cada libro activo:
   - Débito: gasto, inventario o impuesto acreditable según tipo de ítem.
   - Crédito: Cuentas por pagar (AP) — `PartyAccount` del proveedor.
-  - Si hay recepción previa: descarga cuenta GI/IR.
+  - Si hay recepción previa: descarga cuenta puente de conciliación de compras.
 - [ ] Separar impuestos acreditables en cuentas fiscales.
 - [ ] Calcular `outstanding_amount` inicial de forma centralizada al submit.
 - [x] Soportar multimoneda cuando el documento trae moneda/tasa.
@@ -46,7 +46,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 
 ### 1.4 Contabilización de Nota de Entrega / Recepción de Mercancía (Inventario)
 - [x] Al hacer submit de `DeliveryNote`: generar `StockLedgerEntry` (salida) + `GLEntry` de COGS.
-- [x] Al hacer submit de `PurchaseReceipt`: generar `StockLedgerEntry` (entrada) + `GLEntry` GI/IR.
+- [x] Al hacer submit de `PurchaseReceipt`: generar `StockLedgerEntry` (entrada) + `GLEntry` contra cuenta puente de conciliación de compras.
 - [x] Actualizar `StockBin` (saldo actual) tras cada movimiento.
 - [x] Registrar `StockValuationLayer` con costo según método (FIFO / Moving Average).
 - [x] Validar reversión de notas de entrega y recepciones con `is_return` y reversos append-only.
@@ -201,15 +201,22 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 
 ---
 
-## 🟡 BLOQUE 6 — GI/IR (Goods Receipt / Invoice Receipt)
+## 🟡 BLOQUE 6 — Conciliación de Compras
 
-- [x] Definir cuenta GI/IR por compañía en `CompanyDefaultAccount`.
-- [x] Al submit de `StockEntry` material_receipt: acreditar GI/IR.
-- [x] Al submit directo de `PurchaseReceipt`: acreditar GI/IR (no AP).
-- [x] Al submit de `PurchaseInvoice` con recepción previa: debitar GI/IR, acreditar AP.
-- [x] Implementar UI y servicio de `GRIRReconciliation` por líneas.
-- [x] Reporte de GI/IR pendiente de reconciliar por proveedor/ítem/documento.
-- [ ] Definir cuenta de ajuste y flujo contable para diferencias de precio GR/IR.
+- [x] Definir cuenta puente configurable por compañía en `CompanyDefaultAccount`.
+- [x] Al submit de `StockEntry` material_receipt: acreditar cuenta puente cuando el flujo contable la requiere.
+- [x] Al submit directo de `PurchaseReceipt`: acreditar cuenta puente (no AP).
+- [x] Al submit de `PurchaseInvoice` con recepción previa: debitar cuenta puente, acreditar AP.
+- [x] Implementar UI y servicio de `PurchaseReconciliation` por líneas.
+- [x] Soportar matching 3-way con recepción y factura.
+- [x] Soportar matching 2-way con orden de compra y factura sin recepción, sin reutilizar referencias de recepción.
+- [x] Evaluar matching por agregados de producto/UOM antes de crear detalles de conciliación.
+- [x] Registrar disputas (`MATCH_FAILED`) sin consumir cantidades disponibles.
+- [x] Auto-conciliar facturas PO-only desde posting cuando la compañía está configurada en 2-way.
+- [x] Cancelar conciliaciones 2-way y 3-way al anular la factura, liberando cantidades.
+- [x] Permitir posting operativo de recepción sin cuenta puente cuando `bridge_account_required=False`.
+- [x] Reporte de conciliación de compras pendiente por proveedor/ítem/documento.
+- [ ] Definir cuenta de ajuste y flujo contable para diferencias de precio conciliación de compras.
 
 ---
 

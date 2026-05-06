@@ -44,6 +44,7 @@ from cacao_accounting.database.helpers import (
     entidades_creadas,
     obtener_id_modulo_por_nombre,
 )
+from cacao_accounting.document_flow.status import _
 from cacao_accounting.exceptions.mensajes import ERROR2
 from cacao_accounting.inventario import inventario
 from cacao_accounting.modulos import (
@@ -137,6 +138,7 @@ def actualiza_variables_globales_jinja(app: Flask | None = None) -> None:
             app.jinja_env.lstrip_blocks = True
             app.jinja_env.globals.update(validar_modulo_activo=validar_modulo_activo)
             app.jinja_env.globals.update(permisos=Permisos)
+            app.jinja_env.globals.update(_=_)
             app.jinja_env.globals.update(MODO_ESCRITORIO=MODO_ESCRITORIO)
             app.jinja_env.globals.update(TESTING=TESTING_MODE)
             # En las plantillas no se utiliza el termino permiso para evitar un conflicto de nombre

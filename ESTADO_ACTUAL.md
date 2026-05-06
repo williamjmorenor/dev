@@ -42,7 +42,7 @@ El sistema está diseñado con soporte nativo para:
 | Flujo documental | `cacao_accounting/document_flow/` | Trazabilidad entre documentos |
 | Identificadores | `cacao_accounting/document_identifiers.py` | Series y numeración automática |
 | Posting contable | `cacao_accounting/contabilidad/posting.py` | Servicio de contabilización GL, AR/AP, bancos e inventario |
-| Conciliación GR/IR | `cacao_accounting/compras/gr_ir_service.py` | Servicio de matching por líneas entre recepciones y facturas |
+| Conciliación de Compras | `cacao_accounting/compras/purchase_reconciliation_service.py` | Motor de matching 2-way/3-way, eventos económicos, tolerancias configurables por compañía y panel operativo |
 | Conciliación bancaria | `cacao_accounting/bancos/reconciliation_service.py` | Servicio de matching parcial contra pagos y GL |
 | Reportes operativos | `cacao_accounting/reportes/` | Subledger, aging, Kardex y reconciliaciones |
 | Datos demo | `cacao_accounting/datos/` | Datos de carga inicial y desarrollo |
@@ -108,15 +108,18 @@ Rutas implementadas con CRUD + submit/cancel:
 - **Cotización de Proveedor (`SupplierQuotation`):** lista, nueva, ver.
 - **Comparativo de Ofertas:** lista y vista por RFQ.
 - **Orden de Compra (`PurchaseOrder`):** lista, nuevo, ver, submit, cancel.
-- **Recepción de Mercancía (`PurchaseReceipt`):** lista, nueva, ver, submit, cancel. El submit ahora genera `StockLedgerEntry` y GL hacia GR/IR, y el cancelado usa reversos append-only de stock y GL.
+- **Recepción de Mercancía (`PurchaseReceipt`):** lista, nueva, ver, submit, cancel. El submit ahora genera `StockLedgerEntry` y GL hacia cuenta puente / conciliación de compras, y el cancelado usa reversos append-only de stock y GL.
 - **Factura de Proveedor (`PurchaseInvoice`):** lista, nueva, ver, submit, cancel.
 - **Nota de Débito / Nota de Crédito / Devolución:** listas existentes; creación no implementada.
-- **GR/IR por líneas:** servicio y vista `/buying/gr-ir` para saldos pendientes por ítem/bodega/UOM; las facturas contra recepción crean detalle en `GRIRReconciliationItem`.
+- **Cuenta puente / conciliación de compras por líneas:** servicio y vista `/buying/purchase-reconciliation` para saldos pendientes por ítem/bodega/UOM; las facturas contra recepción usan líneas de recepción y las facturas 2-way contra OC usan líneas de orden sin mezclar referencias. El matching se evalúa por agregados de producto/UOM y las disputas no consumen cantidades disponibles.
+- **Panel de conciliación de compras:** vista `/buying/purchase-reconciliation/panel` agrupada por orden de compra, con contadores de recepciones/facturas y badges de estado.
 - **Impuestos/cargos:** `PurchaseInvoice` puede usar `TaxTemplate`; el posting genera GL de impuestos/cargos aditivos o deductivos.
 - **Flujo documental:** integrado con `document_flow` y `document_identifiers` para relaciones y numeración.
 - **Posting:** al aprobar factura de compra se genera GL por libro activo:
   - AP por proveedor (`party_type="supplier"`).
-  - Gasto directo o GR/IR cuando la factura viene de recepción.
+  - Gasto directo o cuenta puente / conciliación de compras cuando la factura viene de recepción.
+  - Auto-conciliación configurable al aprobar facturas con recepción (3-way) o con orden de compra sin recepción (2-way).
+  - La cuenta puente es configurable: si `bridge_account_required=False`, el flujo operativo de recepción mantiene stock ledger y eventos sin bloquear por falta de cuenta puente.
   - Impuestos/cargos desde plantilla.
   - Reverso contable al cancelar.
 
@@ -159,8 +162,8 @@ Rutas implementadas:
 - **Entrada de Almacén (`StockEntry`):** lista, nueva, ver, submit, cancel. Soporta material_receipt, material_issue, material_transfer, stock_adjustment, stock_reconciliation, adjustment_positive y adjustment_negative.
 - **Filtros por tipo:** rutas diferenciadas para recibo de material, emisión y transferencia.
 - **Stock Ledger:** al aprobar `StockEntry` se genera `StockLedgerEntry`, se actualiza `StockBin` y se crea `StockValuationLayer`.
-- **Posting GL de inventario:** material receipt genera Inventario vs GR/IR; material issue genera gasto/costo vs Inventario; transferencias generan stock ledger sin GL.
-- **Recepción/Entrega directa:** el submit de `PurchaseReceipt` y `DeliveryNote` ahora genera `StockLedgerEntry` y GL de forma directa (GR/IR y COGS respectivamente), y el cancelado guarda reversos append-only en stock y GL.
+- **Posting GL de inventario:** material receipt genera Inventario vs cuenta puente / conciliación de compras; material issue genera gasto/costo vs Inventario; transferencias generan stock ledger sin GL.
+- **Recepción/Entrega directa:** el submit de `PurchaseReceipt` y `DeliveryNote` ahora genera `StockLedgerEntry` y GL de forma directa (cuenta puente / conciliación de compras y COGS respectivamente), y el cancelado guarda reversos append-only en stock y GL.
 - **Servicios de inventario:** conversión UOM por ítem, validación obligatoria de lote/serial, actualización de seriales y reconstrucción de `StockBin` desde `StockLedgerEntry`.
 
 Modelos en DB disponibles pero sin funcionalidad completa:  
@@ -249,7 +252,7 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 
 | Archivo | Problema |
 |---|---|
-| `cacao_accounting/database/__init__.py` | Modelos `PeriodCloseRun`, `ExchangeRevaluation`, `GRIRReconciliation`, `Comment`, `Assignment`, `Workflow*`, `File` no tienen UI ni servicio conectado. |
+| `cacao_accounting/database/__init__.py` | Modelos `PeriodCloseRun`, `ExchangeRevaluation`, `PurchaseReconciliation`, `Comment`, `Assignment`, `Workflow*`, `File` no tienen UI ni servicio conectado. |
 | `cacao_accounting/contabilidad/auxiliares.py` | Funciones auxiliares que pueden requerir actualización al implementar posting real. |
 | `cacao_accounting/datos/dev/data.py` | Datos demo pueden no reflejar el estado más reciente del esquema. |
 

@@ -488,10 +488,10 @@ def test_cancel_purchase_receipt_reverts_stock_and_gl(app_ctx):
         classification="asset",
         account_type="inventory",
     )
-    gr_ir_account = Accounts(
+    bridge_account = Accounts(
         entity="cacao",
-        code="GRIR-PR",
-        name="GR/IR PR",
+        code="BRIDGE-PR",
+        name="Cuenta Puente PR",
         active=True,
         enabled=True,
         classification="liability",
@@ -500,12 +500,14 @@ def test_cancel_purchase_receipt_reverts_stock_and_gl(app_ctx):
     uom = UOM(code="EA", name="Each")
     item = Item(code="ITEM-PR", name="Item PR", item_type="goods", is_stock_item=True, default_uom="EA")
     warehouse = Warehouse(code="WH-PR", name="Bodega PR", company="cacao")
-    database.session.add_all([inventory_account, gr_ir_account, uom, item, warehouse])
+    database.session.add_all([inventory_account, bridge_account, uom, item, warehouse])
     database.session.flush()
     database.session.add_all(
         [
             ItemAccount(item_code="ITEM-PR", company="cacao", inventory_account_id=inventory_account.id),
-            CompanyDefaultAccount(company="cacao", gr_ir_account_id=gr_ir_account.id, default_inventory=inventory_account.id),
+            CompanyDefaultAccount(
+                company="cacao", bridge_account_id=bridge_account.id, default_inventory=inventory_account.id
+            ),
             PartyAccount(party_id="SUPP-PR", company="cacao", payable_account_id=None),
         ]
     )
@@ -780,12 +782,12 @@ def test_delivery_note_without_stock_rejects_posting(app_ctx):
     assert stock_entries == []
 
 
-def test_purchase_invoice_with_receipt_records_gr_ir_reconciliation(app_ctx):
+def test_purchase_invoice_with_receipt_records_purchase_reconciliation(app_ctx):
     from cacao_accounting.contabilidad.posting import post_document_to_gl
     from cacao_accounting.database import (
         Accounts,
         CompanyDefaultAccount,
-        GRIRReconciliation,
+        PurchaseReconciliation,
         GLEntry,
         Item,
         ItemAccount,
@@ -808,10 +810,10 @@ def test_purchase_invoice_with_receipt_records_gr_ir_reconciliation(app_ctx):
         classification="asset",
         account_type="inventory",
     )
-    gr_ir_account = Accounts(
+    bridge_account = Accounts(
         entity="cacao",
-        code="GRIR-GR",
-        name="GR/IR GR",
+        code="BRIDGE-GR",
+        name="Cuenta Puente GR",
         active=True,
         enabled=True,
         classification="liability",
@@ -829,12 +831,12 @@ def test_purchase_invoice_with_receipt_records_gr_ir_reconciliation(app_ctx):
     uom = UOM(code="EA", name="Each")
     item = Item(code="ITEM-GR", name="Item GR", item_type="goods", is_stock_item=True, default_uom="EA")
     warehouse = Warehouse(code="WH-GR", name="Bodega GR", company="cacao")
-    database.session.add_all([inventory_account, gr_ir_account, payable_account, uom, item, warehouse])
+    database.session.add_all([inventory_account, bridge_account, payable_account, uom, item, warehouse])
     database.session.flush()
     database.session.add_all(
         [
             ItemAccount(item_code="ITEM-GR", company="cacao", inventory_account_id=inventory_account.id),
-            CompanyDefaultAccount(company="cacao", gr_ir_account_id=gr_ir_account.id),
+            CompanyDefaultAccount(company="cacao", bridge_account_id=bridge_account.id),
             PartyAccount(party_id="SUPP-GR", company="cacao", payable_account_id=payable_account.id),
         ]
     )
@@ -893,7 +895,9 @@ def test_purchase_invoice_with_receipt_records_gr_ir_reconciliation(app_ctx):
     database.session.commit()
 
     reconciliation = (
-        database.session.execute(database.select(GRIRReconciliation).filter_by(purchase_invoice_id=invoice.id)).scalars().one()
+        database.session.execute(database.select(PurchaseReconciliation).filter_by(purchase_invoice_id=invoice.id))
+        .scalars()
+        .one()
     )
     entries = (
         database.session.execute(database.select(GLEntry).filter_by(voucher_type="purchase_invoice", voucher_id=invoice.id))
@@ -903,11 +907,11 @@ def test_purchase_invoice_with_receipt_records_gr_ir_reconciliation(app_ctx):
 
     assert reconciliation.matched_amount == Decimal("100.00")
     assert sum(entry.debit for entry in entries) == sum(entry.credit for entry in entries)
-    assert any(entry.account_id == gr_ir_account.id and entry.debit == Decimal("100.00") for entry in entries)
+    assert any(entry.account_id == bridge_account.id and entry.debit == Decimal("100.00") for entry in entries)
     assert any(entry.account_id == payable_account.id and entry.credit == Decimal("100.00") for entry in entries)
 
 
-def test_purchase_invoice_with_unposted_receipt_rejects_gr_ir(app_ctx):
+def test_purchase_invoice_with_unposted_receipt_rejects_unposted(app_ctx):
     from cacao_accounting.contabilidad.posting import PostingError, post_document_to_gl
     from cacao_accounting.database import (
         Accounts,
@@ -924,10 +928,10 @@ def test_purchase_invoice_with_unposted_receipt_rejects_gr_ir(app_ctx):
         database,
     )
 
-    gr_ir_account = Accounts(
+    bridge_account = Accounts(
         entity="cacao",
-        code="GRIR-UP",
-        name="GR/IR sin postear",
+        code="BRIDGE-UP",
+        name="Cuenta Puente sin postear",
         active=True,
         enabled=True,
         classification="liability",
@@ -953,7 +957,7 @@ def test_purchase_invoice_with_unposted_receipt_rejects_gr_ir(app_ctx):
     )
     database.session.add_all(
         [
-            gr_ir_account,
+            bridge_account,
             payable_account,
             inventory_account,
             UOM(code="EA-UP", name="Each UP"),
@@ -964,7 +968,7 @@ def test_purchase_invoice_with_unposted_receipt_rejects_gr_ir(app_ctx):
     database.session.flush()
     database.session.add_all(
         [
-            CompanyDefaultAccount(company="cacao", gr_ir_account_id=gr_ir_account.id),
+            CompanyDefaultAccount(company="cacao", bridge_account_id=bridge_account.id),
             ItemAccount(item_code="ITEM-UP", company="cacao", inventory_account_id=inventory_account.id),
             PartyAccount(party_id="SUPP-UP", company="cacao", payable_account_id=payable_account.id),
         ]
@@ -1418,10 +1422,10 @@ def test_post_stock_entry_creates_stock_ledger_bin_valuation_and_gl(app_ctx):
         classification="asset",
         account_type="inventory",
     )
-    gr_ir_account = Accounts(
+    bridge_account = Accounts(
         entity="cacao",
-        code="GRIR-ST",
-        name="GR IR",
+        code="BRIDGE-ST",
+        name="Cuenta Puente Compras",
         active=True,
         enabled=True,
         classification="liability",
@@ -1430,12 +1434,12 @@ def test_post_stock_entry_creates_stock_ledger_bin_valuation_and_gl(app_ctx):
     uom = UOM(code="UND", name="Unidad")
     item = Item(code="ITEM-ST", name="Item stock", item_type="goods", is_stock_item=True, default_uom="UND")
     warehouse = Warehouse(code="WH-ST", name="Bodega stock", company="cacao")
-    database.session.add_all([inventory_account, gr_ir_account, uom, item, warehouse])
+    database.session.add_all([inventory_account, bridge_account, uom, item, warehouse])
     database.session.flush()
     database.session.add_all(
         [
             ItemAccount(item_code="ITEM-ST", company="cacao", inventory_account_id=inventory_account.id),
-            CompanyDefaultAccount(company="cacao", gr_ir_account_id=gr_ir_account.id),
+            CompanyDefaultAccount(company="cacao", bridge_account_id=bridge_account.id),
         ]
     )
     entry = StockEntry(

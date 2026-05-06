@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from cacao_accounting.compras.gr_ir_service import get_gr_ir_pending
+from cacao_accounting.compras.purchase_reconciliation_service import get_purchase_reconciliation_pending
 from cacao_accounting.database import (
     Batch,
     GLEntry,
@@ -262,7 +262,7 @@ def get_kardex(filters: KardexFilters) -> PaginatedReport:
 
 
 def get_reconciliation_report(company: str, as_of_date: date | None = None) -> PaginatedReport:
-    """Devuelve reconciliaciones bancarias y GR/IR pendientes."""
+    """Devuelve reconciliaciones bancarias y conciliaciones de compras pendientes."""
 
     query = (
         select(Reconciliation, ReconciliationItem)
@@ -292,14 +292,14 @@ def get_reconciliation_report(company: str, as_of_date: date | None = None) -> P
         for reconciliation, item in database.session.execute(query).all()
     ]
     bank_total = sum((_decimal_value(row.values["amount"]) for row in rows), Decimal("0"))
-    gr_ir_pending = get_gr_ir_pending(company=company, as_of_date=as_of_date)
-    for pending in gr_ir_pending:
+    purchase_pending = get_purchase_reconciliation_pending(company=company, as_of_date=as_of_date)
+    for pending in purchase_pending:
         rows.append(
             ReportRow(
                 values={
                     "reconciliation_id": pending.purchase_receipt_id,
                     "recon_date": as_of_date,
-                    "recon_type": "gr_ir",
+                    "recon_type": "purchase_reconciliation",
                     "source_type": "purchase_receipt_item",
                     "source_id": pending.purchase_receipt_item_id,
                     "target_type": None,
@@ -313,7 +313,7 @@ def get_reconciliation_report(company: str, as_of_date: date | None = None) -> P
         rows=rows,
         totals={
             "bank_reconciled_amount": bank_total,
-            "gr_ir_pending_amount": sum((row.pending_amount for row in gr_ir_pending), Decimal("0")),
+            "purchase_pending_amount": sum((row.pending_amount for row in purchase_pending), Decimal("0")),
         },
     )
 

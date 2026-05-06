@@ -200,7 +200,7 @@ def _resolve_item_account_id(item_code: str | None, company: str, account_type: 
         "income": defaults.default_income,
         "expense": defaults.default_expense,
         "inventory": defaults.default_inventory,
-        "gr_ir": defaults.gr_ir_account_id,
+        "bridge": defaults.bridge_account_id,
     }.get(account_type)
 
 
@@ -593,8 +593,8 @@ def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = N
     tax_result = _tax_result_for_document(document, items)
     item_amount_total = _invoice_items_total(items, document)
     amount_total = item_amount_total + _signed_tax_delta(document, tax_result)
-    if getattr(document, "purchase_receipt_id", None):
-        _record_gr_ir_reconciliation(document, abs(item_amount_total))
+    if getattr(document, "purchase_receipt_id", None) or getattr(document, "purchase_order_id", None):
+        _record_purchase_reconciliation(document, abs(item_amount_total))
 
     entries: list[GLEntry] = []
     for context in _document_contexts(document, ledger_code=ledger_code):
@@ -602,10 +602,10 @@ def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = N
             amount = _signed_amount(document, _decimal_value(getattr(item, "amount", None)))
             if amount == 0:
                 continue
-            debit_account_type = "gr_ir" if getattr(document, "purchase_receipt_id", None) else "expense"
+            debit_account_type = "bridge" if getattr(document, "purchase_receipt_id", None) else "expense"
             debit_account_id = _require_account(
                 _account_id_for_item(item, company, debit_account_type),
-                "Falta la cuenta de gasto o GR/IR para una linea de factura de compra.",
+                "Falta la cuenta de gasto o cuenta puente para una linea de factura de compra.",
             )
             if amount > 0:
                 entries.append(
@@ -655,7 +655,24 @@ def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = N
                 )
             )
 
-    return _add_entries(entries)
+    result = _add_entries(entries)
+
+    from cacao_accounting.compras.purchase_reconciliation_service import EventType, emit_economic_event
+
+    emit_economic_event(
+        event_type=EventType.INVOICE_RECEIVED,
+        company=company,
+        document_type="purchase_invoice",
+        document_id=document.id,
+        payload={
+            "supplier_id": str(document.supplier_id),
+            "posting_date": str(document.posting_date),
+            "purchase_order_id": str(document.purchase_order_id) if document.purchase_order_id else None,
+            "purchase_receipt_id": str(document.purchase_receipt_id) if document.purchase_receipt_id else None,
+        },
+    )
+
+    return result
 
 
 def post_payment_entry(document: PaymentEntry, ledger_code: str | None = None) -> list[GLEntry]:
@@ -1318,25 +1335,34 @@ def _receipt_total(document: PurchaseReceipt) -> Decimal:
     return total
 
 
-def _record_gr_ir_reconciliation(document: PurchaseInvoice, matched_amount: Decimal) -> None:
-    from cacao_accounting.compras.gr_ir_service import GRIRServiceError, reconcile_gr_ir_invoice
+def _record_purchase_reconciliation(document: PurchaseInvoice, matched_amount: Decimal) -> None:
+    from cacao_accounting.compras.purchase_reconciliation_service import (
+        PurchaseReconciliationError,
+        get_matching_config,
+        reconcile_purchase_invoice,
+    )
 
-    if not getattr(document, "purchase_receipt_id", None):
+    _ = matched_amount
+    config = get_matching_config(str(document.company))
+    if not config.auto_reconcile:
         return
 
-    purchase_receipt = database.session.get(PurchaseReceipt, document.purchase_receipt_id)
-    if not purchase_receipt:
-        raise PostingError("La recepción de compra referenciada no existe.")
-    if purchase_receipt.company != document.company:
-        raise PostingError("La factura de compra y la recepción de compra deben pertenecer a la misma compañía.")
-    if getattr(purchase_receipt, "docstatus", 0) != 1:
-        raise PostingError("La recepción de compra referenciada debe estar aprobada.")
-    if not _has_active_gl_entries(purchase_receipt) or not _has_stock_ledger_entries(purchase_receipt):
-        raise PostingError("La recepción de compra referenciada debe estar contabilizada antes de facturarse.")
+    if getattr(document, "purchase_receipt_id", None):
+        purchase_receipt = database.session.get(PurchaseReceipt, document.purchase_receipt_id)
+        if not purchase_receipt:
+            raise PostingError("La recepción de compra referenciada no existe.")
+        if purchase_receipt.company != document.company:
+            raise PostingError("La factura de compra y la recepción de compra deben pertenecer a la misma compañía.")
+        if getattr(purchase_receipt, "docstatus", 0) != 1:
+            raise PostingError("La recepción de compra referenciada debe estar aprobada.")
+        if not _has_active_gl_entries(purchase_receipt) or not _has_stock_ledger_entries(purchase_receipt):
+            raise PostingError("La recepción de compra referenciada debe estar contabilizada antes de facturarse.")
+    elif not getattr(document, "purchase_order_id", None):
+        return
 
     try:
-        reconcile_gr_ir_invoice(document.id)
-    except GRIRServiceError as exc:
+        reconcile_purchase_invoice(document.id)
+    except PurchaseReconciliationError as exc:
         raise PostingError(str(exc)) from exc
 
 
@@ -1394,38 +1420,56 @@ def post_purchase_receipt(document: PurchaseReceipt, ledger_code: str | None = N
         raise PostingError("Solo se puede contabilizar una recepción de compra aprobada.")
 
     company = _company_for(document)
-    gr_ir_account_id = _require_account(
-        _resolve_item_account_id(None, company, "gr_ir"),
-        "Falta la cuenta GR/IR configurada para la compañia.",
-    )
+    from cacao_accounting.compras.purchase_reconciliation_service import get_matching_config
+
+    matching_config = get_matching_config(company)
+    bridge_account_id = _resolve_item_account_id(None, company, "bridge")
+    if matching_config.bridge_account_required:
+        bridge_account_id = _require_account(
+            bridge_account_id,
+            "Falta la cuenta puente configurada para la compañia.",
+        )
     movements = _create_stock_ledger_for_document_type(document, Decimal("1"))
     if not movements:
         raise PostingError("No se generaron movimientos de inventario para esta recepción de compra.")
 
     entries: list[GLEntry] = []
-    for context in _document_contexts(document, ledger_code=ledger_code):
-        for line in _document_items(document):
-            qty = _line_qty_generic(line)
-            rate = _line_rate_generic(line)
-            amount = _decimal_value(getattr(line, "amount", None)) or (qty * rate)
-            value = _signed_amount(document, amount)
-            inventory_account_id = _require_account(
-                _account_id_for_item(line, company, "inventory"),
-                "Falta la cuenta de inventario para una linea de recepcion de compra.",
-            )
-            entries.extend(
-                _normal_entries_for_amount(
-                    context=context,
-                    debit_account_id=inventory_account_id,
-                    credit_account_id=gr_ir_account_id,
-                    amount=value,
-                    party_type="supplier",
-                    party_id=document.supplier_id,
-                    debit_remarks="Recepción de compra",
-                    credit_remarks="GR/IR",
+    if bridge_account_id:
+        for context in _document_contexts(document, ledger_code=ledger_code):
+            for line in _document_items(document):
+                qty = _line_qty_generic(line)
+                rate = _line_rate_generic(line)
+                amount = _decimal_value(getattr(line, "amount", None)) or (qty * rate)
+                value = _signed_amount(document, amount)
+                inventory_account_id = _require_account(
+                    _account_id_for_item(line, company, "inventory"),
+                    "Falta la cuenta de inventario para una linea de recepcion de compra.",
                 )
-            )
-    return _add_entries(entries)
+                entries.extend(
+                    _normal_entries_for_amount(
+                        context=context,
+                        debit_account_id=inventory_account_id,
+                        credit_account_id=bridge_account_id,
+                        amount=value,
+                        party_type="supplier",
+                        party_id=document.supplier_id,
+                        debit_remarks="Recepción de compra",
+                        credit_remarks="Cuenta puente compras",
+                    )
+                )
+    result = _add_entries(entries)
+
+    from cacao_accounting.compras.purchase_reconciliation_service import EventType, emit_economic_event
+
+    emit_economic_event(
+        event_type=EventType.GOODS_RECEIVED,
+        company=company,
+        document_type="purchase_receipt",
+        document_id=document.id,
+        payload={"supplier_id": str(document.supplier_id), "posting_date": str(document.posting_date)},
+    )
+
+    return result
 
 
 def post_delivery_note(document: DeliveryNote, ledger_code: str | None = None) -> list[GLEntry]:
@@ -1537,7 +1581,7 @@ def post_stock_entry(document: StockEntry, ledger_code: str | None = None) -> li
                 _account_id_for_item(line, company, "inventory"),
                 "Falta la cuenta de inventario para la linea de stock.",
             )
-            offset_type = "gr_ir" if purpose in ("material_receipt", "adjustment_positive") else "expense"
+            offset_type = "bridge" if purpose in ("material_receipt", "adjustment_positive") else "expense"
             offset_account_id = _require_account(
                 _account_id_for_item(line, company, offset_type),
                 "Falta la cuenta de contrapartida para la linea de stock.",
@@ -1550,7 +1594,7 @@ def post_stock_entry(document: StockEntry, ledger_code: str | None = None) -> li
                         credit_account_id=offset_account_id,
                         amount=amount,
                         debit_remarks="Ingreso de inventario",
-                        credit_remarks="GR/IR",
+                        credit_remarks="Cuenta puente compras",
                     )
                 )
             else:
@@ -1691,9 +1735,16 @@ def cancel_document(document: Any) -> list[GLEntry]:
             stock_reversals.append(_create_stock_reversal(document, movement))
         database.session.add_all(stock_reversals)
 
-    if isinstance(document, PurchaseInvoice) and getattr(document, "purchase_receipt_id", None):
-        from cacao_accounting.compras.gr_ir_service import cancel_gr_ir_for_invoice
+    if isinstance(document, PurchaseReceipt):
+        from cacao_accounting.compras.purchase_reconciliation_service import emit_goods_received_cancelled
 
-        cancel_gr_ir_for_invoice(document.id)
+        emit_goods_received_cancelled(voucher_id, company)
+
+    if isinstance(document, PurchaseInvoice) and (
+        getattr(document, "purchase_receipt_id", None) or getattr(document, "purchase_order_id", None)
+    ):
+        from cacao_accounting.compras.purchase_reconciliation_service import cancel_purchase_reconciliation
+
+        cancel_purchase_reconciliation(document.id)
 
     return _add_entries(reversals)

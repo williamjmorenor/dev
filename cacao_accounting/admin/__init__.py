@@ -33,6 +33,7 @@ from cacao_accounting.database import (
     ItemPrice,
     Modules,
     PriceList,
+    PurchaseMatchingConfig,
     Roles,
     RolesAccess,
     RolesUser,
@@ -276,6 +277,58 @@ def precios_item():
     )
     return render_template(
         "admin/item_prices.html", item_prices=item_prices, price_lists=price_lists, titulo=_("Precios por Item")
+    )
+
+
+@admin.route("/settings/purchase-reconciliation", methods=["GET", "POST"])
+@login_required
+@modulo_activo("admin")
+def config_conciliacion_compras():
+    """Administra la configuracion de conciliacion de compras por compania."""
+
+    _require_system_admin()
+    from cacao_accounting.database import Entity
+    from cacao_accounting.compras.purchase_reconciliation_service import seed_matching_config_for_company
+
+    companies = database.session.execute(database.select(Entity).order_by(Entity.code)).scalars().all()
+
+    if request.method == "POST":
+        company = request.form.get("company") or ""
+        if not company:
+            flash(_("Debe seleccionar una compania."), "danger")
+            return redirect(url_for("admin.config_conciliacion_compras"))
+
+        config = database.session.execute(
+            database.select(PurchaseMatchingConfig).filter_by(company=company)
+        ).scalar_one_or_none()
+        if config is None:
+            config = seed_matching_config_for_company(company)
+            database.session.flush()
+
+        config.matching_type = request.form.get("matching_type") or "3-way"
+        config.price_tolerance_type = request.form.get("price_tolerance_type") or "percentage"
+        config.price_tolerance_value = _decimal_form("price_tolerance_value")
+        config.qty_tolerance_type = request.form.get("qty_tolerance_type") or "percentage"
+        config.qty_tolerance_value = _decimal_form("qty_tolerance_value")
+        config.require_purchase_order = bool(request.form.get("require_purchase_order"))
+        config.bridge_account_required = bool(request.form.get("bridge_account_required"))
+        config.auto_reconcile = bool(request.form.get("auto_reconcile"))
+        config.allow_price_difference = bool(request.form.get("allow_price_difference"))
+        database.session.commit()
+        flash(_("Configuracion de conciliacion de compras guardada correctamente."), "success")
+        return redirect(url_for("admin.config_conciliacion_compras"))
+
+    configs = (
+        database.session.execute(database.select(PurchaseMatchingConfig).order_by(PurchaseMatchingConfig.company))
+        .scalars()
+        .all()
+    )
+
+    return render_template(
+        "admin/purchase_reconciliation_config.html",
+        configs=configs,
+        companies=companies,
+        titulo=_("Configuracion de Conciliacion de Compras"),
     )
 
 

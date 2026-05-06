@@ -32,10 +32,17 @@ Siempre considera los siguientes controles de calidad:
 - Chequeo estatico con ruff y flake8
 - Pruebas unitarias con pytest
 
+Los tests unitarios se ejecutan con este comando:
+
+CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest  -v -s --exitfirst --slow=True
+
 Crear un archivo SESSIONS.md este archivo debe servir como una bitacora de desarrollo, incluye en orden cronologico
 un resumen de la petición del usuario y un resumen de el plan implementado, analiza el contenido del archivo SESSIONS.md
 como una fuente de contexto y de las desiciones de diseño que se han tomado y para dar continuidad a desarrollo por etapas para
 no tener que planear todo desde cero y tener un continuidad en el desarrollo con un contexto completo de la evolucion del proyecto.
+
+Actualiza siempre los archivos ESTADO_ACTUAL.md y PENDIENTE.md con el resultado de las iteraciones para tener siempre a
+vista el estado del proyecto.
 
 ---
 
