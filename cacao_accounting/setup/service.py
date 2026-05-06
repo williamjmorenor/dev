@@ -7,6 +7,11 @@ from os import listdir
 from os.path import isfile, join
 from typing import Any
 
+from cacao_accounting.contabilidad.default_accounts import (
+    DefaultAccountError,
+    apply_catalog_default_mapping,
+    catalog_has_default_mapping,
+)
 from cacao_accounting.contabilidad.ctas import (
     CatalogoCtas,
     DIRECTORIO_CTAS,
@@ -26,6 +31,15 @@ SETUP_COUNTRY = "SETUP_COUNTRY"
 SETUP_CURRENCY = "SETUP_CURRENCY"
 SETUP_COMPLETED = "SETUP_COMPLETE"
 SETUP_ENTITY = "SETUP_DEFAULT_ENTITY"
+CATALOG_FILE_ALIASES = {
+    "base_es.csv": "Predeterminado - ES",
+    "base_en.csv": "Default - EN",
+}
+
+
+def catalog_display_name(filename: str) -> str:
+    """Devuelve el alias visible de un catalogo o su nombre de archivo."""
+    return CATALOG_FILE_ALIASES.get(filename, filename)
 
 
 def available_catalog_files() -> list[tuple[str, str]]:
@@ -33,8 +47,8 @@ def available_catalog_files() -> list[tuple[str, str]]:
     choices: list[tuple[str, str]] = []
     for filename in sorted(listdir(DIRECTORIO_CTAS), key=str.lower):
         path = join(DIRECTORIO_CTAS, filename)
-        if isfile(path) and filename.lower().endswith(".csv"):
-            choices.append((filename, filename))
+        if isfile(path) and filename.lower().endswith(".csv") and catalog_has_default_mapping(path):
+            choices.append((filename, catalog_display_name(filename)))
     return choices
 
 
@@ -42,7 +56,7 @@ def choose_catalog_file(country: str, idioma: str, catalog_name: str | None = No
     """Selecciona el catálogo contable adecuado según país, idioma y nombre de archivo."""
     if catalog_name:
         catalog_file = join(DIRECTORIO_CTAS, catalog_name)
-        if isfile(catalog_file):
+        if isfile(catalog_file) and catalog_has_default_mapping(catalog_file):
             return CatalogoCtas(file=catalog_file, pais=country, idioma=idioma)
         return None
 
@@ -102,5 +116,9 @@ def finalize_setup(
             catalogo = choose_catalog_file(country, idioma, catalogo_archivo)
             if catalogo:
                 cargar_catalogos(catalogo, entity)
+                try:
+                    apply_catalog_default_mapping(entity.code, catalogo.file)
+                except DefaultAccountError as exc:
+                    raise ValueError(str(exc)) from exc
         save_company_details(company_data)
         mark_setup_complete()

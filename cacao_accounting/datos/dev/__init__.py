@@ -17,15 +17,27 @@
 from cacao_accounting.auth.roles import asigna_rol_a_usuario
 from cacao_accounting.database import database
 from cacao_accounting.datos.dev.data import (
+    ARTICULOS,
+    BANCOS,
     BASE_USUARIOS,
+    BODEGAS,
     CENTROS_DE_COSTOS,
     CUENTAS,
+    DOCUMENTOS,
     ENTIDADES,
+    ITEMS_ENTREGA,
+    ITEMS_FACTURA_COMPRA,
+    ITEMS_FACTURA_VENTA,
+    ITEMS_ORDEN_COMPRA,
+    ITEMS_ORDEN_VENTA,
+    ITEMS_RECEPCION,
     PERIODOS,
     PROYECTOS,
     SERIES,
     TASAS_DE_CAMBIO,
+    TERCEROS,
     UNIDADES,
+    UNIDADES_MEDIDA,
     USUARIO_ROLES,
 )
 from cacao_accounting.logs import log
@@ -76,11 +88,12 @@ def demo_unidades():
 def cargar_catalogo_de_cuentas():
     """Catalogo de cuentas de demostración."""
     from cacao_accounting.contabilidad.ctas import base, cargar_catalogos
+    from cacao_accounting.contabilidad.default_accounts import apply_catalog_default_mapping
 
     log.debug("Cargando catalogos de cuentas.")
-    cargar_catalogos(base, "cacao")
-    cargar_catalogos(base, "dulce")
-    cargar_catalogos(base, "cafe")
+    for company in ("cacao", "dulce", "cafe"):
+        cargar_catalogos(base, company)
+        apply_catalog_default_mapping(company, base.file)
 
     for c in CUENTAS:
         database.session.add(c)
@@ -108,6 +121,41 @@ def tasas_de_cambio():
     database.session.commit()
 
 
+def cargar_bancos():
+    """Bancos de demostración."""
+    for b in BANCOS:
+        database.session.add(b)
+    database.session.commit()
+
+
+def cargar_terceros():
+    """Terceros de demostración."""
+    for t in TERCEROS:
+        database.session.add(t)
+    database.session.commit()
+
+
+def cargar_unidades_medida():
+    """Unidades de medida de demostración."""
+    for u in UNIDADES_MEDIDA:
+        database.session.add(u)
+    database.session.commit()
+
+
+def cargar_articulos():
+    """Articulos de demostración."""
+    for a in ARTICULOS:
+        database.session.add(a)
+    database.session.commit()
+
+
+def cargar_bodegas():
+    """Bodegas de demostración."""
+    for b in BODEGAS:
+        database.session.add(b)
+    database.session.commit()
+
+
 def master_data():
     """Carga datos maestros de desarrollo a la base de datos."""
     log.info("Iniciando carga de master data de pruebas.")
@@ -120,6 +168,11 @@ def master_data():
     cargar_proyectos()
     tasas_de_cambio()
     cargar_catalogo_de_cuentas()
+    cargar_bancos()
+    cargar_terceros()
+    cargar_unidades_medida()
+    cargar_articulos()
+    cargar_bodegas()
 
     log.debug("Master data de prueba creada correctamente.")
 
@@ -134,7 +187,28 @@ def periodo_contable():
 def transacciones():
     """Crea transacciones de desarrollo en la base de datos."""
     periodo_contable()
+    _cargar_documentos_demo()
     log.debug("Transacciones de Pruebas Creadas correctamente.")
+
+
+def _cargar_documentos_demo():
+    """Crea documentos transaccionales de demostración."""
+    for d in DOCUMENTOS:
+        database.session.add(d)
+    database.session.commit()
+    for i in ITEMS_ORDEN_COMPRA:
+        database.session.add(i)
+    for i in ITEMS_ORDEN_VENTA:
+        database.session.add(i)
+    for i in ITEMS_RECEPCION:
+        database.session.add(i)
+    for i in ITEMS_FACTURA_COMPRA:
+        database.session.add(i)
+    for i in ITEMS_ENTREGA:
+        database.session.add(i)
+    for i in ITEMS_FACTURA_VENTA:
+        database.session.add(i)
+    database.session.commit()
 
 
 def dev_data():

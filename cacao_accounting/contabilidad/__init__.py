@@ -10,7 +10,7 @@
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
-from flask import Blueprint, redirect, render_template, request
+from flask import Blueprint, flash, redirect, render_template, request
 from flask.helpers import url_for
 from flask_login import login_required
 
@@ -151,6 +151,11 @@ def nueva_entidad():
         )
 
         database.session.add(ENTIDAD)
+        database.session.flush()
+
+        from cacao_accounting.compras.purchase_reconciliation_service import seed_matching_config_for_company
+
+        seed_matching_config_for_company(ENTIDAD.code)
         database.session.commit()
 
         return LISTA_ENTIDADES
@@ -312,8 +317,14 @@ def unidad(id_unidad):
 @modulo_activo("accounting")
 @login_required
 def eliminar_unidad(id_unidad):
-    """Elimina una entidad de la base de datos."""
-    return redirect("/app")
+    """Elimina una unidad de negocios de la base de datos."""
+    from cacao_accounting.database import Unit
+
+    unidad = database.session.execute(database.select(Unit).filter_by(code=id_unidad)).scalar_one_or_none()
+    if unidad:
+        database.session.delete(unidad)
+        database.session.commit()
+    return redirect(url_for("contabilidad.unidades"))
 
 
 @contabilidad.route("/unit/new", methods=["GET", "POST"])
@@ -323,14 +334,13 @@ def eliminar_unidad(id_unidad):
 def nueva_unidad():
     """Formulario para crear una nueva unidad de negocios."""
     from cacao_accounting.contabilidad.forms import FormularioUnidad
+    from cacao_accounting.database import Unit
 
     formulario = FormularioUnidad()
     formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
-    TITULO = "Crear Nueva Unidad de Negocios - " + APPNAME
+    TITULO = "Crear Nueva Unidad de Negocio - " + APPNAME
     if formulario.validate_on_submit() or request.method == "POST":
-        from cacao_accounting.database import Unidad
-
-        DATA = Unidad(
+        DATA = Unit(
             code=request.form.get("id", None),
             name=request.form.get("nombre", None),
             entity=request.form.get("entidad", None),
@@ -339,7 +349,7 @@ def nueva_unidad():
         database.session.add(DATA)
         database.session.commit()
 
-        return redirect("/unit/list")
+        return redirect(url_for("contabilidad.unidades"))
     return render_template(
         "contabilidad/unidad_crear.html",
         titulo=TITULO,
@@ -390,7 +400,13 @@ def libro(id_unidad):
 @login_required
 def eliminar_libro(id_unidad):
     """Elimina un libro de contabilidad de la base de datos."""
-    return redirect("/app")
+    from cacao_accounting.database import Book
+
+    libro = database.session.execute(database.select(Book).filter_by(code=id_unidad)).scalar_one_or_none()
+    if libro:
+        database.session.delete(libro)
+        database.session.commit()
+    return redirect(url_for("contabilidad.libros"))
 
 
 @contabilidad.route("/book/new", methods=["GET", "POST"])
@@ -400,14 +416,13 @@ def eliminar_libro(id_unidad):
 def nuevo_libro():
     """Formulario para crear un nuevo libro de contabilidad."""
     from cacao_accounting.contabilidad.forms import FormularioLibro
+    from cacao_accounting.database import Book
 
     formulario = FormularioLibro()
     formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
-    TITULO = "Crear Nuevo Libro de Contabilidad- " + APPNAME
+    TITULO = "Crear Nuevo Libro de Contabilidad - " + APPNAME
     if formulario.validate_on_submit() or request.method == "POST":
-        from cacao_accounting.database import Unidad
-
-        DATA = Unidad(
+        DATA = Book(
             code=request.form.get("id", None),
             name=request.form.get("nombre", None),
             entity=request.form.get("entidad", None),
@@ -416,7 +431,7 @@ def nuevo_libro():
         database.session.add(DATA)
         database.session.commit()
 
-        return redirect("/books/list")
+        return redirect(url_for("contabilidad.libros"))
     return render_template(
         "contabilidad/book_crear.html",
         titulo=TITULO,
@@ -589,96 +604,371 @@ def periodo_contable():
 @verifica_acceso("accounting")
 def nuevo_comprobante():
     """Nuevo comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_new"))
 
 
 @contabilidad.route("/journal/<identifier>")
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def ver_comprobante():
-    """Nuevo comprobante contable."""
+def ver_comprobante(identifier: str):
+    """Ver comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_list"))
 
 
 @contabilidad.route("/journal/edit/<identifier>", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def editar_comprobante():
+def editar_comprobante(identifier: str):
     """Editar comprobante contable."""
+    return redirect(url_for("contabilidad.gl.gl_list"))
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
-# Series e Identificadores
+# NamingSeries — CRUD robusto de series de numeracion
+
+# NamingSeries — CRUD robusto de series de numeracion
 
 
-@contabilidad.route("/series", methods=["GET", "POST"])
+@contabilidad.route("/naming-series/list")
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def series():
-    """Series e Identificadores."""
-    from cacao_accounting.database import Serie, database
-    from cacao_accounting.modulos import lista_tipos_documentos
+def naming_series_list():
+    """Lista de series de numeracion (NamingSeries)."""
+    from cacao_accounting.database import NamingSeries, Sequence, SeriesExternalCounterMap, SeriesSequenceMap
 
-    TITULO = "Series e Identificadores - " + APPNAME
+    company_filter = request.args.get("company", type=str)
 
-    if request.args.get("doc", type=str):
-        consulta = consulta = database.paginate(
-            database.select(Serie).filter_by(doc=request.args.get("doc", type=str)),
-            page=request.args.get("page", default=1, type=int),
-            max_per_page=10,
-            count=True,
-        )
+    if company_filter:
+        query = database.select(NamingSeries).filter_by(company=company_filter)
     else:
-        consulta = database.paginate(
-            database.select(Serie),
-            page=request.args.get("page", default=1, type=int),
-            max_per_page=10,
-            count=True,
-        )
+        query = database.select(NamingSeries)
+
+    consulta = database.paginate(
+        query.order_by(NamingSeries.entity_type, NamingSeries.name),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=20,
+        count=True,
+    )
+
+    from cacao_accounting.database import Entity
+
+    entidades = database.session.execute(database.select(Entity)).scalars().all()
+    sequence_rows = database.session.execute(
+        database.select(SeriesSequenceMap.naming_series_id, Sequence)
+        .join(Sequence, SeriesSequenceMap.sequence_id == Sequence.id)
+        .order_by(SeriesSequenceMap.priority.asc())
+    ).all()
+    series_sequences = {series_id: sequence for series_id, sequence in sequence_rows}
+    external_counter_counts = {
+        series_id: count
+        for series_id, count in database.session.execute(
+            database.select(
+                SeriesExternalCounterMap.naming_series_id, database.func.count(SeriesExternalCounterMap.id)
+            ).group_by(SeriesExternalCounterMap.naming_series_id)
+        ).all()
+    }
 
     return render_template(
-        "contabilidad/serie_lista.html",
+        "contabilidad/naming_series_lista.html",
         consulta=consulta,
-        documentos=lista_tipos_documentos(),
-        titulo=TITULO,
+        entidades=entidades,
+        external_counter_counts=external_counter_counts,
+        series_sequences=series_sequences,
+        company_filter=company_filter,
+        titulo="Series de Numeracion - " + APPNAME,
     )
 
 
-@contabilidad.route("/serie/new", methods=["GET", "POST"])
+@contabilidad.route("/naming-series/new", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def nueva_serie():
-    """Nueva Serie."""
-    from cacao_accounting.contabilidad.forms import FormularioSerie
-    from cacao_accounting.database import Entity, Serie, database
+def naming_series_new():
+    """Nueva serie de numeracion."""
+    from cacao_accounting.contabilidad.forms import FormularioNamingSeries
+    from cacao_accounting.database import Entity, NamingSeries, Sequence, SeriesSequenceMap
+    from cacao_accounting.document_identifiers import enforce_single_default_series
 
-    form = FormularioSerie()
+    form = FormularioNamingSeries()
+    entidades = database.session.execute(database.select(Entity)).scalars().all()
+    company_choices = [("", "— Global (sin compania) —")] + [(e.code, e.name) for e in entidades]
+    form.company.choices = company_choices
 
-    CONSULTA_ENTIDADES = database.session.execute(database.select(Entity)).all()
-    LISTA_DE_ENTIDADES = []
+    if form.validate_on_submit():
+        company = form.company.data or None
+        is_default = bool(form.is_default.data)
 
-    for e in CONSULTA_ENTIDADES:
-        LISTA_DE_ENTIDADES.append((e[0].code, e[0].name))
+        if is_default:
+            enforce_single_default_series(
+                entity_type=form.entity_type.data,
+                company=company,
+                exclude_id=None,
+            )
 
-    form.entidad.choices = LISTA_DE_ENTIDADES
-
-    if form.validate_on_submit() or request.method == "POST":
-        SERIE = Serie(
-            entity=form.entidad.data,
-            doc=form.documento.data,
-            serie=form.serie.data,
-            enabled=True,
-            default=False,
+        secuencia = Sequence(
+            name=f"{form.nombre.data} sequence",
+            current_value=form.current_value.data or 0,
+            increment=form.increment.data or 1,
+            padding=form.padding.data or 5,
+            reset_policy=form.reset_policy.data or "never",
         )
+        database.session.add(secuencia)
+        database.session.flush()
 
-        database.session.add(SERIE)
+        nueva = NamingSeries(
+            name=form.nombre.data,
+            entity_type=form.entity_type.data,
+            company=company,
+            prefix_template=form.prefix_template.data,
+            is_active=bool(form.is_active.data),
+            is_default=is_default,
+        )
+        database.session.add(nueva)
+        database.session.flush()
+        database.session.add(
+            SeriesSequenceMap(
+                naming_series_id=nueva.id,
+                sequence_id=secuencia.id,
+                priority=0,
+                condition=None,
+            )
+        )
         database.session.commit()
-
-        return redirect(url_for("contabilidad.series"))
+        return redirect(url_for("contabilidad.naming_series_list"))
 
     return render_template(
-        "contabilidad/serie_crear.html",
+        "contabilidad/naming_series_nueva.html",
         form=form,
+        titulo="Nueva Serie de Numeracion - " + APPNAME,
+    )
+
+
+@contabilidad.route("/naming-series/<series_id>/toggle-default", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def naming_series_toggle_default(series_id: str):
+    """Alterna el estado predeterminado de una serie de numeracion."""
+    from cacao_accounting.database import NamingSeries
+    from cacao_accounting.document_identifiers import enforce_single_default_series
+
+    serie = database.session.get(NamingSeries, series_id)
+    if not serie:
+        return redirect(url_for("contabilidad.naming_series_list"))
+
+    if not serie.is_default:
+        enforce_single_default_series(
+            entity_type=serie.entity_type,
+            company=serie.company,
+            exclude_id=serie.id,
+        )
+        serie.is_default = True
+    else:
+        serie.is_default = False
+
+    database.session.commit()
+    return redirect(url_for("contabilidad.naming_series_list"))
+
+
+@contabilidad.route("/naming-series/<series_id>/toggle-active", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def naming_series_toggle_active(series_id: str):
+    """Activa o desactiva una serie de numeracion."""
+    from cacao_accounting.database import GeneratedIdentifierLog, NamingSeries, SeriesSequenceMap
+
+    serie = database.session.get(NamingSeries, series_id)
+    if not serie:
+        return redirect(url_for("contabilidad.naming_series_list"))
+
+    if serie.is_active:
+        # Comprobar si la serie ya genero identificadores (no se puede eliminar, solo desactivar)
+        series_has_generated_identifiers = (
+            database.session.execute(
+                database.select(GeneratedIdentifierLog)
+                .join(SeriesSequenceMap, GeneratedIdentifierLog.sequence_id == SeriesSequenceMap.sequence_id)
+                .filter(SeriesSequenceMap.naming_series_id == series_id)
+                .limit(1)
+            ).scalar_one_or_none()
+            is not None
+        )
+        # Serie utilizada — solo marcarla inactiva, nunca eliminar aunque no haya generado documentos
+        _ = series_has_generated_identifiers
+        serie.is_active = False
+        if serie.is_default:
+            serie.is_default = False
+    else:
+        serie.is_active = True
+
+    database.session.commit()
+    return redirect(url_for("contabilidad.naming_series_list"))
+
+
+# <------------------------------------------------------------------------------------------------------------------------> #
+# ExternalCounter — CRUD de contadores externos con auditoria
+
+
+@contabilidad.route("/external-counter/list")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def external_counter_list():
+    """Lista de contadores externos."""
+    from cacao_accounting.database import ExternalCounter
+
+    company_filter = request.args.get("company", type=str)
+
+    if company_filter:
+        query = database.select(ExternalCounter).filter_by(company=company_filter)
+    else:
+        query = database.select(ExternalCounter)
+
+    consulta = database.paginate(
+        query.order_by(ExternalCounter.company, ExternalCounter.name),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=20,
+        count=True,
+    )
+
+    from cacao_accounting.database import Entity
+
+    entidades = database.session.execute(database.select(Entity)).scalars().all()
+
+    return render_template(
+        "contabilidad/external_counter_lista.html",
+        consulta=consulta,
+        entidades=entidades,
+        company_filter=company_filter,
+        titulo="Contadores Externos - " + APPNAME,
+    )
+
+
+@contabilidad.route("/external-counter/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def external_counter_new():
+    """Nuevo contador externo."""
+    from cacao_accounting.contabilidad.forms import FormularioExternalCounter
+    from cacao_accounting.database import Entity, ExternalCounter, NamingSeries, SeriesExternalCounterMap
+
+    form = FormularioExternalCounter()
+    entidades = database.session.execute(database.select(Entity)).scalars().all()
+    form.company.choices = [(e.code, e.name) for e in entidades]
+
+    series_list = (
+        database.session.execute(database.select(NamingSeries).filter_by(is_active=True).order_by(NamingSeries.name))
+        .scalars()
+        .all()
+    )
+    form.naming_series_id.choices = [("", "— Sin asociar —")] + [(s.id, f"{s.name} ({s.entity_type})") for s in series_list]
+
+    if form.validate_on_submit():
+        naming_series_id = form.naming_series_id.data or None
+        nuevo = ExternalCounter(
+            company=form.company.data,
+            name=form.nombre.data,
+            counter_type=form.counter_type.data,
+            prefix=form.prefix.data or None,
+            last_used=form.last_used.data or 0,
+            padding=form.padding.data or 5,
+            is_active=bool(form.is_active.data),
+            description=form.description.data or None,
+            naming_series_id=naming_series_id,
+        )
+        database.session.add(nuevo)
+        database.session.flush()
+        if naming_series_id:
+            database.session.add(
+                SeriesExternalCounterMap(
+                    naming_series_id=naming_series_id,
+                    external_counter_id=nuevo.id,
+                    priority=0,
+                    condition_json=None,
+                )
+            )
+        database.session.commit()
+        return redirect(url_for("contabilidad.external_counter_list"))
+
+    return render_template(
+        "contabilidad/external_counter_nuevo.html",
+        form=form,
+        titulo="Nuevo Contador Externo - " + APPNAME,
+    )
+
+
+@contabilidad.route("/external-counter/<counter_id>/adjust", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def external_counter_adjust(counter_id: str):
+    """Ajusta el ultimo numero usado de un contador externo con auditoria obligatoria."""
+    from flask_login import current_user
+
+    from cacao_accounting.contabilidad.forms import FormularioAjusteContadorExterno
+    from cacao_accounting.database import ExternalCounter
+    from cacao_accounting.document_identifiers import IdentifierConfigurationError, adjust_external_counter
+
+    counter = database.session.get(ExternalCounter, counter_id)
+    if not counter:
+        return redirect(url_for("contabilidad.external_counter_list"))
+
+    form = FormularioAjusteContadorExterno()
+
+    if form.validate_on_submit():
+        try:
+            adjust_external_counter(
+                external_counter_id=counter_id,
+                new_last_used=form.new_last_used.data,
+                reason=form.reason.data,
+                changed_by=current_user.id if current_user.is_authenticated else None,
+            )
+            database.session.commit()
+            flash("Contador externo ajustado correctamente.", "success")
+        except IdentifierConfigurationError as exc:
+            from cacao_accounting.logs import log
+
+            log.warning(f"Error al ajustar contador externo {counter_id}: {exc}")
+            flash(str(exc), "danger")
+        return redirect(url_for("contabilidad.external_counter_list"))
+
+    return render_template(
+        "contabilidad/external_counter_ajuste.html",
+        form=form,
+        counter=counter,
+        titulo="Ajustar Contador Externo - " + APPNAME,
+    )
+
+
+@contabilidad.route("/external-counter/<counter_id>/audit-log")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def external_counter_audit_log(counter_id: str):
+    """Bitacora de auditoria de un contador externo."""
+    from cacao_accounting.database import ExternalCounter, ExternalCounterAuditLog
+
+    counter = database.session.get(ExternalCounter, counter_id)
+    if not counter:
+        return redirect(url_for("contabilidad.external_counter_list"))
+
+    registros = (
+        database.session.execute(
+            database.select(ExternalCounterAuditLog)
+            .filter_by(external_counter_id=counter_id)
+            .order_by(ExternalCounterAuditLog.changed_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+    return render_template(
+        "contabilidad/external_counter_auditoria.html",
+        counter=counter,
+        registros=registros,
+        titulo="Auditoria de Contador Externo - " + APPNAME,
     )

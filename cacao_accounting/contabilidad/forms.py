@@ -11,14 +11,13 @@
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
 from flask_wtf import FlaskForm
-from wtforms import SelectField, StringField
-from wtforms.validators import DataRequired
+from wtforms import BooleanField, IntegerField, SelectField, StringField, TextAreaField
+from wtforms.validators import DataRequired, InputRequired, NumberRange, Optional
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
 from cacao_accounting.database import Entity
-from cacao_accounting.modulos import lista_tipos_documentos
 
 # <------------------------------------------------------------------------------------------------------------------------> #
 # Entidades
@@ -86,12 +85,82 @@ class ComprobanteContableDetalle(FlaskForm):
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
-# Series e Identificadores
-class FormularioSerie(FlaskForm):
-    """Serie."""
+# NamingSeries — Framework robusto de series e identificadores
 
-    entidad = SelectField(
-        "Entidad",
-    )
-    documento = SelectField("Documento", choices=lista_tipos_documentos())
-    serie = StringField(validators=[])
+ENTITY_TYPE_CHOICES = [
+    ("", "— Seleccione tipo de documento —"),
+    ("journal_entry", "Comprobante de Diario"),
+    ("sales_invoice", "Factura de Venta"),
+    ("purchase_invoice", "Factura de Compra"),
+    ("payment_entry", "Pago"),
+    ("stock_entry", "Movimiento de Inventario"),
+    ("purchase_order", "Orden de Compra"),
+    ("purchase_receipt", "Recepcion de Compra"),
+    ("purchase_request", "Solicitud de Compra"),
+    ("purchase_quotation", "Solicitud de Cotizacion"),
+    ("supplier_quotation", "Cotizacion de Proveedor"),
+    ("sales_order", "Orden de Venta"),
+    ("sales_request", "Pedido de Venta"),
+    ("sales_quotation", "Cotizacion de Venta"),
+    ("delivery_note", "Nota de Entrega"),
+]
+
+RESET_POLICY_CHOICES = [
+    ("never", "Nunca"),
+    ("yearly", "Anual"),
+    ("monthly", "Mensual"),
+]
+
+EXTERNAL_COUNTER_TYPE_CHOICES = [
+    ("checkbook", "Chequera"),
+    ("fiscal", "Numero Fiscal"),
+    ("receipt", "Recibo Preimpreso"),
+    ("bank_transfer", "Transferencia Bancaria"),
+    ("other", "Otro"),
+]
+
+
+class FormularioNamingSeries(FlaskForm):
+    """Formulario para crear y editar series de numeracion (NamingSeries)."""
+
+    nombre = StringField("Nombre", validators=[DataRequired()])
+    entity_type = SelectField("Tipo de Documento", choices=ENTITY_TYPE_CHOICES, validators=[DataRequired()])
+    company = SelectField("Compania (opcional — dejar vacio para serie global)", validators=[Optional()])
+    prefix_template = StringField("Plantilla de Prefijo", validators=[DataRequired()])
+    current_value = IntegerField("Ultimo Numero Interno Usado", default=0, validators=[InputRequired(), NumberRange(min=0)])
+    increment = IntegerField("Incremento", default=1, validators=[InputRequired(), NumberRange(min=1)])
+    padding = IntegerField("Padding (digitos)", default=5, validators=[InputRequired(), NumberRange(min=1, max=20)])
+    reset_policy = SelectField("Politica de Reinicio", choices=RESET_POLICY_CHOICES)
+    is_active = BooleanField("Activa", default=True)
+    is_default = BooleanField("Predeterminada para esta compania y documento")
+
+
+class FormularioSecuencia(FlaskForm):
+    """Formulario para crear y editar secuencias fisicas (Sequence)."""
+
+    nombre = StringField("Nombre", validators=[DataRequired()])
+    current_value = IntegerField("Valor Actual", default=0, validators=[NumberRange(min=0)])
+    increment = IntegerField("Incremento", default=1, validators=[NumberRange(min=1)])
+    padding = IntegerField("Padding (digitos)", default=5, validators=[NumberRange(min=1, max=20)])
+    reset_policy = SelectField("Politica de Reinicio", choices=RESET_POLICY_CHOICES)
+
+
+class FormularioExternalCounter(FlaskForm):
+    """Formulario para crear y editar contadores externos."""
+
+    company = SelectField("Compania", validators=[DataRequired()])
+    nombre = StringField("Nombre", validators=[DataRequired()])
+    counter_type = SelectField("Tipo", choices=EXTERNAL_COUNTER_TYPE_CHOICES)
+    prefix = StringField("Prefijo", validators=[Optional()])
+    last_used = IntegerField("Ultimo Numero Usado", default=0, validators=[NumberRange(min=0)])
+    padding = IntegerField("Padding (digitos)", default=5, validators=[NumberRange(min=1, max=20)])
+    is_active = BooleanField("Activo", default=True)
+    description = TextAreaField("Descripcion", validators=[Optional()])
+    naming_series_id = SelectField("Serie Interna Asociada (opcional)", validators=[Optional()])
+
+
+class FormularioAjusteContadorExterno(FlaskForm):
+    """Formulario de ajuste de ultimo numero usado con motivo obligatorio."""
+
+    new_last_used = IntegerField("Nuevo Ultimo Numero Usado", validators=[InputRequired(), NumberRange(min=0)])
+    reason = TextAreaField("Motivo del Ajuste", validators=[DataRequired()])
