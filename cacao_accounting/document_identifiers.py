@@ -139,6 +139,29 @@ def _pick_naming_series(entity_type: str, company: str, naming_series_id: str | 
     return sorted(global_matches, key=lambda row: row.name)[0]
 
 
+def ensure_default_naming_series_for_company(company: str, entity_types: list[str] | None = None) -> None:
+    """Crea las series predeterminadas para una compañia cuando no existen."""
+    if entity_types is None:
+        entity_types = [
+            "journal_entry",
+            "sales_invoice",
+            "purchase_invoice",
+            "payment_entry",
+            "stock_entry",
+            "purchase_order",
+            "purchase_receipt",
+            "purchase_request",
+            "purchase_quotation",
+            "supplier_quotation",
+            "sales_order",
+            "sales_request",
+            "sales_quotation",
+            "delivery_note",
+        ]
+    for entity_type in entity_types:
+        _pick_naming_series(entity_type=entity_type, company=company, naming_series_id=None)
+
+
 def _default_entity_code(entity_type: str) -> str:
     """Devuelve abreviacion de doctype para prefijos de series."""
     map_codes = {

@@ -34,6 +34,7 @@ from cacao_accounting.document_flow.repository import get_document
 from cacao_accounting.document_flow.service import get_source_items
 from cacao_accounting.document_flow.status import _, document_status_payload
 from cacao_accounting.document_flow.tracing import document_flow_tree
+from cacao_accounting.form_preferences import get_form_preference, reset_form_preference, save_form_preference
 from cacao_accounting.search_select import SearchSelectError, search_select
 
 api = Blueprint("api", __name__, template_folder="templates")
@@ -113,6 +114,19 @@ def api_search_select():
             return jsonify({"error": _("Parametro invalido."), "message": str(exc)}), 400
         return jsonify({"error": _(str(exc)), "message": _(str(exc))}), exc.status_code
     return jsonify(payload)
+
+
+@api.route("/api/form-preferences/<path:form_key>/<view_key>", methods=["GET", "PUT", "DELETE"])
+@login_required
+def api_form_preferences(form_key: str, view_key: str):
+    """Lee, guarda o restablece preferencias de formulario del usuario actual."""
+    user_id = str(current_user.id)
+    if request.method == "GET":
+        return jsonify(get_form_preference(user_id=user_id, form_key=form_key, view_key=view_key))
+    if request.method == "DELETE":
+        return jsonify(reset_form_preference(user_id=user_id, form_key=form_key, view_key=view_key))
+    payload = request.get_json(silent=True) or {}
+    return jsonify(save_form_preference(user_id=user_id, form_key=form_key, view_key=view_key, payload=payload))
 
 
 @api.route("/api/buying/purchase-order/<order_id>/items")

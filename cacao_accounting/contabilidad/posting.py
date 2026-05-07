@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from cacao_accounting.database import (
     Accounts,
@@ -110,13 +110,35 @@ def _find_period_ids(company: str, posting_date: Any) -> tuple[str | None, str |
     return period.id, period.fiscal_year_id
 
 
-def _active_books(company: str, ledger_code: str | None = None) -> list[Book | None]:
-    query = select(Book).filter_by(entity=company)
-    if ledger_code:
-        query = query.filter_by(code=ledger_code)
+def _normalize_ledger_codes(ledger_code: str | Sequence[str] | None) -> list[str] | None:
+    if ledger_code is None:
+        return None
+    if isinstance(ledger_code, str):
+        normalized = ledger_code.strip()
+        return [normalized] if normalized else None
+
+    codes: list[str] = []
+    for item in ledger_code:
+        normalized = str(item).strip()
+        if normalized and normalized not in codes:
+            codes.append(normalized)
+    return codes or None
+
+
+def _active_books(company: str, ledger_code: str | Sequence[str] | None = None) -> list[Book | None]:
+    selected_codes = _normalize_ledger_codes(ledger_code)
+    query = select(Book).where(
+        Book.entity == company,
+        or_(Book.status == "activo", Book.status.is_(None)),
+    )
+    if selected_codes:
+        query = query.where(Book.code.in_(selected_codes))
     books = database.session.execute(query.order_by(Book.is_primary.desc(), Book.code)).scalars().all()
-    if ledger_code and not books:
-        raise PostingError("El libro contable indicado no existe para la compania.")
+    if selected_codes:
+        found_codes = {book.code for book in books}
+        missing_codes = [code for code in selected_codes if code not in found_codes]
+        if missing_codes:
+            raise PostingError("Uno o más libros contables seleccionados no existen o están inactivos para la compañia.")
     return list(books) if books else [None]
 
 

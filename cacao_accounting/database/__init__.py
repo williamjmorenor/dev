@@ -276,6 +276,26 @@ class RolesUser(database.Model, BaseTabla):  # type: ignore[name-defined]
     active = database.Column(database.Boolean, nullable=True)
 
 
+class UserFormPreference(database.Model, BaseTabla):  # type: ignore[name-defined]
+    """Preferencias persistentes de formularios por usuario."""
+
+    __tablename__ = "user_form_preference"
+    __table_args__ = (
+        database.UniqueConstraint(
+            "user_id",
+            "form_key",
+            "view_key",
+            name="uq_user_form_preference",
+        ),
+    )
+
+    user_id = database.Column(database.String(26), database.ForeignKey("user.id"), nullable=False, index=True)
+    form_key = database.Column(database.String(100), nullable=False, index=True)
+    view_key = database.Column(database.String(50), nullable=False, index=True)
+    schema_version = database.Column(database.Integer(), nullable=False, default=1)
+    config_json = database.Column(database.Text(), nullable=False)
+
+
 # <---------------------------------------------------------------------------------------------> #
 # Administración de módulos del sistema.
 # <---------------------------------------------------------------------------------------------> #
@@ -305,6 +325,7 @@ class Entity(database.Model, BaseTabla):  # type: ignore[name-defined]
     name = database.Column(database.String(100))
     tax_id = database.Column(database.String(50), unique=True, nullable=False)
     currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE))
+    country = database.Column(database.String(2), nullable=True)
     entity_type = database.Column(database.String(50))
     tipo_entidad_lista = [
         "Asociación",
@@ -1552,6 +1573,11 @@ class ComprobanteContable(database.Model, BaseTransaccion):  # type: ignore[name
     """Comprobante contable manual."""
 
     __tablename__ = "comprobante_contable"
+    voucher_type = database.Column(database.String(50), nullable=True, index=True)
+    voucher_id = database.Column(database.String(26), nullable=True, index=True)
+    document_no = database.Column(database.String(100), nullable=True, index=True)
+    naming_series_id = database.Column(database.String(26), database.ForeignKey("naming_series.id"), nullable=True)
+    book_codes = database.Column(database.Text(), nullable=True)
 
 
 class ComprobanteContableDetalle(database.Model, GLBase):  # type: ignore[name-defined]

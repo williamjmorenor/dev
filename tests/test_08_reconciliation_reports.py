@@ -458,6 +458,81 @@ def test_setup_with_predefined_catalog_creates_complete_company_defaults(app_ctx
     assert all(getattr(defaults, field) for field in DEFAULT_ACCOUNT_FIELDS)
 
 
+def test_setup_with_invalid_catalog_raises_error(app_ctx):
+    from cacao_accounting.setup.service import finalize_setup
+
+    with pytest.raises(ValueError, match="catálogo seleccionado.*no está disponible"):
+        finalize_setup(
+            {
+                "id": "mapco",
+                "razon_social": "Mapping Company",
+                "nombre_comercial": "Mapping Company",
+                "id_fiscal": "J-MAP",
+                "moneda": "NIO",
+                "tipo_entidad": "Sociedad Anonima",
+            },
+            catalogo_tipo="preexistente",
+            country="NI",
+            idioma="ES",
+            catalogo_archivo="missing_catalog.csv",
+        )
+
+
+def test_setup_with_predefined_catalog_creates_bootstrap_records(app_ctx):
+    from datetime import date
+
+    from cacao_accounting.database import (
+        AccountingPeriod,
+        Book,
+        CostCenter,
+        Currency,
+        Entity,
+        FiscalYear,
+        NamingSeries,
+        database,
+    )
+    from cacao_accounting.setup.service import finalize_setup
+
+    database.session.add(Currency(code="NIO", name="Córdoba", decimals=2, active=True, default=True))
+    database.session.commit()
+
+    finalize_setup(
+        {
+            "id": "mapco",
+            "razon_social": "Mapping Company",
+            "nombre_comercial": "Mapping Company",
+            "id_fiscal": "J-MAP",
+            "moneda": "NIO",
+            "tipo_entidad": "Sociedad Anonima",
+        },
+        catalogo_tipo="preexistente",
+        country="NI",
+        idioma="ES",
+        catalogo_archivo="base_es.csv",
+    )
+
+    entity = database.session.execute(database.select(Entity).filter_by(code="mapco")).scalar_one()
+    book = database.session.execute(database.select(Book).filter_by(entity="mapco", code="FISC")).scalar_one()
+    cost_center = database.session.execute(database.select(CostCenter).filter_by(entity="mapco", code="MAIN")).scalar_one()
+    fiscal_year = database.session.execute(
+        database.select(FiscalYear).filter_by(entity="mapco", name=str(date.today().year))
+    ).scalar_one()
+    period = database.session.execute(
+        database.select(AccountingPeriod).filter_by(entity="mapco", name=str(date.today().year))
+    ).scalar_one()
+    series = database.session.execute(
+        database.select(NamingSeries).filter_by(company="mapco", entity_type="journal_entry")
+    ).scalar_one_or_none()
+
+    assert entity is not None
+    assert book is not None
+    assert cost_center is not None
+    assert fiscal_year is not None
+    assert period is not None
+    assert period.fiscal_year_id == fiscal_year.id
+    assert series is not None
+
+
 def test_example_seed_creates_company_default_accounts(app_ctx):
     from cacao_accounting.contabilidad.default_accounts import DEFAULT_ACCOUNT_FIELDS
     from cacao_accounting.database.helpers import inicia_base_de_datos

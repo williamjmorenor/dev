@@ -11,13 +11,15 @@
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
 from flask_wtf import FlaskForm
-from wtforms import BooleanField, IntegerField, SelectField, StringField, TextAreaField
+from wtforms import BooleanField, IntegerField, RadioField, SelectField, StringField, TextAreaField
+from wtforms.fields import DateField, DecimalField
 from wtforms.validators import DataRequired, InputRequired, NumberRange, Optional
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
 from cacao_accounting.database import Entity
+from cacao_accounting.setup.forms import CATALOG_CHOICES, COUNTRY_CHOICES, LANGUAGE_CHOICES
 
 # <------------------------------------------------------------------------------------------------------------------------> #
 # Entidades
@@ -35,10 +37,12 @@ class FormularioEntidad(FlaskForm):
     razon_social = StringField(validators=[DataRequired()])
     nombre_comercial = StringField(validators=[])
     id_fiscal = StringField(validators=[DataRequired()])
-    moneda = SelectField(
-        "Tipo de Entidad",
-    )
-    tipo_entidad = SelectField("Tipo de Entidad", choices=Entity.tipo_entidad_lista)
+    pais = SelectField("País", choices=COUNTRY_CHOICES, validators=[DataRequired()])
+    idioma = SelectField("Idioma", choices=LANGUAGE_CHOICES, validators=[DataRequired()])
+    moneda = SelectField("Moneda Principal", choices=[], validators=[DataRequired()])
+    catalogo = RadioField("Catálogo contable", choices=CATALOG_CHOICES, default="preexistente", validators=[DataRequired()])
+    catalogo_origen = SelectField("Catálogo existente", choices=[], validators=[])
+    tipo_entidad = SelectField("Tipo de Entidad", choices=Entity.tipo_entidad_lista, validators=[DataRequired()])
     correo_electronico = StringField(validators=[])
     web = StringField(validators=[])
     telefono1 = StringField(validators=[])
@@ -71,7 +75,14 @@ class FormularioLibro(FlaskForm):
 
     id = StringField(validators=[DataRequired()])
     nombre = StringField(validators=[DataRequired()])
-    entidad = SelectField("Entidad")
+    entidad = SelectField("Entidad", validators=[DataRequired()])
+    moneda = SelectField("Moneda", choices=[], validators=[DataRequired()])
+    estado = SelectField(
+        "Estado",
+        choices=[("activo", "Activo"), ("inactivo", "Inactivo")],
+        default="activo",
+        validators=[DataRequired()],
+    )
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
@@ -133,6 +144,55 @@ class FormularioNamingSeries(FlaskForm):
     reset_policy = SelectField("Politica de Reinicio", choices=RESET_POLICY_CHOICES)
     is_active = BooleanField("Activa", default=True)
     is_default = BooleanField("Predeterminada para esta compania y documento")
+
+
+class FormularioCentroCosto(FlaskForm):
+    """Formulario para crear y editar centros de costos."""
+
+    id = StringField("Codigo", validators=[DataRequired()])
+    nombre = StringField("Nombre", validators=[DataRequired()])
+    entidad = SelectField("Entidad", validators=[DataRequired()])
+    activo = BooleanField("Activo", default=True)
+    habilitado = BooleanField("Habilitado", default=True)
+    predeterminado = BooleanField("Predeterminado", default=False)
+    grupo = BooleanField("Grupo", default=False)
+    padre = SelectField("Centro Padre", choices=[], validators=[Optional()])
+
+
+class FormularioProyecto(FlaskForm):
+    """Formulario para crear y editar proyectos."""
+
+    id = StringField("Codigo", validators=[DataRequired()])
+    nombre = StringField("Nombre", validators=[DataRequired()])
+    entidad = SelectField("Entidad", validators=[DataRequired()])
+    inicio = DateField("Fecha Inicio", validators=[Optional()])
+    fin = DateField("Fecha Fin", validators=[Optional()])
+    presupuesto = DecimalField("Presupuesto", places=2, validators=[Optional(), NumberRange(min=0)])
+    habilitado = BooleanField("Habilitado", default=True)
+
+
+class FormularioFiscalYear(FlaskForm):
+    """Formulario para crear y editar años fiscales."""
+
+    id = StringField("Codigo", validators=[DataRequired()])
+    entidad = SelectField("Entidad", validators=[DataRequired()])
+    inicio = DateField("Fecha Inicio", validators=[DataRequired()])
+    fin = DateField("Fecha Fin", validators=[DataRequired()])
+    cerrado = BooleanField("Cerrado", default=False)
+
+
+class FormularioAccountingPeriod(FlaskForm):
+    """Formulario para crear y editar periodos contables."""
+
+    id = StringField("Codigo", validators=[DataRequired()])
+    entidad = SelectField("Entidad", validators=[DataRequired()])
+    fiscal_year = SelectField("Año Fiscal", validators=[DataRequired()])
+    nombre = StringField("Nombre", validators=[DataRequired()])
+    status = StringField("Estado", validators=[DataRequired()])
+    habilitado = BooleanField("Habilitado", default=True)
+    cerrado = BooleanField("Cerrado", default=False)
+    inicio = DateField("Fecha Inicio", validators=[DataRequired()])
+    fin = DateField("Fecha Fin", validators=[DataRequired()])
 
 
 class FormularioSecuencia(FlaskForm):

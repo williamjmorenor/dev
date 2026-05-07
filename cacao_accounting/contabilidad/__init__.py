@@ -10,9 +10,10 @@
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
-from flask import Blueprint, flash, redirect, render_template, request
+from flask import Blueprint, flash, jsonify, redirect, render_template, request
 from flask.helpers import url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
+from sqlalchemy import or_
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
@@ -26,6 +27,10 @@ from cacao_accounting.contabilidad.auxiliares import (
     obtener_entidades,
     obtener_lista_entidades_por_id_razonsocial,
     obtener_lista_monedas,
+)
+from cacao_accounting.setup.service import (
+    available_catalog_files,
+    create_company,
 )
 from cacao_accounting.contabilidad.gl import gl
 from cacao_accounting.database import STATUS, database
@@ -126,32 +131,39 @@ def entidad(entidad_id):
 def nueva_entidad():
     """Formulario para crear una nueva entidad."""
     from cacao_accounting.contabilidad.forms import FormularioEntidad
-    from cacao_accounting.database import Entity
 
     formulario = FormularioEntidad()
     formulario.moneda.choices = obtener_lista_monedas()
+    formulario.catalogo_origen.choices = [("", "Seleccione un catálogo existente")] + available_catalog_files()
 
     TITULO = "Crear Nueva Entidad - " + APPNAME
-    if formulario.validate_on_submit() or request.method == "POST":
-        ENTIDAD = Entity(
-            code=request.form.get("id", None),
-            company_name=request.form.get("razon_social", None),
-            name=request.form.get("nombre_comercial", None),
-            tax_id=request.form.get("id_fiscal", None),
-            currency=request.form.get("moneda", None),
-            entity_type=request.form.get("tipo_entidad", None),
-            e_mail=request.form.get("correo_electronico", None),
-            web=request.form.get("web", None),
-            phone1=request.form.get("telefono1", None),
-            phone2=request.form.get("telefono2", None),
-            fax=request.form.get("fax", None),
-            status="activo",
-            enabled=True,
-            default=False,
-        )
-
-        database.session.add(ENTIDAD)
-        database.session.flush()
+    if formulario.validate_on_submit():
+        try:
+            ENTIDAD = create_company(
+                {
+                    "id": formulario.id.data,
+                    "razon_social": formulario.razon_social.data,
+                    "nombre_comercial": formulario.nombre_comercial.data,
+                    "id_fiscal": formulario.id_fiscal.data,
+                    "moneda": formulario.moneda.data,
+                    "pais": formulario.pais.data,
+                    "tipo_entidad": formulario.tipo_entidad.data,
+                },
+                catalogo_tipo=formulario.catalogo.data,
+                country=formulario.pais.data,
+                idioma=formulario.idioma.data,
+                catalogo_archivo=formulario.catalogo_origen.data if formulario.catalogo.data == "preexistente" else None,
+                status="activo",
+                default=False,
+            )
+        except ValueError as exc:
+            database.session.rollback()
+            flash(str(exc), "danger")
+            return render_template(
+                "contabilidad/entidad_crear.html",
+                form=formulario,
+                titulo=TITULO,
+            )
 
         from cacao_accounting.compras.purchase_reconciliation_service import seed_matching_config_for_company
 
@@ -159,6 +171,8 @@ def nueva_entidad():
         database.session.commit()
 
         return LISTA_ENTIDADES
+    elif request.method == "POST":
+        flash("Complete los campos correctamente.", "danger")
 
     return render_template(
         "contabilidad/entidad_crear.html",
@@ -409,6 +423,43 @@ def eliminar_libro(id_unidad):
     return redirect(url_for("contabilidad.libros"))
 
 
+@contabilidad.route("/book/edit/<id_libro>", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def editar_libro(id_libro):
+    """Editar un libro de contabilidad."""
+    from cacao_accounting.contabilidad.forms import FormularioLibro
+    from cacao_accounting.database import Book
+
+    libro = database.session.execute(database.select(Book).filter_by(code=id_libro)).scalar_one_or_none()
+    if libro is None:
+        return redirect(url_for("contabilidad.libros"))
+
+    formulario = FormularioLibro(obj=libro)
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.moneda.choices = obtener_lista_monedas()
+    formulario.id.data = libro.code
+    formulario.moneda.data = libro.currency
+    formulario.estado.data = libro.status or "activo"
+    TITULO = "Editar Libro de Contabilidad - " + APPNAME
+
+    if formulario.validate_on_submit():
+        libro.name = formulario.nombre.data
+        libro.entity = formulario.entidad.data
+        libro.currency = formulario.moneda.data
+        libro.status = formulario.estado.data
+        database.session.commit()
+        return redirect(url_for("contabilidad.libros"))
+
+    return render_template(
+        "contabilidad/book_crear.html",
+        titulo=TITULO,
+        form=formulario,
+        edit=True,
+    )
+
+
 @contabilidad.route("/book/new", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
@@ -420,13 +471,15 @@ def nuevo_libro():
 
     formulario = FormularioLibro()
     formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.moneda.choices = obtener_lista_monedas()
     TITULO = "Crear Nuevo Libro de Contabilidad - " + APPNAME
-    if formulario.validate_on_submit() or request.method == "POST":
+    if formulario.validate_on_submit():
         DATA = Book(
-            code=request.form.get("id", None),
-            name=request.form.get("nombre", None),
-            entity=request.form.get("entidad", None),
-            status="activo",
+            code=formulario.id.data,
+            name=formulario.nombre.data,
+            entity=formulario.entidad.data,
+            currency=formulario.moneda.data,
+            status=formulario.estado.data,
         )
         database.session.add(DATA)
         database.session.commit()
@@ -436,6 +489,42 @@ def nuevo_libro():
         "contabilidad/book_crear.html",
         titulo=TITULO,
         form=formulario,
+    )
+
+
+@contabilidad.route("/journal/books")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def journal_books():
+    """Lista libros activos disponibles para un comprobante contable."""
+    from cacao_accounting.database import Book
+
+    company = request.args.get("company", type=str)
+    if not company:
+        return jsonify({"results": []})
+
+    books = (
+        database.session.execute(
+            database.select(Book)
+            .where(Book.entity == company, or_(Book.status == "activo", Book.status.is_(None)))
+            .order_by(Book.is_primary.desc(), Book.code)
+        )
+        .scalars()
+        .all()
+    )
+    return jsonify(
+        {
+            "results": [
+                {
+                    "value": book.code,
+                    "display_name": f"{book.code} - {book.name}",
+                    "currency": book.currency,
+                    "is_primary": bool(book.is_primary),
+                }
+                for book in books
+            ]
+        }
     )
 
 
@@ -500,21 +589,94 @@ def ccostos():
     )
 
 
-@contabilidad.route("/costs_center/<id_cc>")
+@contabilidad.route("/costs_center/new", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
-def centro_costo(id_cc):
-    """Centro de Costos."""
+def nuevo_centro_costo():
+    """Formulario para crear un nuevo centro de costos."""
+    from cacao_accounting.contabilidad.forms import FormularioCentroCosto
     from cacao_accounting.database import CostCenter
 
-    registro = database.session.execute(database.select(CostCenter).filter_by(code=id_cc)).first()
+    formulario = FormularioCentroCosto()
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.padre.choices = [("", "Sin padre")]
+    TITULO = "Nuevo Centro de Costos - " + APPNAME
+
+    if formulario.validate_on_submit():
+        DATA = CostCenter(
+            entity=formulario.entidad.data,
+            code=request.form.get("id", None),
+            name=request.form.get("nombre", None),
+            active=bool(formulario.activo.data),
+            enabled=bool(formulario.habilitado.data),
+            default=bool(formulario.predeterminado.data),
+            group=bool(formulario.grupo.data),
+            parent=request.form.get("padre") or None,
+            status="activo",
+        )
+        database.session.add(DATA)
+        database.session.commit()
+        return redirect(url_for("contabilidad.ccostos"))
 
     return render_template(
-        "contabilidad/centro-costo.html",
-        registro=registro[0],
-        statusweb=STATUS,
+        "contabilidad/centro-costo_crear.html",
+        titulo=TITULO,
+        form=formulario,
     )
+
+
+@contabilidad.route("/costs_center/<id_cc>/edit", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def editar_centro_costo(id_cc):
+    """Editar un centro de costos existente."""
+    from cacao_accounting.contabilidad.forms import FormularioCentroCosto
+    from cacao_accounting.database import CostCenter
+
+    registro = database.session.execute(database.select(CostCenter).filter_by(code=id_cc)).scalar_one_or_none()
+    if registro is None:
+        return redirect(url_for("contabilidad.ccostos"))
+
+    formulario = FormularioCentroCosto(obj=registro)
+    formulario.id.data = registro.code
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.padre.choices = [("", "Sin padre")]
+    TITULO = "Editar Centro de Costos - " + APPNAME
+
+    if formulario.validate_on_submit():
+        registro.name = request.form.get("nombre", registro.name)
+        registro.entity = request.form.get("entidad", registro.entity)
+        registro.active = bool(formulario.activo.data)
+        registro.enabled = bool(formulario.habilitado.data)
+        registro.default = bool(formulario.predeterminado.data)
+        registro.group = bool(formulario.grupo.data)
+        registro.parent = request.form.get("padre") or None
+        database.session.commit()
+        return redirect(url_for("contabilidad.centro_costo", id_cc=registro.code))
+
+    return render_template(
+        "contabilidad/centro-costo_crear.html",
+        titulo=TITULO,
+        form=formulario,
+        edit=True,
+    )
+
+
+@contabilidad.route("/costs_center/<id_cc>/delete")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def eliminar_centro_costo(id_cc):
+    """Elimina un centro de costos."""
+    from cacao_accounting.database import CostCenter
+
+    registro = database.session.execute(database.select(CostCenter).filter_by(code=id_cc)).scalar_one_or_none()
+    if registro:
+        database.session.delete(registro)
+        database.session.commit()
+    return redirect(url_for("contabilidad.ccostos"))
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
@@ -527,21 +689,312 @@ def proyectos():
     """Listado de proyectos."""
     from cacao_accounting.database import Project
 
-    CONSULTA = database.paginate(
+    consulta = database.paginate(
         database.select(Project),
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
     )
 
-    TITULO = "Listados de Proyectos - " + APPNAME
-
     return render_template(
         "contabilidad/proyecto_lista.html",
+        consulta=consulta,
+        titulo="Listado de Proyectos - " + APPNAME,
+    )
+
+
+@contabilidad.route("/project/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def nuevo_proyecto():
+    """Formulario para crear un nuevo proyecto."""
+    from cacao_accounting.contabilidad.forms import FormularioProyecto
+    from cacao_accounting.database import Project
+
+    formulario = FormularioProyecto()
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    TITULO = "Nuevo Proyecto - " + APPNAME
+
+    if formulario.validate_on_submit():
+        DATA = Project(
+            code=request.form.get("id", None),
+            name=request.form.get("nombre", None),
+            entity=request.form.get("entidad", None),
+            start=formulario.inicio.data,
+            end=formulario.fin.data,
+            budget=float(formulario.presupuesto.data or 0),
+            enabled=bool(formulario.habilitado.data),
+            status="activo",
+        )
+        database.session.add(DATA)
+        database.session.commit()
+        return redirect(url_for("contabilidad.proyectos"))
+
+    return render_template(
+        "contabilidad/proyecto_crear.html",
         titulo=TITULO,
+        form=formulario,
+    )
+
+
+@contabilidad.route("/project/<project_id>/edit", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def editar_proyecto(project_id):
+    """Editar un proyecto existente."""
+    from cacao_accounting.contabilidad.forms import FormularioProyecto
+    from cacao_accounting.database import Project
+
+    proyecto = database.session.execute(database.select(Project).filter_by(code=project_id)).scalar_one_or_none()
+    if proyecto is None:
+        return redirect(url_for("contabilidad.proyectos"))
+
+    formulario = FormularioProyecto(obj=proyecto)
+    formulario.id.data = proyecto.code
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    TITULO = "Editar Proyecto - " + APPNAME
+
+    if formulario.validate_on_submit():
+        proyecto.name = request.form.get("nombre", proyecto.name)
+        proyecto.entity = request.form.get("entidad", proyecto.entity)
+        proyecto.start = formulario.inicio.data
+        proyecto.end = formulario.fin.data
+        proyecto.budget = float(formulario.presupuesto.data or 0)
+        proyecto.enabled = bool(formulario.habilitado.data)
+        database.session.commit()
+        return redirect(url_for("contabilidad.proyectos"))
+
+    return render_template(
+        "contabilidad/proyecto_crear.html",
+        titulo=TITULO,
+        form=formulario,
+        edit=True,
+    )
+
+
+@contabilidad.route("/project/<project_id>/delete")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def eliminar_proyecto(project_id):
+    """Elimina un proyecto."""
+    from cacao_accounting.database import Project
+
+    proyecto = database.session.execute(database.select(Project).filter_by(code=project_id)).scalar_one_or_none()
+    if proyecto:
+        database.session.delete(proyecto)
+        database.session.commit()
+    return redirect(url_for("contabilidad.proyectos"))
+
+
+# <------------------------------------------------------------------------------------------------------------------------> #
+# Proyectos
+@contabilidad.route("/fiscal_year/list")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def fiscal_year_list():
+    """Listado de años fiscales."""
+    from cacao_accounting.database import FiscalYear
+
+    CONSULTA = database.paginate(
+        database.select(FiscalYear),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+
+    return render_template(
+        "contabilidad/fiscal_year_lista.html",
+        titulo="Años Fiscales - " + APPNAME,
         consulta=CONSULTA,
         statusweb=STATUS,
     )
+
+
+@contabilidad.route("/fiscal_year/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def fiscal_year_new():
+    """Crear un nuevo año fiscal."""
+    from cacao_accounting.contabilidad.forms import FormularioFiscalYear
+    from cacao_accounting.database import FiscalYear
+
+    formulario = FormularioFiscalYear()
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    TITULO = "Nuevo Año Fiscal - " + APPNAME
+
+    if formulario.validate_on_submit():
+        DATA = FiscalYear(
+            entity=request.form.get("entidad", None),
+            name=request.form.get("id", None),
+            year_start_date=formulario.inicio.data,
+            year_end_date=formulario.fin.data,
+            is_closed=bool(formulario.cerrado.data),
+        )
+        database.session.add(DATA)
+        database.session.commit()
+        return redirect(url_for("contabilidad.fiscal_year_list"))
+
+    return render_template(
+        "contabilidad/fiscal_year_crear.html",
+        titulo=TITULO,
+        form=formulario,
+    )
+
+
+@contabilidad.route("/fiscal_year/<fy_id>/edit", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def fiscal_year_edit(fy_id):
+    """Editar un año fiscal."""
+    from cacao_accounting.contabilidad.forms import FormularioFiscalYear
+    from cacao_accounting.database import FiscalYear
+
+    fiscal_year = database.session.execute(database.select(FiscalYear).filter_by(id=fy_id)).scalar_one_or_none()
+    if fiscal_year is None:
+        return redirect(url_for("contabilidad.fiscal_year_list"))
+
+    formulario = FormularioFiscalYear(obj=fiscal_year)
+    formulario.id.data = fiscal_year.name
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    TITULO = "Editar Año Fiscal - " + APPNAME
+
+    if formulario.validate_on_submit():
+        fiscal_year.entity = request.form.get("entidad", fiscal_year.entity)
+        fiscal_year.name = request.form.get("id", fiscal_year.name)
+        fiscal_year.year_start_date = formulario.inicio.data
+        fiscal_year.year_end_date = formulario.fin.data
+        fiscal_year.is_closed = bool(formulario.cerrado.data)
+        database.session.commit()
+        return redirect(url_for("contabilidad.fiscal_year_list"))
+
+    return render_template(
+        "contabilidad/fiscal_year_crear.html",
+        titulo=TITULO,
+        form=formulario,
+        edit=True,
+    )
+
+
+@contabilidad.route("/fiscal_year/<fy_id>/delete")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def fiscal_year_delete(fy_id):
+    """Elimina un año fiscal."""
+    from cacao_accounting.database import FiscalYear
+
+    fiscal_year = database.session.execute(database.select(FiscalYear).filter_by(id=fy_id)).scalar_one_or_none()
+    if fiscal_year:
+        database.session.delete(fiscal_year)
+        database.session.commit()
+    return redirect(url_for("contabilidad.fiscal_year_list"))
+
+
+# <------------------------------------------------------------------------------------------------------------------------> #
+# Años Fiscales
+@contabilidad.route("/accounting_period/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def accounting_period_new():
+    """Crear un nuevo período contable."""
+    from cacao_accounting.contabilidad.forms import FormularioAccountingPeriod
+    from cacao_accounting.database import AccountingPeriod, FiscalYear
+
+    formulario = FormularioAccountingPeriod()
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.fiscal_year.choices = [("", "Seleccione un año fiscal")]
+    fiscal_years = database.session.execute(database.select(FiscalYear)).scalars().all()
+    formulario.fiscal_year.choices += [
+        (fy.id, fy.name)
+        for fy in fiscal_years
+    ]
+    TITULO = "Nuevo Período Contable - " + APPNAME
+
+    if formulario.validate_on_submit():
+        DATA = AccountingPeriod(
+            entity=request.form.get("entidad", None),
+            fiscal_year_id=request.form.get("fiscal_year", None),
+            name=request.form.get("nombre", None),
+            status=request.form.get("status", None),
+            enabled=bool(formulario.habilitado.data),
+            is_closed=bool(formulario.cerrado.data),
+            start=formulario.inicio.data,
+            end=formulario.fin.data,
+        )
+        database.session.add(DATA)
+        database.session.commit()
+        return redirect(url_for("contabilidad.periodo_contable"))
+
+    return render_template(
+        "contabilidad/periodo_crear.html",
+        titulo=TITULO,
+        form=formulario,
+    )
+
+
+@contabilidad.route("/accounting_period/<period_id>/edit", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def accounting_period_edit(period_id):
+    """Editar un período contable."""
+    from cacao_accounting.contabilidad.forms import FormularioAccountingPeriod
+    from cacao_accounting.database import AccountingPeriod, FiscalYear
+
+    period = database.session.execute(database.select(AccountingPeriod).filter_by(id=period_id)).scalar_one_or_none()
+    if period is None:
+        return redirect(url_for("contabilidad.periodo_contable"))
+
+    formulario = FormularioAccountingPeriod(obj=period)
+    formulario.id.data = period.name
+    fiscal_years = database.session.execute(database.select(FiscalYear)).scalars().all()
+    formulario.fiscal_year.choices = [
+        (fy.id, fy.name)
+        for fy in fiscal_years
+    ]
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    TITULO = "Editar Período Contable - " + APPNAME
+
+    if formulario.validate_on_submit():
+        period.entity = request.form.get("entidad", period.entity)
+        period.fiscal_year_id = request.form.get("fiscal_year", period.fiscal_year_id)
+        period.name = request.form.get("nombre", period.name)
+        period.status = request.form.get("status", period.status)
+        period.enabled = bool(formulario.habilitado.data)
+        period.is_closed = bool(formulario.cerrado.data)
+        period.start = formulario.inicio.data
+        period.end = formulario.fin.data
+        database.session.commit()
+        return redirect(url_for("contabilidad.periodo_contable"))
+
+    return render_template(
+        "contabilidad/periodo_crear.html",
+        titulo=TITULO,
+        form=formulario,
+        edit=True,
+    )
+
+
+@contabilidad.route("/accounting_period/<period_id>/delete")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def accounting_period_delete(period_id):
+    """Elimina un período contable."""
+    from cacao_accounting.database import AccountingPeriod
+
+    period = database.session.execute(database.select(AccountingPeriod).filter_by(id=period_id)).scalar_one_or_none()
+    if period:
+        database.session.delete(period)
+        database.session.commit()
+    return redirect(url_for("contabilidad.periodo_contable"))
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
@@ -598,13 +1051,71 @@ def periodo_contable():
 
 # <------------------------------------------------------------------------------------------------------------------------> #
 # Comprobante contable
+@contabilidad.route("/journal/list")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def listar_comprobantes():
+    """Lista comprobantes contables manuales."""
+    from cacao_accounting.contabilidad.journal_repository import list_journals
+
+    return render_template(
+        "contabilidad/journal_lista.html",
+        consulta=list_journals(),
+        titulo="Comprobantes Contables - " + APPNAME,
+    )
+
+
 @contabilidad.route("/journal/new", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
 def nuevo_comprobante():
     """Nuevo comprobante contable."""
-    return redirect(url_for("contabilidad.gl.gl_new"))
+    from cacao_accounting.contabilidad.journal_service import (
+        JournalValidationError,
+        create_journal_draft,
+        parse_journal_form,
+    )
+    from cacao_accounting.form_preferences import DEFAULT_VIEW_KEY, JOURNAL_FORM_KEY, get_form_preference
+
+    if request.method == "POST":
+        try:
+            journal = create_journal_draft(parse_journal_form(request.form), user_id=str(current_user.id))
+        except JournalValidationError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Comprobante contable guardado como borrador.", "success")
+            return redirect(url_for("contabilidad.ver_comprobante", identifier=journal.id))
+
+    TITULO = "Nuevo Comprobante Contable - " + APPNAME
+    column_preferences = get_form_preference(str(current_user.id), JOURNAL_FORM_KEY, DEFAULT_VIEW_KEY)
+    return render_template(
+        "contabilidad/journal_nuevo.html",
+        titulo=TITULO,
+        column_preferences=column_preferences,
+        form_key=JOURNAL_FORM_KEY,
+        view_key=DEFAULT_VIEW_KEY,
+        initial_journal=None,
+        submit_url=url_for("contabilidad.nuevo_comprobante"),
+    )
+
+
+@contabilidad.route("/journal/<identifier>/submit", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def contabilizar_comprobante(identifier: str):
+    """Contabiliza un comprobante contable manual."""
+    from cacao_accounting.contabilidad.journal_service import JournalValidationError, submit_journal
+
+    try:
+        submit_journal(identifier)
+    except JournalValidationError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("Comprobante contable contabilizado.", "success")
+    return redirect(url_for("contabilidad.ver_comprobante", identifier=identifier))
 
 
 @contabilidad.route("/journal/<identifier>")
@@ -613,7 +1124,20 @@ def nuevo_comprobante():
 @verifica_acceso("accounting")
 def ver_comprobante(identifier: str):
     """Ver comprobante contable."""
-    return redirect(url_for("contabilidad.gl.gl_list"))
+    from cacao_accounting.contabilidad.journal_repository import get_journal, list_journal_lines
+    from cacao_accounting.contabilidad.journal_service import serialize_journal_for_form
+
+    journal = get_journal(identifier)
+    if journal is None:
+        flash("El comprobante contable indicado no existe.", "warning")
+        return redirect(url_for("contabilidad.conta"))
+    return render_template(
+        "contabilidad/journal.html",
+        registro=journal,
+        lineas=list_journal_lines(identifier),
+        selected_books=(serialize_journal_for_form(journal).get("books") or []),
+        titulo="Comprobante Contable - " + APPNAME,
+    )
 
 
 @contabilidad.route("/journal/edit/<identifier>", methods=["GET", "POST"])
@@ -622,7 +1146,43 @@ def ver_comprobante(identifier: str):
 @verifica_acceso("accounting")
 def editar_comprobante(identifier: str):
     """Editar comprobante contable."""
-    return redirect(url_for("contabilidad.gl.gl_list"))
+    from cacao_accounting.contabilidad.journal_repository import get_journal
+    from cacao_accounting.contabilidad.journal_service import (
+        JournalValidationError,
+        parse_journal_form,
+        serialize_journal_for_form,
+        update_journal_draft,
+    )
+    from cacao_accounting.form_preferences import DEFAULT_VIEW_KEY, JOURNAL_FORM_KEY, get_form_preference
+
+    journal = get_journal(identifier)
+    if journal is None:
+        flash("El comprobante contable indicado no existe.", "warning")
+        return redirect(url_for("contabilidad.listar_comprobantes"))
+    if journal.status != "draft":
+        flash("Solo se puede editar un comprobante en borrador.", "warning")
+        return redirect(url_for("contabilidad.ver_comprobante", identifier=identifier))
+
+    if request.method == "POST":
+        try:
+            journal = update_journal_draft(identifier, parse_journal_form(request.form), user_id=str(current_user.id))
+        except JournalValidationError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Comprobante contable actualizado.", "success")
+            return redirect(url_for("contabilidad.ver_comprobante", identifier=journal.id))
+
+    TITULO = "Editar Comprobante Contable - " + APPNAME
+    column_preferences = get_form_preference(str(current_user.id), JOURNAL_FORM_KEY, DEFAULT_VIEW_KEY)
+    return render_template(
+        "contabilidad/journal_nuevo.html",
+        titulo=TITULO,
+        column_preferences=column_preferences,
+        form_key=JOURNAL_FORM_KEY,
+        view_key=DEFAULT_VIEW_KEY,
+        initial_journal=serialize_journal_for_form(journal),
+        submit_url=url_for("contabilidad.editar_comprobante", identifier=identifier),
+    )
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
@@ -770,6 +1330,95 @@ def naming_series_toggle_default(series_id: str):
         serie.is_default = False
 
     database.session.commit()
+    return redirect(url_for("contabilidad.naming_series_list"))
+
+
+@contabilidad.route("/naming-series/<series_id>/edit", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def naming_series_edit(series_id: str):
+    """Editar una serie de numeracion."""
+    from cacao_accounting.contabilidad.forms import FormularioNamingSeries
+    from cacao_accounting.database import Entity, NamingSeries, Sequence, SeriesSequenceMap
+    from cacao_accounting.document_identifiers import enforce_single_default_series
+
+    serie = database.session.get(NamingSeries, series_id)
+    if serie is None:
+        return redirect(url_for("contabilidad.naming_series_list"))
+
+    form = FormularioNamingSeries(obj=serie)
+    entidades = database.session.execute(database.select(Entity)).scalars().all()
+    form.company.choices = [("", "— Global (sin compania) —")] + [(e.code, e.name) for e in entidades]
+    form.company.data = serie.company or ""
+    form.current_value.data = database.session.execute(
+        database.select(Sequence.current_value)
+        .join(SeriesSequenceMap, SeriesSequenceMap.sequence_id == Sequence.id)
+        .filter(SeriesSequenceMap.naming_series_id == series_id)
+    ).scalar_one_or_none() or 0
+
+    if form.validate_on_submit():
+        company = form.company.data or None
+        if form.is_default.data:
+            enforce_single_default_series(
+                entity_type=form.entity_type.data,
+                company=company,
+                exclude_id=serie.id,
+            )
+        serie.name = form.nombre.data
+        serie.entity_type = form.entity_type.data
+        serie.company = company
+        serie.prefix_template = form.prefix_template.data
+        serie.is_active = bool(form.is_active.data)
+        serie.is_default = bool(form.is_default.data)
+
+        sequence_id = database.session.execute(
+            database.select(SeriesSequenceMap.sequence_id)
+            .filter_by(naming_series_id=serie.id)
+        ).scalar_one_or_none()
+        if sequence_id:
+            sequence = database.session.get(Sequence, sequence_id)
+            sequence.current_value = form.current_value.data or 0
+            sequence.increment = form.increment.data or 1
+            sequence.padding = form.padding.data or 5
+            sequence.reset_policy = form.reset_policy.data or "never"
+
+        database.session.commit()
+        return redirect(url_for("contabilidad.naming_series_list"))
+
+    return render_template(
+        "contabilidad/naming_series_nueva.html",
+        form=form,
+        titulo="Editar Serie de Numeracion - " + APPNAME,
+        edit=True,
+    )
+
+
+@contabilidad.route("/naming-series/<series_id>/delete", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def naming_series_delete(series_id: str):
+    """Eliminar una serie de numeracion si no ha sido utilizada."""
+    from cacao_accounting.database import GeneratedIdentifierLog, NamingSeries, SeriesSequenceMap
+
+    serie = database.session.get(NamingSeries, series_id)
+    if serie is None:
+        return redirect(url_for("contabilidad.naming_series_list"))
+
+    has_history = (
+        database.session.execute(
+            database.select(GeneratedIdentifierLog)
+            .join(SeriesSequenceMap, GeneratedIdentifierLog.sequence_id == SeriesSequenceMap.sequence_id)
+            .filter(SeriesSequenceMap.naming_series_id == series_id)
+            .limit(1)
+        ).scalar_one_or_none()
+        is not None
+    )
+    if not has_history:
+        database.session.delete(serie)
+        database.session.commit()
+
     return redirect(url_for("contabilidad.naming_series_list"))
 
 

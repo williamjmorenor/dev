@@ -218,6 +218,90 @@ Calcular el saldo vivo de AR/AP desde las referencias de pago y agregar cobertur
 2. Avanzar en la UI de reconciliación bancaria.
 3. Extender pruebas para `DeliveryNote` y notas de crédito de venta.
 
+## 2026-05-06 (corrección de setup inicial y mapping de cuentas por defecto)
+
+### Peticion del usuario
+Corregir el setup inicial cuando se selecciona un catálogo predefinido, evitando completar el proceso sin aplicar el mapping de `CompanyDefaultAccount`.
+
+### Plan implementado
+1. Validar que un catálogo preexistente seleccionado exista y tenga mapping JSON antes de finalizar el setup.
+2. Hacer que el proceso falle con un error claro si el catálogo faltante o no tiene mapping de cuentas por defecto.
+3. Confirmar con prueba de regresión que un catálogo inválido no completa el setup silenciosamente.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/setup/service.py`: ahora lanza `ValueError` cuando el catálogo seleccionado no está disponible o carece de mapping JSON.
+- `cacao_accounting/setup/service.py`: agrega `database.session.commit()` al final de `finalize_setup` para asegurar la persistencia de la entidad, el catálogo y las cuentas por defecto.
+- `tests/test_08_reconciliation_reports.py`: nueva prueba de regresión para `finalize_setup` con un catálogo inválido.
+
+### Verificacion ejecutada
+- `pytest -q tests/test_08_reconciliation_reports.py -q` -> 30 passed.
+
+### Notas para siguiente iteracion
+1. Revisar la inclusión de archivos de mapping JSON en el paquete distribuible.
+2. Añadir cobertura de pruebas de UI para el wizard de setup si hay cambios en Render.
+3. Auditar la lógica de persistencia de transacciones en el flujo de setup.
+
+## 2026-05-07 (cierre de libros contables múltiples en comprobante manual)
+
+### Peticion del usuario
+Finalizar la implementación de libros contables para permitir múltiples libros por compañía con estado activo/inactivo, moneda por libro y selección explícita en el formulario de nuevo comprobante contable usando checkboxes preseleccionados.
+
+### Plan implementado
+1. Extender el mantenimiento de `Book` para capturar moneda y estado (`activo` / `inactivo`).
+2. Ajustar el flujo de `Journal Entry` para persistir selección múltiple de libros y tratar “todos seleccionados” como aplicar a todos los libros activos.
+3. Filtrar el posting multi-ledger para excluir libros inactivos y permitir subset explícito sólo en el comprobante manual.
+4. Actualizar la bitácora y el estado consolidado del proyecto con el cierre de este slice.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/database/__init__.py`: `ComprobanteContable` ahora persiste `book_codes` para recordar la selección múltiple de libros.
+- `cacao_accounting/contabilidad/forms.py`: `FormularioLibro` ahora captura entidad, moneda y estado.
+- `cacao_accounting/contabilidad/__init__.py`: CRUD de libros actualizado para crear/editar moneda y estado; nuevo endpoint `/accounting/journal/books` lista libros activos por compañía.
+- `cacao_accounting/contabilidad/journal_service.py`: normaliza `books` como lista, guarda la selección múltiple y la usa al contabilizar el borrador.
+- `cacao_accounting/contabilidad/posting.py`: el motor multi-ledger ahora considera sólo libros activos (o legacy `status=NULL`) y acepta subsets explícitos de libros en el comprobante manual.
+- `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html`: el selector único de libro fue reemplazado por checkboxes de libros activos preseleccionados; si quedan todos marcados se contabiliza contra todos.
+- `cacao_accounting/contabilidad/templates/contabilidad/book_*.html`: vistas de libros actualizadas para exponer moneda, estado y acciones correctas.
+- `cacao_accounting/__init__.py`: el factory asigna una `SECRET_KEY` utilizable en modo testing cuando la configuración llega vacía, evitando `NullSession` en pruebas HTTP.
+- `cacao_accounting/contabilidad/journal_repository.py` y `cacao_accounting/contabilidad/journal_service.py`: soporte para reemplazar líneas y actualizar un comprobante manual en estado borrador.
+- `cacao_accounting/contabilidad/__init__.py` y `cacao_accounting/contabilidad/templates/contabilidad/journal.html`: el borrador puede abrirse en modo edición antes de contabilizar.
+- `tests/test_09_journal_entry_form.py`: nuevas pruebas HTTP y de servicio para validar borrador, edición, endpoint de libros activos y contabilización multi-book.
+
+### Verificacion ejecutada
+- `SECRET_KEY=test-secret python -m pytest -q tests/test_09_journal_entry_form.py -k 'test_create_journal_draft_preserves_lines_and_does_not_post_gl or test_journal_service_rejects_unbalanced_and_double_sided_lines or test_submit_journal_posts_only_selected_books or test_submit_journal_without_selected_books_posts_all_active_books'` -> 4 passed.
+- `python -m pytest -q tests/test_09_journal_entry_form.py` -> 11 passed.
+- `ruff check cacao_accounting/contabilidad/__init__.py cacao_accounting/contabilidad/forms.py cacao_accounting/contabilidad/journal_service.py cacao_accounting/contabilidad/posting.py tests/test_09_journal_entry_form.py` -> ok.
+- `python -m py_compile cacao_accounting/database/__init__.py cacao_accounting/contabilidad/__init__.py cacao_accounting/contabilidad/forms.py cacao_accounting/contabilidad/journal_service.py cacao_accounting/contabilidad/posting.py tests/test_09_journal_entry_form.py` -> sin errores.
+
+### Notas para siguiente iteracion
+1. Evaluar si se requiere migración formal para poblar `Book.status='activo'` en instalaciones existentes.
+2. Ampliar la edición de borradores para recalcular o reemitir `document_no` si cambia la serie seleccionada antes del submit.
+3. Extender la vista detalle del comprobante para mostrar labels enriquecidos de cuentas/dimensiones y no solo códigos.
+
+## 2026-05-07 (smoke test de rutas y reparación de endpoint roto)
+
+### Peticion del usuario
+Corregir el acceso al módulo de contabilidad bloqueado por `BuildError` en `contabilidad.proyectos` y ajustar `tests/test_routes_map.py` para recorrer el `url_map` de la aplicación y detectar rutas rotas automáticamente.
+
+### Plan implementado
+1. Restaurar el endpoint faltante `contabilidad.proyectos` para que `/accounting/` y las plantillas relacionadas puedan construir enlaces válidos.
+2. Reemplazar `tests/test_routes_map.py` por un smoke test autosuficiente que use el `url_map` real de Flask, inicie sesión como admin y visite todas las rutas GET estáticas construibles.
+3. Corregir fallos adicionales encontrados por ese barrido hasta dejar la prueba en verde.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/__init__.py`: añadido nuevamente el endpoint `/accounting/project/list` con nombre `contabilidad.proyectos`.
+- `cacao_accounting/auth/__init__.py`: `permisos_usuario` usa `current_user.user` en lugar de un atributo inexistente `current_user.usuario`.
+- `cacao_accounting/auth/permisos.py`: reemplazo de `User.query.get()` por `database.session.get()` para eliminar warnings legacy durante el smoke test.
+- `tests/test_routes_map.py`: nueva prueba basada en `url_map`, con app/DB in-memory, seed mínimo funcional y verificación de que las rutas GET estáticas no respondan con 404 ni 5xx.
+
+### Verificacion ejecutada
+- `python -m pytest -q tests/test_routes_map.py` -> 2 passed.
+- `ruff check cacao_accounting/contabilidad/__init__.py cacao_accounting/auth/__init__.py cacao_accounting/auth/permisos.py tests/test_routes_map.py` -> ok.
+- `python -m py_compile cacao_accounting/contabilidad/__init__.py cacao_accounting/auth/__init__.py cacao_accounting/auth/permisos.py tests/test_routes_map.py` -> sin errores.
+
+### Notas para siguiente iteracion
+1. Extender el smoke test para cubrir rutas dinámicas con fixtures de datos representativos por módulo.
+2. Revisar si conviene clasificar explícitamente endpoints API que responden 400/404 por falta de query params para separar errores funcionales de errores de routing.
+3. Añadir una variante anónima del barrido si se quiere validar redirecciones a login como contrato estable.
+
 ## 2026-05-04
 
 ### Peticion del usuario
@@ -1156,3 +1240,37 @@ En el último paso del setup inicial, deshabilitar el selector de catálogos de 
 - `mypy cacao_accounting/setup/service.py cacao_accounting/setup/forms.py` -> passed.
 - `pytest -q tests/test_08_reconciliation_reports.py::test_setup_with_predefined_catalog_creates_complete_company_defaults -q` -> passed.
 - `git diff --check` -> passed.
+
+## 2026-05-06 (GL Entry acoplado al backend)
+
+### Peticion del usuario
+Implementar un nuevo formulario de comprobante contable manual acoplado al backend desde el blueprint principal de `contabilidad`, tomando `cacao_accounting/contabilidad/gl/` como implementación legacy desacoplada. El formulario debe guardar borrador, usar Smart Select, permitir grilla rápida con detalle avanzado tipo ERPNext, persistir columnas por usuario en backend y dejar contabilización como acción separada. Además, registrar como decisión mandatoria que los nombres técnicos de tipos de transacción se mantienen en inglés.
+
+### Decisiones de diseño
+- `cacao_accounting/contabilidad/gl/` queda como legacy visual; el nuevo flujo vive en `/accounting/journal/new`.
+- El primer botón guarda borrador; `POST /accounting/journal/<id>/submit` contabiliza posteriormente usando el motor contable existente.
+- Decisión mandatoria: todo nombre técnico persistido de tipo documental/transaccional debe estar en inglés (`transaction_type`, `voucher_type`, `entity_type`, `doctype`, `journal_entry`, `purchase_invoice`, etc.). Las etiquetas visibles al usuario se traducen con i18n, pero los valores técnicos no se localizan.
+- La configuración de columnas se guarda por usuario en backend, nunca en `localStorage`.
+
+### Plan implementado
+1. Agregar `UserFormPreference` para persistir layout por `user_id + form_key + view_key`.
+2. Crear `contabilidad/journal_service.py` y `contabilidad/journal_repository.py` para separar rutas, validaciones y acceso a datos.
+3. Reemplazar `/accounting/journal/new` para renderizar el nuevo formulario y guardar `ComprobanteContable` + `ComprobanteContableDetalle` en estado `draft`.
+4. Agregar `/accounting/journal/<id>` para ver el borrador y `/accounting/journal/<id>/submit` para contabilizar.
+5. Extender Smart Select con doctypes `company`, `book`, `cost_center`, `unit`, `project` y `party`.
+6. Agregar API de preferencias `/api/form-preferences/<form_key>/<view_key>` con GET, PUT y DELETE.
+7. Crear templates `journal_nuevo.html` y `journal.html`.
+8. Agregar pruebas específicas del servicio, rutas, Smart Select y preferencias.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/database/__init__.py`: modelo `UserFormPreference` y campos documentales mínimos en `ComprobanteContable`.
+- `cacao_accounting/contabilidad/journal_service.py`: validación de balance, líneas de un solo lado, normalización de payload y contabilización.
+- `cacao_accounting/contabilidad/journal_repository.py`: persistencia y lectura de comprobantes manuales.
+- `cacao_accounting/contabilidad/__init__.py`: rutas reales de nuevo/ver/submit de Journal Entry.
+- `cacao_accounting/search_select.py`: nuevos doctypes para el formulario contable.
+- `cacao_accounting/api/__init__.py` y `cacao_accounting/form_preferences.py`: API y servicio de preferencias por usuario.
+- `tests/test_09_journal_entry_form.py`: cobertura del nuevo flujo.
+
+### Verificacion ejecutada
+- `python -m py_compile cacao_accounting/database/__init__.py cacao_accounting/search_select.py cacao_accounting/api/__init__.py cacao_accounting/contabilidad/__init__.py cacao_accounting/contabilidad/journal_service.py cacao_accounting/contabilidad/journal_repository.py cacao_accounting/form_preferences.py` -> sin errores.
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest tests/test_09_journal_entry_form.py -q` -> 6 passed, 3 warnings de deprecación SQLAlchemy existentes.

@@ -311,15 +311,17 @@ static_rutes = [
         ],
     ),
     Route(
-        url="/accounting/gl/list",
+        url="/accounting/journal/list",
         text=[
             "Listado de Comprobantes Contables.".encode("utf-8"),
+            "Nuevo".encode("utf-8"),
         ],
     ),
     Route(
-        url="/accounting/gl/new",
+        url="/accounting/journal/new",
         text=[
-            "Crear un Nuevo Comprobante de Diario.".encode("utf-8"),
+            "Comprobante contable".encode("utf-8"),
+            "Guardar borrador".encode("utf-8"),
         ],
     ),
     Route(

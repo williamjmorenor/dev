@@ -1,0 +1,116 @@
+{% set acceso = permisos(modulo=id_modulo("accounting"), usuario=usuario.id) %}
+{% extends "base.html" %}
+{% block contenido %}
+{% import "macros.html" as macros %}
+
+<nav aria-label="{{ _('breadcrumb') }}">
+  <ol class="breadcrumb lh-sm">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark">
+        <i class="bi bi-house"></i> {{ _('Inicio') }}
+      </a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('contabilidad.conta') }}" class="link-dark">{{ _('Contabilidad') }}</a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+  </ol>
+</nav>
+
+<div class="ca-card" style="max-width:960px;">
+  <div class="ca-card-header">
+    <h5 class="ca-card-title">
+      <i class="bi bi-receipt"></i> {{ registro.document_no or registro.id }}
+      <span class="badge bg-secondary ms-2">{{ _(registro.status or 'draft') }}</span>
+    </h5>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if registro.status == "draft" %}
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('contabilidad.editar_comprobante', identifier=registro.id) }}">
+        <i class="bi bi-pencil-square me-1"></i>{{ _('Editar borrador') }}
+      </a>
+      <form method="post" action="{{ url_for('contabilidad.contabilizar_comprobante', identifier=registro.id) }}">
+        <button class="btn btn-sm btn-success" type="submit">
+          <i class="bi bi-check2-circle me-1"></i>{{ _('Contabilizar') }}
+        </button>
+      </form>
+      {% endif %}
+      <a class="btn btn-sm btn-primary" href="{{ url_for('contabilidad.nuevo_comprobante') }}">
+        <i class="bi bi-plus-lg me-1"></i>{{ _('Nuevo') }}
+      </a>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('contabilidad.listar_comprobantes') }}">
+        <i class="bi bi-list-ul me-1"></i>{{ _('Listado') }}
+      </a>
+    </div>
+  </div>
+  <div class="row g-3 mt-1">
+    <div class="col-md-6">
+      <p class="mb-1" style="font-size:.75rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.05em;">{{ _('Datos Generales') }}</p>
+      <table class="ca-table">
+        <caption class="visually-hidden">{{ _('Datos generales del comprobante contable') }}</caption>
+        <thead>
+          <tr><th scope="col">{{ _('Campo') }}</th><th scope="col">{{ _('Valor') }}</th></tr>
+        </thead>
+        <tbody>
+          <tr><td style="color:#64748b;">{{ _('Documento') }}</td><td>{{ registro.document_no or registro.id }}</td></tr>
+          <tr><td style="color:#64748b;">{{ _('Compañía') }}</td><td>{{ registro.entity }}</td></tr>
+          <tr><td style="color:#64748b;">{{ _('Libros') }}</td><td>{{ ', '.join(selected_books) if selected_books else (registro.book or '') }}</td></tr>
+          <tr><td style="color:#64748b;">{{ _('Fecha') }}</td><td>{{ registro.date }}</td></tr>
+          <tr><td style="color:#64748b;">{{ _('Estado') }}</td><td>{{ _(registro.status or 'draft') }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col-md-6">
+      <p class="mb-1" style="font-size:.75rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.05em;">{{ _('Referencia') }}</p>
+      <table class="ca-table">
+        <caption class="visually-hidden">{{ _('Referencia del comprobante contable') }}</caption>
+        <thead>
+          <tr><th scope="col">{{ _('Campo') }}</th><th scope="col">{{ _('Valor') }}</th></tr>
+        </thead>
+        <tbody>
+          <tr><td style="color:#64748b;">{{ _('Referencia') }}</td><td>{{ registro.reference or '' }}</td></tr>
+          <tr><td style="color:#64748b;">{{ _('Concepto') }}</td><td>{{ registro.memo or '' }}</td></tr>
+          <tr><td style="color:#64748b;">{{ _('Usuario') }}</td><td>{{ registro.user_id or '' }}</td></tr>
+          <tr><td style="color:#64748b;">{{ _('Serie') }}</td><td>{{ registro.serie or '' }}</td></tr>
+          <tr><td style="color:#64748b;">{{ _('ID') }}</td><td>{{ registro.id }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="ca-card mt-3">
+  <div class="ca-card-header">
+    <h6 class="ca-card-title mb-0"><i class="bi bi-table me-1"></i>{{ _('Líneas') }}</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="ca-table">
+      <caption class="visually-hidden">{{ _('Líneas del comprobante contable') }}</caption>
+      <thead>
+        <tr>
+          <th>{{ _('No.') }}</th>
+          <th>{{ _('Cuenta') }}</th>
+          <th>{{ _('Centro de costos') }}</th>
+          <th>{{ _('Tercero') }}</th>
+          <th class="text-end">{{ _('Debe') }}</th>
+          <th class="text-end">{{ _('Haber') }}</th>
+          <th>{{ _('Observaciones') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linea in lineas %}
+        <tr>
+          <td>{{ linea.order }}</td>
+          <td>{{ linea.account }}</td>
+          <td>{{ linea.cost_center or '' }}</td>
+          <td>{{ linea.third_code or '' }}</td>
+          <td class="text-end">{{ "%.2f"|format(linea.value if linea.value and linea.value > 0 else 0) }}</td>
+          <td class="text-end">{{ "%.2f"|format(-linea.value if linea.value and linea.value < 0 else 0) }}</td>
+          <td>{{ linea.memo or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

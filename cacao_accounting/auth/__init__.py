@@ -110,7 +110,7 @@ def test_roles():  # pragma: no cover
     return render_template(
         "test_roles.html",
         permisos=Permisos,
-        roles=obtener_roles_por_usuario(current_user.usuario),
+        roles=obtener_roles_por_usuario(current_user.user),
         modulos=MODULOS,
     )
 

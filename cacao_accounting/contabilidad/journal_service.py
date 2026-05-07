@@ -1,0 +1,399 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
+
+"""Servicio de comprobantes contables manuales."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
+from cacao_accounting.contabilidad.journal_repository import (
+    add_journal,
+    get_journal,
+    list_journal_lines,
+    replace_journal_lines,
+)
+from cacao_accounting.contabilidad.posting import PostingError, post_comprobante_contable
+from cacao_accounting.database import Accounts, ComprobanteContable, ComprobanteContableDetalle, database
+from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
+
+JOURNAL_ENTITY_TYPE = "journal_entry"
+JOURNAL_TRANSACTION_TYPE = "journal_entry"
+JOURNAL_STATUS_DRAFT = "draft"
+JOURNAL_STATUS_SUBMITTED = "submitted"
+
+
+class JournalValidationError(ValueError):
+    """Error validado en la captura de comprobantes manuales."""
+
+
+@dataclass(frozen=True)
+class JournalLineInput:
+    """Linea normalizada de comprobante contable manual."""
+
+    order: int
+    account: str
+    cost_center: str | None
+    party_type: str | None
+    party: str | None
+    debit: Decimal
+    credit: Decimal
+    unit: str | None
+    project: str | None
+    currency: str | None
+    exchange_rate: Decimal | None
+    reference_type: str | None
+    reference_name: str | None
+    reference1: str | None
+    reference2: str | None
+    remarks: str | None
+    is_advance: bool
+
+
+@dataclass(frozen=True)
+class JournalDraftInput:
+    """Datos normalizados de cabecera y lineas de un comprobante."""
+
+    company: str
+    posting_date: date
+    books: list[str] | None
+    naming_series_id: str | None
+    reference: str | None
+    memo: str | None
+    lines: list[JournalLineInput]
+
+
+def create_journal_draft(payload: dict[str, Any], user_id: str) -> ComprobanteContable:
+    """Crea un comprobante contable manual en borrador."""
+    data = _normalize_journal_payload(payload)
+    _validate_balanced_lines(data.lines)
+    primary_book = data.books[0] if data.books else None
+    journal = ComprobanteContable(
+        entity=data.company,
+        book=primary_book,
+        user_id=user_id,
+        date=data.posting_date,
+        reference=data.reference,
+        memo=data.memo,
+        status=JOURNAL_STATUS_DRAFT,
+        voucher_type=JOURNAL_TRANSACTION_TYPE,
+        naming_series_id=data.naming_series_id,
+        book_codes=_serialize_book_codes(data.books),
+    )
+    lines = [_line_model(data.company, data.posting_date, primary_book, line) for line in data.lines]
+    journal = add_journal(journal, lines)
+    _assign_identifier_if_needed(journal, data.naming_series_id)
+    database.session.commit()
+    return journal
+
+
+def submit_journal(journal_id: str) -> list[Any]:
+    """Contabiliza un comprobante manual en borrador."""
+    journal = get_journal(journal_id)
+    if journal is None:
+        raise JournalValidationError("El comprobante indicado no existe.")
+    if journal.status != JOURNAL_STATUS_DRAFT:
+        raise JournalValidationError("Solo se puede contabilizar un comprobante en borrador.")
+    try:
+        entries = post_comprobante_contable(journal, ledger_code=_selected_books_for_journal(journal))
+    except PostingError as exc:
+        database.session.rollback()
+        raise JournalValidationError(str(exc)) from exc
+    journal.status = JOURNAL_STATUS_SUBMITTED
+    database.session.add(journal)
+    database.session.commit()
+    return entries
+
+
+def update_journal_draft(journal_id: str, payload: dict[str, Any], user_id: str) -> ComprobanteContable:
+    """Actualiza un comprobante manual en borrador."""
+    journal = get_journal(journal_id)
+    if journal is None:
+        raise JournalValidationError("El comprobante indicado no existe.")
+    if journal.status != JOURNAL_STATUS_DRAFT:
+        raise JournalValidationError("Solo se puede editar un comprobante en borrador.")
+
+    data = _normalize_journal_payload(payload)
+    _validate_balanced_lines(data.lines)
+    primary_book = data.books[0] if data.books else None
+
+    journal.entity = data.company
+    journal.book = primary_book
+    journal.book_codes = _serialize_book_codes(data.books)
+    journal.date = data.posting_date
+    journal.reference = data.reference
+    journal.memo = data.memo
+    journal.naming_series_id = data.naming_series_id
+    journal.user_id = user_id
+
+    lines = [_line_model(data.company, data.posting_date, primary_book, line) for line in data.lines]
+    journal = replace_journal_lines(journal, lines)
+    database.session.commit()
+    return journal
+
+
+def serialize_journal_for_form(journal: ComprobanteContable) -> dict[str, Any]:
+    """Convierte un comprobante manual a un payload compatible con el formulario."""
+    lines = list_journal_lines(journal.id)
+    selected_books = _selected_books_for_journal(journal)
+    return {
+        "company": journal.entity,
+        "company_label": journal.entity,
+        "posting_date": journal.date.isoformat() if journal.date else None,
+        "books": selected_books or [],
+        "naming_series_id": journal.naming_series_id,
+        "naming_series_label": journal.document_no or journal.serie or "",
+        "reference": journal.reference or "",
+        "memo": journal.memo or "",
+        "lines": [_serialize_journal_line(line) for line in lines],
+    }
+
+
+def parse_journal_form(form_data: Any) -> dict[str, Any]:
+    """Convierte datos del formulario HTML en payload de servicio."""
+    raw_payload = form_data.get("journal_payload")
+    if raw_payload:
+        try:
+            return json.loads(raw_payload)
+        except json.JSONDecodeError as exc:
+            raise JournalValidationError("El detalle del comprobante no tiene un formato valido.") from exc
+    return {
+        "company": form_data.get("company"),
+        "posting_date": form_data.get("posting_date"),
+        "book": form_data.get("book"),
+        "books": form_data.getlist("books") if hasattr(form_data, "getlist") else [],
+        "naming_series_id": form_data.get("naming_series_id"),
+        "reference": form_data.get("reference"),
+        "memo": form_data.get("memo"),
+        "lines": [],
+    }
+
+
+def _normalize_journal_payload(payload: dict[str, Any]) -> JournalDraftInput:
+    company = _required_text(payload.get("company"), "La compañia es obligatoria.")
+    posting_date = _parse_date(payload.get("posting_date"))
+    lines_payload = payload.get("lines") or []
+    if not isinstance(lines_payload, list):
+        raise JournalValidationError("Las lineas del comprobante no tienen un formato valido.")
+    lines = [_normalize_line(line, index + 1) for index, line in enumerate(lines_payload)]
+    lines = [line for line in lines if line.account or line.debit or line.credit]
+    if not lines:
+        raise JournalValidationError("El comprobante debe contener al menos una linea.")
+    books = _normalize_books(payload.get("books"))
+    if books is None and (book := _optional_text(payload.get("book"))):
+        books = [book]
+    return JournalDraftInput(
+        company=company,
+        posting_date=posting_date,
+        books=books,
+        naming_series_id=_optional_text(payload.get("naming_series_id")),
+        reference=_optional_text(payload.get("reference")),
+        memo=_optional_text(payload.get("memo")),
+        lines=lines,
+    )
+
+
+def _normalize_line(raw_line: Any, fallback_order: int) -> JournalLineInput:
+    if not isinstance(raw_line, dict):
+        raise JournalValidationError("Cada linea del comprobante debe ser un objeto.")
+    debit = _decimal(raw_line.get("debit"))
+    credit = _decimal(raw_line.get("credit"))
+    return JournalLineInput(
+        order=int(raw_line.get("order") or fallback_order),
+        account=_optional_text(raw_line.get("account")) or "",
+        cost_center=_optional_text(raw_line.get("cost_center")),
+        party_type=_optional_text(raw_line.get("party_type")),
+        party=_optional_text(raw_line.get("party")),
+        debit=debit,
+        credit=credit,
+        unit=_optional_text(raw_line.get("unit")),
+        project=_optional_text(raw_line.get("project")),
+        currency=_optional_text(raw_line.get("currency")),
+        exchange_rate=_optional_decimal(raw_line.get("exchange_rate")),
+        reference_type=_optional_text(raw_line.get("reference_type")),
+        reference_name=_optional_text(raw_line.get("reference_name")),
+        reference1=_optional_text(raw_line.get("reference1")),
+        reference2=_optional_text(raw_line.get("reference2")),
+        remarks=_optional_text(raw_line.get("remarks")),
+        is_advance=bool(raw_line.get("is_advance")),
+    )
+
+
+def _validate_balanced_lines(lines: list[JournalLineInput]) -> None:
+    total_debit = Decimal("0")
+    total_credit = Decimal("0")
+    for line in lines:
+        if not line.account:
+            raise JournalValidationError("Cada linea debe tener una cuenta contable.")
+        if line.debit < 0 or line.credit < 0:
+            raise JournalValidationError("Los importes de debe y haber no pueden ser negativos.")
+        if line.debit > 0 and line.credit > 0:
+            raise JournalValidationError("Una linea no puede tener debe y haber positivos al mismo tiempo.")
+        if line.debit == 0 and line.credit == 0:
+            raise JournalValidationError("Cada linea debe tener un importe en debe o en haber.")
+        total_debit += line.debit
+        total_credit += line.credit
+    if total_debit != total_credit:
+        raise JournalValidationError("El comprobante contable no esta balanceado.")
+
+
+def _line_model(
+    company: str,
+    posting_date: date,
+    book: str | None,
+    line: JournalLineInput,
+) -> ComprobanteContableDetalle:
+    amount = line.debit if line.debit > 0 else -line.credit
+    return ComprobanteContableDetalle(
+        entity=company,
+        account=_account_code(company, line.account),
+        cost_center=line.cost_center,
+        unit=line.unit,
+        project=line.project,
+        book=book,
+        date=posting_date,
+        transaction=ComprobanteContable.__tablename__,
+        order=line.order,
+        value=amount,
+        currency_id=line.currency,
+        exchange_rate=line.exchange_rate,
+        value_default=amount,
+        memo=line.remarks,
+        reference=line.reference_name,
+        line_memo=line.remarks,
+        internal_reference=line.reference_type,
+        internal_reference_id=line.reference_name,
+        reference1=line.reference1,
+        reference2=line.reference2,
+        third_type=line.party_type,
+        third_code=line.party,
+        voucher_type=JOURNAL_TRANSACTION_TYPE,
+    )
+
+
+def _assign_identifier_if_needed(journal: ComprobanteContable, naming_series_id: str | None) -> None:
+    setattr(journal, "company", journal.entity)
+    try:
+        assign_document_identifier(
+            document=journal,
+            entity_type=JOURNAL_ENTITY_TYPE,
+            posting_date_raw=journal.date,
+            naming_series_id=naming_series_id,
+        )
+    except IdentifierConfigurationError:
+        return
+    journal.serie = journal.document_no
+
+
+def _normalize_books(value: Any) -> list[str] | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        normalized = _optional_text(value)
+        return [normalized] if normalized else None
+    if not isinstance(value, list):
+        raise JournalValidationError("La selección de libros no tiene un formato valido.")
+
+    books: list[str] = []
+    for item in value:
+        normalized = _optional_text(item)
+        if normalized and normalized not in books:
+            books.append(normalized)
+    return books or None
+
+
+def _serialize_book_codes(books: list[str] | None) -> str | None:
+    if not books:
+        return None
+    return json.dumps(books)
+
+
+def _selected_books_for_journal(journal: ComprobanteContable) -> list[str] | None:
+    if journal.book_codes:
+        try:
+            return _normalize_books(json.loads(journal.book_codes))
+        except json.JSONDecodeError as exc:
+            raise JournalValidationError("La selección de libros del comprobante no es valida.") from exc
+    if journal.book:
+        return [str(journal.book)]
+    return None
+
+
+def _serialize_journal_line(line: ComprobanteContableDetalle) -> dict[str, Any]:
+    value = Decimal(str(line.value or 0))
+    return {
+        "order": line.order or 0,
+        "account": line.account or "",
+        "account_label": line.account or "",
+        "cost_center": line.cost_center or "",
+        "party_type": line.third_type or "",
+        "party": line.third_code or "",
+        "debit": str(value) if value > 0 else "",
+        "credit": str(abs(value)) if value < 0 else "",
+        "unit": line.unit or "",
+        "project": line.project or "",
+        "currency": line.currency_id or "",
+        "exchange_rate": str(line.exchange_rate) if line.exchange_rate is not None else "",
+        "reference_type": line.internal_reference or "",
+        "reference_name": line.internal_reference_id or line.reference or "",
+        "reference1": line.reference1 or "",
+        "reference2": line.reference2 or "",
+        "remarks": line.memo or line.line_memo or "",
+        "is_advance": bool(getattr(line, "is_advance", False)),
+        "bank_account": getattr(line, "bank_account", "") or "",
+    }
+
+
+def _account_code(company: str, account_value: str) -> str:
+    account = database.session.get(Accounts, account_value)
+    if account is not None:
+        if account.entity != company:
+            raise JournalValidationError("La cuenta contable no pertenece a la compañia del comprobante.")
+        return str(account.code)
+    account = (
+        database.session.execute(database.select(Accounts).filter_by(entity=company, code=account_value)).scalars().first()
+    )
+    if account is None:
+        raise JournalValidationError("La cuenta contable indicada no existe para la compañia.")
+    return str(account.code)
+
+
+def _required_text(value: Any, message: str) -> str:
+    normalized = _optional_text(value)
+    if not normalized:
+        raise JournalValidationError(message)
+    return normalized
+
+
+def _optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def _parse_date(value: Any) -> date:
+    normalized = _required_text(value, "La fecha de contabilizacion es obligatoria.")
+    try:
+        return date.fromisoformat(normalized)
+    except ValueError as exc:
+        raise JournalValidationError("La fecha de contabilizacion no es valida.") from exc
+
+
+def _decimal(value: Any) -> Decimal:
+    if value in (None, ""):
+        return Decimal("0")
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise JournalValidationError("Los importes del comprobante no son validos.") from exc
+
+
+def _optional_decimal(value: Any) -> Decimal | None:
+    if value in (None, ""):
+        return None
+    return _decimal(value)

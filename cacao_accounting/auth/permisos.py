@@ -103,7 +103,7 @@ class Permisos:
 
         self.usuario_model: User | None = None
         if usuario:
-            self.usuario_model = User.query.get(usuario)
+            self.usuario_model = database.session.get(User, usuario)
 
         if self.__init_valido:
             self.administrador: bool = self.valida_usuario_tiene_rol_administrativo()
