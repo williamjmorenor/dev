@@ -1274,3 +1274,35 @@ Implementar un nuevo formulario de comprobante contable manual acoplado al backe
 ### Verificacion ejecutada
 - `python -m py_compile cacao_accounting/database/__init__.py cacao_accounting/search_select.py cacao_accounting/api/__init__.py cacao_accounting/contabilidad/__init__.py cacao_accounting/contabilidad/journal_service.py cacao_accounting/contabilidad/journal_repository.py cacao_accounting/form_preferences.py` -> sin errores.
 - `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest tests/test_09_journal_entry_form.py -q` -> 6 passed, 3 warnings de deprecación SQLAlchemy existentes.
+
+## 2026-06-XX (implementación de FIXME items - UI y formularios)
+
+### Peticion del usuario
+Implementar los 8 ítems listados en FIXME.md: treeviews colapsables, nuevos formularios CRUD (moneda, tasa de cambio, cuenta), reorganización del menú (mover conciliación a Compras), links de año fiscal, campo habilitado/activo en entidad/unidad, y enum de estados en proyectos.
+
+### Plan implementado
+1. Agregar `FormularioMoneda`, `FormularioTasaCambio`, `FormularioCuenta` en `contabilidad/forms.py`.
+2. Agregar campo `status` (SelectField) a `FormularioProyecto` y campo `habilitado` a `FormularioEntidad` y `FormularioUnidad`.
+3. Agregar columna `enabled` al modelo `Unit` en `database/__init__.py`.
+4. Agregar rutas `nueva_moneda()`, `nueva_tasa_cambio()`, `nueva_cuenta()` en `contabilidad/__init__.py`.
+5. Actualizar rutas de proyecto/unidad para guardar `status`/`enabled`.
+6. Crear templates nuevos: `moneda_crear.html`, `tc_crear.html`, `cuenta_crear.html`.
+7. Actualizar templates: `moneda_lista.html` (habilitar botón), `tc_lista.html` (botón nuevo), `cuenta_lista.html` (botón + treeview Alpine.js colapsable), `centro-costo_lista.html` (treeview Alpine.js colapsable), `proyecto_crear.html` (campo status), `unidad_crear.html` (campo habilitado), `entidad_crear.html` (campo habilitado), `periodo_crear.html` (advertencia si no hay años fiscales).
+8. Agregar enlace a Años Fiscales en `contabilidad.html`.
+9. Mover Panel/Pendientes de Conciliación de `admin.html` a `compras.html`.
+10. Agregar `status` a `allowed_filters` de proyecto en `search_select.py` (para poder filtrar por estado desde formularios).
+
+### Resumen tecnico de cambios
+- `forms.py`: +FormularioMoneda, +FormularioTasaCambio, +FormularioCuenta, +status a FormularioProyecto, +habilitado a FormularioEntidad y FormularioUnidad.
+- `database/__init__.py`: Unit.enabled columna booleana agregada.
+- `contabilidad/__init__.py`: +nueva_moneda(), +nueva_tasa_cambio(), +nueva_cuenta(); proyecto y unidad ahora guardan status/enabled; periodo_crear pasa no_fiscal_years al template.
+- 3 templates nuevos creados.
+- 9 templates existentes actualizados.
+- `search_select.py`: status agregado a allowed_filters de proyecto.
+
+### Verificacion ejecutada
+- `python -m black` -> reformatted contabilidad/__init__.py
+- `python -m flake8 --max-line-length=130` -> All checks passed
+- `python -m ruff check` -> All checks passed
+- `python -m mypy --ignore-missing-imports` -> Success: no issues found
+- `CACAO_TEST=True ... python -m pytest tests/ -q --slow=True` -> 331 passed, 25 warnings

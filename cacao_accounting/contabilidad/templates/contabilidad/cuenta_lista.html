@@ -13,6 +13,9 @@
 <div class="ca-card">
   <div class="ca-card-header">
     <h5 class="ca-card-title"><i class="bi bi-diagram-3"></i> Catálogo de Cuentas Contables.</h5>
+    {% if entidades_creadas %}
+    <a href="{{ url_for('contabilidad.nueva_cuenta') }}" class="btn btn-sm btn-primary">Nueva Cuenta</a>
+    {% endif %}
   </div>
 
   {% if entidades_creadas %}
@@ -37,12 +40,14 @@
 
   <ul class="ca-tree">
     {%- for ctabase in base_cuentas -%}
-    <li>
-      <a href="{{ url_for('contabilidad.cuenta', entity=ctabase[0].entity, id_cta=ctabase[0].code) }}">
-        <i class="bi bi-chevron-down me-1" style="font-size:.7rem;color:#94a3b8;"></i>
-        <strong>{{ ctabase[0].code }}</strong>&nbsp;{{ ctabase[0].name }}
-      </a>
-      <ul>
+    <li x-data="{ open: true }">
+      <span @click="open = !open" style="cursor:pointer;" class="d-inline-flex align-items-center gap-1">
+        <i class="bi me-1" :class="open ? 'bi-chevron-down' : 'bi-chevron-right'" style="font-size:.7rem;color:#94a3b8;"></i>
+        <a href="{{ url_for('contabilidad.cuenta', entity=ctabase[0].entity, id_cta=ctabase[0].code) }}">
+          <strong>{{ ctabase[0].code }}</strong>&nbsp;{{ ctabase[0].name }}
+        </a>
+      </span>
+      <ul x-show="open"
         {%- for subcuenta01 in cuentas if subcuenta01[0].parent == ctabase[0].code-%}
         <li>
           <a href="{{ url_for('contabilidad.cuenta', entity=subcuenta01[0].entity, id_cta=subcuenta01[0].code) }}">

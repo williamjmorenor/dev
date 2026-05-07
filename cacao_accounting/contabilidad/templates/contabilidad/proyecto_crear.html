@@ -46,6 +46,10 @@
         <label class="form-label" for="fin">Fecha Fin</label>
         {{ form.fin(class="form-control form-control-sm", id="fin") }}
       </div>
+      <div class="col-md-6">
+        <label class="form-label" for="status">Estado</label>
+        {{ form.status(class="form-select form-select-sm", id="status") }}
+      </div>
       <div class="col-md-3 mt-2">
         <div class="form-check">
           {{ form.habilitado(class="form-check-input", id="habilitado") }}

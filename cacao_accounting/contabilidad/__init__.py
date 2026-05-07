@@ -68,6 +68,37 @@ def monedas():
     )
 
 
+@contabilidad.route("/currency/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def nueva_moneda():
+    """Formulario para crear una nueva moneda."""
+    from cacao_accounting.contabilidad.forms import FormularioMoneda
+    from cacao_accounting.database import Currency
+
+    formulario = FormularioMoneda()
+    TITULO = "Nueva Moneda - " + APPNAME
+
+    if formulario.validate_on_submit():
+        DATA = Currency(
+            code=formulario.code.data,
+            name=formulario.name.data,
+            decimals=formulario.decimals.data,
+            active=bool(formulario.active.data),
+            default=bool(formulario.default.data),
+        )
+        database.session.add(DATA)
+        database.session.commit()
+        return redirect(url_for("contabilidad.monedas"))
+
+    return render_template(
+        "contabilidad/moneda_crear.html",
+        titulo=TITULO,
+        form=formulario,
+    )
+
+
 # <------------------------------------------------------------------------------------------------------------------------> #
 # Contabilidad
 @contabilidad.route("/")
@@ -359,6 +390,7 @@ def nueva_unidad():
             name=request.form.get("nombre", None),
             entity=request.form.get("entidad", None),
             status="activo",
+            enabled=bool(formulario.habilitado.data),
         )
         database.session.add(DATA)
         database.session.commit()
@@ -569,8 +601,46 @@ def cuenta(entity, id_cta):
     )
 
 
-# <------------------------------------------------------------------------------------------------------------------------> #
-# Centros de Costos
+@contabilidad.route("/account/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def nueva_cuenta():
+    """Formulario para crear una nueva cuenta contable."""
+    from cacao_accounting.contabilidad.forms import FormularioCuenta
+    from cacao_accounting.database import Accounts
+
+    formulario = FormularioCuenta()
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.moneda.choices = [("", "Sin moneda específica")] + obtener_lista_monedas()
+    formulario.padre.choices = [("", "Sin padre")]
+    TITULO = "Nueva Cuenta Contable - " + APPNAME
+
+    if formulario.validate_on_submit():
+        DATA = Accounts(
+            entity=formulario.entidad.data,
+            code=formulario.code.data,
+            name=formulario.name.data,
+            group=bool(formulario.grupo.data),
+            parent=formulario.padre.data or None,
+            currency=formulario.moneda.data or None,
+            classification=formulario.clasificacion.data or None,
+            type_=formulario.tipo.data or None,
+            account_type=formulario.account_type.data or None,
+            active=bool(formulario.activo.data),
+            enabled=bool(formulario.habilitado.data),
+        )
+        database.session.add(DATA)
+        database.session.commit()
+        return redirect(url_for("contabilidad.cuentas"))
+
+    return render_template(
+        "contabilidad/cuenta_crear.html",
+        titulo=TITULO,
+        form=formulario,
+    )
+
+
 @contabilidad.route("/costs_center", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
@@ -664,6 +734,25 @@ def editar_centro_costo(id_cc):
     )
 
 
+@contabilidad.route("/costs_center/<id_cc>")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def centro_costo(id_cc: str):
+    """Detalle de un centro de costos."""
+    from cacao_accounting.database import CostCenter
+
+    registro = database.session.execute(database.select(CostCenter).filter_by(code=id_cc)).scalars().first()
+    if registro is None:
+        return redirect(url_for("contabilidad.ccostos"))
+
+    return render_template(
+        "contabilidad/centro-costo.html",
+        registro=registro,
+        statusweb=STATUS,
+    )
+
+
 @contabilidad.route("/costs_center/<id_cc>/delete")
 @login_required
 @modulo_activo("accounting")
@@ -700,6 +789,7 @@ def proyectos():
         "contabilidad/proyecto_lista.html",
         consulta=consulta,
         titulo="Listado de Proyectos - " + APPNAME,
+        statusweb=STATUS,
     )
 
 
@@ -725,7 +815,7 @@ def nuevo_proyecto():
             end=formulario.fin.data,
             budget=float(formulario.presupuesto.data or 0),
             enabled=bool(formulario.habilitado.data),
-            status="activo",
+            status=formulario.status.data or "open",
         )
         database.session.add(DATA)
         database.session.commit()
@@ -763,6 +853,7 @@ def editar_proyecto(project_id):
         proyecto.end = formulario.fin.data
         proyecto.budget = float(formulario.presupuesto.data or 0)
         proyecto.enabled = bool(formulario.habilitado.data)
+        proyecto.status = formulario.status.data or "open"
         database.session.commit()
         return redirect(url_for("contabilidad.proyectos"))
 
@@ -911,10 +1002,8 @@ def accounting_period_new():
     formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
     formulario.fiscal_year.choices = [("", "Seleccione un año fiscal")]
     fiscal_years = database.session.execute(database.select(FiscalYear)).scalars().all()
-    formulario.fiscal_year.choices += [
-        (fy.id, fy.name)
-        for fy in fiscal_years
-    ]
+    formulario.fiscal_year.choices += [(fy.id, fy.name) for fy in fiscal_years]
+    no_fiscal_years = len(fiscal_years) == 0
     TITULO = "Nuevo Período Contable - " + APPNAME
 
     if formulario.validate_on_submit():
@@ -936,6 +1025,7 @@ def accounting_period_new():
         "contabilidad/periodo_crear.html",
         titulo=TITULO,
         form=formulario,
+        no_fiscal_years=no_fiscal_years,
     )
 
 
@@ -955,10 +1045,7 @@ def accounting_period_edit(period_id):
     formulario = FormularioAccountingPeriod(obj=period)
     formulario.id.data = period.name
     fiscal_years = database.session.execute(database.select(FiscalYear)).scalars().all()
-    formulario.fiscal_year.choices = [
-        (fy.id, fy.name)
-        for fy in fiscal_years
-    ]
+    formulario.fiscal_year.choices = [(fy.id, fy.name) for fy in fiscal_years]
     formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
     TITULO = "Editar Período Contable - " + APPNAME
 
@@ -1022,8 +1109,39 @@ def tasa_cambio():
     )
 
 
-# <------------------------------------------------------------------------------------------------------------------------> #
-# Períodos Contables
+@contabilidad.route("/exchange/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def nueva_tasa_cambio():
+    """Formulario para crear una nueva tasa de cambio."""
+    from cacao_accounting.contabilidad.forms import FormularioTasaCambio
+    from cacao_accounting.database import ExchangeRate
+
+    formulario = FormularioTasaCambio()
+    monedas_choices = obtener_lista_monedas()
+    formulario.origin.choices = monedas_choices
+    formulario.destination.choices = monedas_choices
+    TITULO = "Nueva Tasa de Cambio - " + APPNAME
+
+    if formulario.validate_on_submit():
+        DATA = ExchangeRate(
+            origin=formulario.origin.data,
+            destination=formulario.destination.data,
+            rate=formulario.rate.data,
+            date=formulario.date.data,
+        )
+        database.session.add(DATA)
+        database.session.commit()
+        return redirect(url_for("contabilidad.tasa_cambio"))
+
+    return render_template(
+        "contabilidad/tc_crear.html",
+        titulo=TITULO,
+        form=formulario,
+    )
+
+
 @contabilidad.route("/accounting_period")
 @login_required
 @modulo_activo("accounting")
@@ -1351,11 +1469,14 @@ def naming_series_edit(series_id: str):
     entidades = database.session.execute(database.select(Entity)).scalars().all()
     form.company.choices = [("", "— Global (sin compania) —")] + [(e.code, e.name) for e in entidades]
     form.company.data = serie.company or ""
-    form.current_value.data = database.session.execute(
-        database.select(Sequence.current_value)
-        .join(SeriesSequenceMap, SeriesSequenceMap.sequence_id == Sequence.id)
-        .filter(SeriesSequenceMap.naming_series_id == series_id)
-    ).scalar_one_or_none() or 0
+    form.current_value.data = (
+        database.session.execute(
+            database.select(Sequence.current_value)
+            .join(SeriesSequenceMap, SeriesSequenceMap.sequence_id == Sequence.id)
+            .filter(SeriesSequenceMap.naming_series_id == series_id)
+        ).scalar_one_or_none()
+        or 0
+    )
 
     if form.validate_on_submit():
         company = form.company.data or None
@@ -1373,15 +1494,19 @@ def naming_series_edit(series_id: str):
         serie.is_default = bool(form.is_default.data)
 
         sequence_id = database.session.execute(
-            database.select(SeriesSequenceMap.sequence_id)
-            .filter_by(naming_series_id=serie.id)
+            database.select(SeriesSequenceMap.sequence_id).filter_by(naming_series_id=serie.id)
         ).scalar_one_or_none()
         if sequence_id:
             sequence = database.session.get(Sequence, sequence_id)
-            sequence.current_value = form.current_value.data or 0
-            sequence.increment = form.increment.data or 1
-            sequence.padding = form.padding.data or 5
-            sequence.reset_policy = form.reset_policy.data or "never"
+            if sequence is not None:
+                sequence.current_value = form.current_value.data or 0
+                sequence.increment = form.increment.data or 1
+                sequence.padding = form.padding.data or 5
+                sequence.reset_policy = form.reset_policy.data or "never"
+            else:
+                from cacao_accounting.logs import log
+
+                log.warning(f"Sequence record not found for sequence_id={sequence_id} on series={serie.id}")
 
         database.session.commit()
         return redirect(url_for("contabilidad.naming_series_list"))

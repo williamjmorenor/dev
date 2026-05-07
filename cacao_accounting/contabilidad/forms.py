@@ -13,7 +13,7 @@
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, IntegerField, RadioField, SelectField, StringField, TextAreaField
 from wtforms.fields import DateField, DecimalField
-from wtforms.validators import DataRequired, InputRequired, NumberRange, Optional
+from wtforms.validators import DataRequired, InputRequired, Length, NumberRange, Optional
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
@@ -48,6 +48,7 @@ class FormularioEntidad(FlaskForm):
     telefono1 = StringField(validators=[])
     telefono2 = StringField(validators=[])
     fax = StringField(validators=[])
+    habilitado = BooleanField("Habilitado", default=True)
 
 
 # <------------------------------------------------------------------------------------------------------------------------> #
@@ -68,6 +69,7 @@ class FormularioUnidad(FlaskForm):
     telefono1 = StringField(validators=[])
     telefono2 = StringField(validators=[])
     fax = StringField(validators=[])
+    habilitado = BooleanField("Habilitado", default=True)
 
 
 class FormularioLibro(FlaskForm):
@@ -146,6 +148,66 @@ class FormularioNamingSeries(FlaskForm):
     is_default = BooleanField("Predeterminada para esta compania y documento")
 
 
+class FormularioMoneda(FlaskForm):
+    """Formulario para crear y editar monedas."""
+
+    code = StringField("Código", validators=[DataRequired(), Length(max=10)])
+    name = StringField("Nombre", validators=[DataRequired()])
+    decimals = IntegerField("Decimales", default=2, validators=[Optional(), NumberRange(min=0, max=8)])
+    active = BooleanField("Activo", default=True)
+    default = BooleanField("Predeterminada", default=False)
+
+
+class FormularioTasaCambio(FlaskForm):
+    """Formulario para crear tasas de cambio."""
+
+    origin = SelectField("Moneda Base", validators=[DataRequired()])
+    destination = SelectField("Moneda Destino", validators=[DataRequired()])
+    rate = DecimalField("Tasa", places=9, validators=[DataRequired(), NumberRange(min=0)])
+    date = DateField("Fecha", validators=[DataRequired()])
+
+
+class FormularioCuenta(FlaskForm):
+    """Formulario para crear y editar cuentas contables."""
+
+    code = StringField("Código", validators=[DataRequired()])
+    name = StringField("Nombre", validators=[DataRequired()])
+    entidad = SelectField("Entidad", validators=[DataRequired()])
+    grupo = BooleanField("Grupo", default=False)
+    padre = SelectField("Cuenta Padre", choices=[], validators=[Optional()])
+    moneda = SelectField("Moneda", choices=[], validators=[Optional()])
+    clasificacion = SelectField(
+        "Clasificación",
+        choices=[
+            ("", "— Seleccione —"),
+            ("activo", "Activo"),
+            ("pasivo", "Pasivo"),
+            ("patrimonio", "Patrimonio"),
+            ("ingresos", "Ingresos"),
+            ("gastos", "Gastos"),
+        ],
+        validators=[Optional()],
+    )
+    tipo = StringField("Tipo", validators=[Optional()])
+    account_type = SelectField(
+        "Tipo de Cuenta",
+        choices=[
+            ("", "— Seleccione —"),
+            ("receivable", "Cuentas por Cobrar"),
+            ("payable", "Cuentas por Pagar"),
+            ("bank", "Banco"),
+            ("cash", "Efectivo"),
+            ("expense", "Gasto"),
+            ("income", "Ingreso"),
+            ("asset", "Activo"),
+            ("liability", "Pasivo"),
+        ],
+        validators=[Optional()],
+    )
+    activo = BooleanField("Activo", default=True)
+    habilitado = BooleanField("Habilitado", default=True)
+
+
 class FormularioCentroCosto(FlaskForm):
     """Formulario para crear y editar centros de costos."""
 
@@ -169,6 +231,16 @@ class FormularioProyecto(FlaskForm):
     fin = DateField("Fecha Fin", validators=[Optional()])
     presupuesto = DecimalField("Presupuesto", places=2, validators=[Optional(), NumberRange(min=0)])
     habilitado = BooleanField("Habilitado", default=True)
+    status = SelectField(
+        "Estado",
+        choices=[
+            ("open", "Abierto"),
+            ("closed", "Cerrado"),
+            ("paused", "Detenido"),
+        ],
+        default="open",
+        validators=[DataRequired()],
+    )
 
 
 class FormularioFiscalYear(FlaskForm):

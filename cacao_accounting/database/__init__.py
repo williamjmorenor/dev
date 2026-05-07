@@ -356,6 +356,7 @@ class Unit(database.Model, BaseTabla):  # type: ignore[name-defined]
     code = database.Column(database.String(10), unique=True, index=True)
     name = database.Column(database.String(50), nullable=False)
     entity = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE))
+    enabled = database.Column(database.Boolean(), nullable=True)
 
 
 # Alias para compatibilidad

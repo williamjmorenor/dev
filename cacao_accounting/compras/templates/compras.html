@@ -122,5 +122,29 @@
     </ul>
   </div>
 
+  {# ── Columna 4: Conciliación ──────────────────────── #}
+  <div class="ca-module-card">
+    <h5><i class="bi bi-arrow-left-right"></i> Conciliación de Compras</h5>
+    <ul class="ca-module-links">
+
+      {% if acceso.autorizado %}
+      <li>
+        <a href="{{ url_for('compras.compras_reconciliation_panel') }}">Panel de Conciliaciones</a>
+        <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
+      </li>
+      <li>
+        <a href="{{ url_for('compras.compras_purchase_reconciliation') }}">Conciliaciones Pendientes</a>
+        <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
+      </li>
+      {% else %}
+      <li class="ca-no-access">
+        <span>Conciliación de Compras</span>
+        <span class="ca-status-dot ca-status-no-access" title="Sin acceso"></span>
+      </li>
+      {% endif %}
+
+    </ul>
+  </div>
+
 </div>
 {% endblock %}

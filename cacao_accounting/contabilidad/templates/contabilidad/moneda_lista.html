@@ -15,7 +15,7 @@
 <div class="ca-card">
   <div class="ca-card-header d-flex align-items-center justify-content-between">
     <h5 class="ca-card-title"><i class="bi bi-currency-exchange"></i> Listado de Monedas.</h5>
-    <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Nueva Moneda</button>
+    <a href="{{ url_for('contabilidad.nueva_moneda') }}" class="btn btn-sm btn-primary">Nueva Moneda</a>
   </div>
   <table class="ca-table">
     <caption style="display: none;">Listado de monedas.</caption>
