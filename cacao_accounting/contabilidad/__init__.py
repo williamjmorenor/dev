@@ -664,6 +664,25 @@ def editar_centro_costo(id_cc):
     )
 
 
+@contabilidad.route("/costs_center/<id_cc>")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def centro_costo(id_cc: str):
+    """Detalle de un centro de costos."""
+    from cacao_accounting.database import CostCenter
+
+    registro = database.session.execute(database.select(CostCenter).filter_by(code=id_cc)).scalars().first()
+    if registro is None:
+        return redirect(url_for("contabilidad.ccostos"))
+
+    return render_template(
+        "contabilidad/centro-costo.html",
+        registro=registro,
+        statusweb=STATUS,
+    )
+
+
 @contabilidad.route("/costs_center/<id_cc>/delete")
 @login_required
 @modulo_activo("accounting")
@@ -700,6 +719,7 @@ def proyectos():
         "contabilidad/proyecto_lista.html",
         consulta=consulta,
         titulo="Listado de Proyectos - " + APPNAME,
+        statusweb=STATUS,
     )
 
 
@@ -1378,10 +1398,11 @@ def naming_series_edit(series_id: str):
         ).scalar_one_or_none()
         if sequence_id:
             sequence = database.session.get(Sequence, sequence_id)
-            sequence.current_value = form.current_value.data or 0
-            sequence.increment = form.increment.data or 1
-            sequence.padding = form.padding.data or 5
-            sequence.reset_policy = form.reset_policy.data or "never"
+            if sequence is not None:
+                sequence.current_value = form.current_value.data or 0
+                sequence.increment = form.increment.data or 1
+                sequence.padding = form.padding.data or 5
+                sequence.reset_policy = form.reset_policy.data or "never"
 
         database.session.commit()
         return redirect(url_for("contabilidad.naming_series_list"))

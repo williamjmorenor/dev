@@ -142,7 +142,7 @@ def _active_books(company: str, ledger_code: str | Sequence[str] | None = None) 
     return list(books) if books else [None]
 
 
-def _document_contexts(document: Any, ledger_code: str | None = None) -> list[LedgerContext]:
+def _document_contexts(document: Any, ledger_code: str | Sequence[str] | None = None) -> list[LedgerContext]:
     company = _company_for(document)
     posting_date = _posting_date_for(document)
     validate_accounting_period(company, posting_date)
@@ -1543,7 +1543,7 @@ def post_delivery_note(document: DeliveryNote, ledger_code: str | None = None) -
     return _add_entries(entries)
 
 
-def post_comprobante_contable(document: ComprobanteContable, ledger_code: str | None = None) -> list[GLEntry]:
+def post_comprobante_contable(document: ComprobanteContable, ledger_code: str | Sequence[str] | None = None) -> list[GLEntry]:
     """Genera GL para un comprobante contable manual."""
     company = _company_for(document)
     lines = _comprobante_lines(document)
