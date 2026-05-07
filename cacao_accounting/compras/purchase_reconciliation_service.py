@@ -468,7 +468,6 @@ def _derive_reconciliation_status(
     total_reference_qty: Decimal,
 ) -> str:
     """Deriva el estado de conciliacion desde el resultado del matching."""
-
     match matching_result:
         case MatchingResult.MATCH_FAILED:
             return "disputed"
@@ -798,7 +797,6 @@ def _finalize_reconciliation(
 
 def cancel_purchase_reconciliation(purchase_invoice_id: str) -> None:
     """Marca como canceladas las conciliaciones asociadas a una factura."""
-
     reconciliations = (
         database.session.execute(
             select(PurchaseReconciliation)
@@ -830,7 +828,6 @@ def cancel_purchase_reconciliation(purchase_invoice_id: str) -> None:
 
 def get_purchase_reconciliation_pending(company: str, as_of_date: date | None = None) -> list[PurchasePendingRow]:
     """Devuelve saldos pendientes de conciliacion por linea de recepcion."""
-
     query = (
         select(PurchaseReceipt, PurchaseReceiptItem)
         .join(
@@ -867,7 +864,6 @@ def get_purchase_reconciliation_pending(company: str, as_of_date: date | None = 
 
 def get_purchase_reconciliation_panel_groups(company: str) -> list[PurchaseReconciliationPanelGroup]:
     """Devuelve conciliaciones activas agrupadas por orden de compra para la UI."""
-
     reconciliations = (
         database.session.execute(
             select(PurchaseReconciliation)

@@ -42,7 +42,6 @@ ventas = Blueprint("ventas", __name__, template_folder="templates")
 
 def _series_choices(entity_type: str, company: str | None) -> list[tuple[str, str]]:
     """Construye las opciones de series activas para un doctype y compania."""
-
     if not company:
         return [("", "")]
 
@@ -249,7 +248,6 @@ def ventas_factura_venta_devolucion_lista():
 @login_required
 def ventas_factura_venta_nota_credito_lista():
     """Alias explicito para listado de notas de crédito de venta."""
-
     return ventas_factura_venta_devolucion_lista()
 
 
@@ -305,14 +303,12 @@ def ventas_cliente(customer_id):
 
 def _form_decimal(field_name: str, default: str = "0") -> Decimal:
     """Convierte un valor de formulario a Decimal."""
-
     value = request.form.get(field_name)
     return Decimal(str(value if value not in (None, "") else default))
 
 
 def _line_amount(index: int) -> Decimal:
     """Obtiene o calcula el monto de una linea."""
-
     amount = request.form.get(f"amount_{index}")
     if amount not in (None, ""):
         return Decimal(str(amount))
@@ -330,7 +326,6 @@ def _create_line_relation(
     amount: Decimal,
 ) -> None:
     """Crea relacion documental para una linea importada desde un origen."""
-
     source_type = request.form.get(f"source_type_{index}")
     source_id = request.form.get(f"source_id_{index}")
     source_item_id = request.form.get(f"source_item_id_{index}")
@@ -352,7 +347,6 @@ def _create_line_relation(
 
 def _save_sales_order_items(order_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una orden de venta desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -380,7 +374,6 @@ def _save_sales_order_items(order_id: str) -> tuple[Decimal, Decimal]:
 
 def _save_sales_request_items(request_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de un pedido de venta desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -408,7 +401,6 @@ def _save_sales_request_items(request_id: str) -> tuple[Decimal, Decimal]:
 
 def _save_sales_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una cotización de venta desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -436,7 +428,6 @@ def _save_sales_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]:
 
 def _save_delivery_note_items(note_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una nota de entrega desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")
@@ -468,7 +459,6 @@ def _save_delivery_note_items(note_id: str) -> tuple[Decimal, Decimal]:
 
 def _save_sales_invoice_items(invoice_id: str) -> tuple[Decimal, Decimal]:
     """Guarda las líneas de una factura de venta desde el formulario."""
-
     i = 0
     total_qty = Decimal("0")
     total = Decimal("0")

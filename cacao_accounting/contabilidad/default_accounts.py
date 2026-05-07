@@ -160,20 +160,17 @@ MANUAL_BLOCKED_ACCOUNT_TYPES: frozenset[str] = frozenset(
 
 def default_account_json_path(catalog_file: str | Path) -> Path:
     """Devuelve la ruta del JSON de mapping que acompana a un catalogo CSV."""
-
     path = Path(catalog_file)
     return path.with_suffix(".json")
 
 
 def catalog_has_default_mapping(catalog_file: str | Path) -> bool:
     """Indica si un catalogo tiene mapping JSON companero."""
-
     return default_account_json_path(catalog_file).is_file()
 
 
 def load_catalog_default_mapping(catalog_file: str | Path) -> dict[str, str]:
     """Carga y valida el mapping de cuentas predeterminadas de un catalogo."""
-
     mapping_path = default_account_json_path(catalog_file)
     if not mapping_path.is_file():
         raise DefaultAccountError(f"El catalogo {Path(catalog_file).name} no tiene mapping JSON de cuentas.")
@@ -189,7 +186,6 @@ def load_catalog_default_mapping(catalog_file: str | Path) -> dict[str, str]:
 
 def account_label(account: Accounts | None) -> str:
     """Etiqueta compacta para selects y paneles."""
-
     if not account:
         return ""
     return f"{account.code} - {account.name}"
@@ -197,7 +193,6 @@ def account_label(account: Accounts | None) -> str:
 
 def get_company_default_accounts(company: str) -> CompanyDefaultAccount | None:
     """Obtiene la configuracion de cuentas predeterminadas de una compania."""
-
     return database.session.execute(select(CompanyDefaultAccount).filter_by(company=company)).scalar_one_or_none()
 
 
@@ -211,7 +206,6 @@ def _account_by_id(account_id: str) -> Accounts | None:
 
 def validate_default_account_assignment(company: str, field: str, account_id: str | None) -> None:
     """Valida que una cuenta pueda asignarse a un campo predeterminado."""
-
     if not account_id:
         return
     definition = DEFAULT_ACCOUNT_DEFINITION_BY_FIELD[field]
@@ -226,7 +220,6 @@ def validate_default_account_assignment(company: str, field: str, account_id: st
 
 def upsert_company_default_accounts(company: str, values: dict[str, str | None]) -> CompanyDefaultAccount:
     """Crea o actualiza la configuracion de cuentas predeterminadas."""
-
     config = get_company_default_accounts(company)
     if config is None:
         config = CompanyDefaultAccount(company=company)
@@ -240,7 +233,6 @@ def upsert_company_default_accounts(company: str, values: dict[str, str | None])
 
 def apply_catalog_default_mapping(company: str, catalog_file: str | Path) -> CompanyDefaultAccount:
     """Aplica el mapping JSON de un catalogo a una compania."""
-
     code_mapping = load_catalog_default_mapping(catalog_file)
     values: dict[str, str | None] = {}
     for field, account_code in code_mapping.items():
@@ -253,7 +245,6 @@ def apply_catalog_default_mapping(company: str, catalog_file: str | Path) -> Com
 
 def validate_gl_account_usage(account_id: str, voucher_type: str | None) -> None:
     """Valida restricciones estrictas de uso por tipo de cuenta."""
-
     account = _account_by_id(account_id)
     if not account:
         raise DefaultAccountError("La cuenta contable configurada no existe.")
@@ -271,7 +262,6 @@ def validate_gl_account_usage(account_id: str, voucher_type: str | None) -> None
 
 def accounts_for_company(company: str) -> list[Accounts]:
     """Lista cuentas activas de detalle para seleccion de defaults."""
-
     return list(
         database.session.execute(
             select(Accounts).filter_by(entity=company).where(Accounts.group.is_(False)).order_by(Accounts.code)
@@ -281,7 +271,6 @@ def accounts_for_company(company: str) -> list[Accounts]:
 
 def default_account_rows(config: CompanyDefaultAccount | None) -> list[dict[str, Any]]:
     """Construye filas de presentacion para la UI de cuentas predeterminadas."""
-
     rows: list[dict[str, Any]] = []
     for definition in DEFAULT_ACCOUNT_DEFINITIONS:
         account = _account_by_id(getattr(config, definition.field)) if config and getattr(config, definition.field) else None

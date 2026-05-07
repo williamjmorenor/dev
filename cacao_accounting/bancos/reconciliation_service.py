@@ -158,7 +158,6 @@ def _candidate_score(
 
 def find_bank_reconciliation_candidates(bank_transaction_id: str) -> list[BankCandidate]:
     """Busca pagos y GL bancario candidatos para una transaccion bancaria."""
-
     transaction = database.session.get(BankTransaction, bank_transaction_id)
     if not transaction:
         raise BankReconciliationError("La transaccion bancaria no existe.")
@@ -244,7 +243,6 @@ def find_bank_reconciliation_candidates(bank_transaction_id: str) -> list[BankCa
 
 def reconcile_bank_items(request: BankReconciliationRequest) -> Reconciliation:
     """Crea una conciliacion bancaria parcial o total."""
-
     if not request.matches:
         raise BankReconciliationError("La conciliacion bancaria requiere al menos una linea.")
 

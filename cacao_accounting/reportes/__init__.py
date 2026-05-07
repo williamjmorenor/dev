@@ -45,7 +45,6 @@ def _date_arg(name: str) -> date | None:
 @modulo_activo("accounting")
 def subledger():
     """Reporte AR/AP por documento."""
-
     company = request.args.get("company", "cacao")
     party_type = request.args.get("party_type", "customer")
     report = get_ar_ap_subledger(
@@ -70,7 +69,6 @@ def subledger():
 @modulo_activo("accounting")
 def aging():
     """Reporte aging AR/AP."""
-
     company = request.args.get("company", "cacao")
     party_type = request.args.get("party_type", "customer")
     report = get_aging_report(
@@ -95,7 +93,6 @@ def aging():
 @modulo_activo("inventory")
 def kardex():
     """Reporte Kardex."""
-
     report = get_kardex(
         KardexFilters(
             company=request.args.get("company", "cacao"),
@@ -119,7 +116,6 @@ def kardex():
 @modulo_activo("accounting")
 def reconciliations():
     """Reporte de reconciliaciones."""
-
     report = get_reconciliation_report(
         company=request.args.get("company", "cacao"),
         as_of_date=_date_arg("as_of_date"),
@@ -158,6 +154,7 @@ def _render_operational_report(report_name: str, report):
 @login_required
 @modulo_activo("purchases")
 def purchases_by_supplier():
+    """Genera reporte de compras agrupadas por proveedor."""
     return _render_operational_report("Compras por Proveedor", get_purchases_by_supplier(_operational_filters()))
 
 
@@ -165,6 +162,7 @@ def purchases_by_supplier():
 @login_required
 @modulo_activo("purchases")
 def purchases_by_item():
+    """Genera reporte de compras agrupadas por articulo."""
     return _render_operational_report("Compras por Item", get_purchases_by_item(_operational_filters()))
 
 
@@ -172,6 +170,7 @@ def purchases_by_item():
 @login_required
 @modulo_activo("sales")
 def sales_by_customer():
+    """Genera reporte de ventas agrupadas por cliente."""
     return _render_operational_report("Ventas por Cliente", get_sales_by_customer(_operational_filters()))
 
 
@@ -179,6 +178,7 @@ def sales_by_customer():
 @login_required
 @modulo_activo("sales")
 def sales_by_item():
+    """Genera reporte de ventas agrupadas por articulo."""
     return _render_operational_report("Ventas por Item", get_sales_by_item(_operational_filters()))
 
 
@@ -186,6 +186,7 @@ def sales_by_item():
 @login_required
 @modulo_activo("sales")
 def gross_margin():
+    """Genera reporte de margen bruto por ventas."""
     return _render_operational_report("Margen Bruto", get_gross_margin(_operational_filters()))
 
 
@@ -193,6 +194,7 @@ def gross_margin():
 @login_required
 @modulo_activo("inventory")
 def stock_balance():
+    """Genera reporte de balance de stock por articulo y bodega."""
     return _render_operational_report("Stock Balance", get_stock_balance(_operational_filters()))
 
 
@@ -200,6 +202,7 @@ def stock_balance():
 @login_required
 @modulo_activo("inventory")
 def inventory_valuation():
+    """Genera reporte de valoracion del inventario."""
     return _render_operational_report("Valoracion de Inventario", get_inventory_valuation(_operational_filters()))
 
 
@@ -207,6 +210,7 @@ def inventory_valuation():
 @login_required
 @modulo_activo("inventory")
 def batches():
+    """Genera reporte de lotes de inventario."""
     return _render_operational_report("Lotes", get_batch_report(_operational_filters()))
 
 
@@ -214,4 +218,5 @@ def batches():
 @login_required
 @modulo_activo("inventory")
 def serials():
+    """Genera reporte de numeros de serie de inventario."""
     return _render_operational_report("Seriales", get_serial_report(_operational_filters()))

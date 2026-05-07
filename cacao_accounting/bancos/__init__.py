@@ -56,7 +56,6 @@ bancos = Blueprint("bancos", __name__, template_folder="templates")
 
 def _series_choices(entity_type: str, company: str | None) -> list[tuple[str, str]]:
     """Construye las opciones de series activas para un doctype y compania."""
-
     if not company:
         return [("", "")]
 
@@ -128,7 +127,6 @@ def bancos_pago_lista():
 @login_required
 def bancos_transferencia_lista():
     """Listado de transferencias internas."""
-
     consulta = database.paginate(
         database.select(PaymentEntry).filter_by(payment_type="internal_transfer"),
         page=request.args.get("page", default=1, type=int),
@@ -159,7 +157,6 @@ def bancos_transaccion_lista():
 @login_required
 def bancos_nota_debito_lista():
     """Listado de notas de débito bancario (retiros)."""
-
     consulta = database.paginate(
         database.select(BankTransaction).filter(BankTransaction.withdrawal.is_not(None)),
         page=request.args.get("page", default=1, type=int),
@@ -181,7 +178,6 @@ def bancos_nota_debito_lista():
 @login_required
 def bancos_nota_credito_lista():
     """Listado de notas de crédito bancario (depósitos)."""
-
     consulta = database.paginate(
         database.select(BankTransaction).filter(BankTransaction.deposit.is_not(None)),
         page=request.args.get("page", default=1, type=int),
@@ -200,7 +196,6 @@ def bancos_nota_credito_lista():
 
 def _crear_nota_bancaria(note_kind: str):
     """Crea una transacción bancaria manual como nota de débito/crédito."""
-
     company = request.form.get("company") or request.args.get("company") or None
     if request.method == "POST":
         amount = _form_decimal("amount")
@@ -253,7 +248,6 @@ def _crear_nota_bancaria(note_kind: str):
 @login_required
 def bancos_transaccion_reconciliar():
     """Marca transacciones bancarias seleccionadas como conciliadas."""
-
     transaction_ids = request.form.getlist("transaction_id")
     if not transaction_ids:
         abort(400)
@@ -317,7 +311,6 @@ def bancos_transaccion_reconciliar():
 @login_required
 def bancos_conciliacion_bancaria():
     """Panel de conciliacion bancaria con transacciones pendientes."""
-
     company = request.args.get("company") or None
     query = database.select(BankTransaction).filter_by(is_reconciled=False)
     if company:
@@ -340,7 +333,6 @@ def bancos_conciliacion_bancaria():
 @login_required
 def bancos_conciliacion_bancaria_cuenta(bank_account_id: str):
     """Panel de conciliacion bancaria filtrado por cuenta."""
-
     bank_account = database.session.get(BankAccount, bank_account_id)
     if not bank_account:
         abort(404)
@@ -368,7 +360,6 @@ def bancos_conciliacion_bancaria_cuenta(bank_account_id: str):
 @login_required
 def bancos_conciliacion_bancaria_aplicar():
     """Aplica conciliaciones bancarias seleccionadas."""
-
     company = request.form.get("company") or "cacao"
     matches: list[BankReconciliationMatch] = []
     for transaction_id in request.form.getlist("bank_transaction_id"):
@@ -400,7 +391,6 @@ def bancos_conciliacion_bancaria_aplicar():
 @login_required
 def bancos_extracto_importar():
     """Importa extractos bancarios CSV con preview."""
-
     accounts = (
         database.session.execute(database.select(BankAccount).filter_by(is_active=True).order_by(BankAccount.account_name))
         .scalars()
@@ -439,7 +429,6 @@ def bancos_extracto_importar():
 @login_required
 def bancos_reglas_matching():
     """Administra reglas de matching bancario."""
-
     accounts = (
         database.session.execute(database.select(BankAccount).filter_by(is_active=True).order_by(BankAccount.account_name))
         .scalars()
@@ -471,7 +460,6 @@ def bancos_reglas_matching():
 @login_required
 def bancos_regla_matching_ejecutar(rule_id: str):
     """Ejecuta una regla de matching para una cuenta y rango."""
-
     try:
         date_from = date.fromisoformat(request.form.get("date_from") or date.today().isoformat())
         date_to = date.fromisoformat(request.form.get("date_to") or date.today().isoformat())
@@ -490,7 +478,6 @@ def bancos_regla_matching_ejecutar(rule_id: str):
 @login_required
 def bancos_nota_debito_nueva():
     """Formulario de nota de débito bancaria."""
-
     return _crear_nota_bancaria("debit")
 
 
@@ -499,7 +486,6 @@ def bancos_nota_debito_nueva():
 @login_required
 def bancos_nota_credito_nueva():
     """Formulario de nota de crédito bancaria."""
-
     return _crear_nota_bancaria("credit")
 
 
@@ -581,20 +567,17 @@ def bancos_cuenta_bancaria(account_id):
 
 def _form_decimal(field_name: str, default: str = "0") -> Decimal:
     """Convierte un valor de formulario a Decimal."""
-
     value = request.form.get(field_name)
     return Decimal(str(value if value not in (None, "") else default))
 
 
 def _invoice_outstanding(invoice) -> Decimal:
     """Devuelve el saldo vivo calculado de una factura."""
-
     return compute_outstanding_amount(invoice)
 
 
 def _payment_source_rows(purchase_invoice_ids: list[str], sales_invoice_ids: list[str]) -> list[dict]:
     """Construye las filas origen para el formulario de pago."""
-
     rows = []
     for invoice_id in purchase_invoice_ids:
         invoice = database.session.get(PurchaseInvoice, invoice_id)
@@ -623,7 +606,6 @@ def _payment_source_rows(purchase_invoice_ids: list[str], sales_invoice_ids: lis
 
 def _save_payment_references(payment: PaymentEntry) -> Decimal:
     """Guarda referencias de pago y actualiza saldos vivos de facturas."""
-
     total_allocated = Decimal("0")
     i = 0
     while request.form.get(f"reference_id_{i}"):
@@ -800,7 +782,6 @@ def bancos_pago(payment_id):
 @login_required
 def bancos_pago_submit(payment_id: str):
     """Aprueba y contabiliza un pago."""
-
     registro = database.session.get(PaymentEntry, payment_id)
     if not registro:
         abort(404)
@@ -822,7 +803,6 @@ def bancos_pago_submit(payment_id: str):
 @login_required
 def bancos_pago_cancel(payment_id: str):
     """Cancela un pago con reverso contable."""
-
     registro = database.session.get(PaymentEntry, payment_id)
     if not registro:
         abort(404)

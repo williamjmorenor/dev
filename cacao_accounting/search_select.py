@@ -14,10 +14,15 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 from cacao_accounting.database import (
     Accounts,
     BankAccount,
+    Book,
     CompanyParty,
+    CostCenter,
+    Entity,
     Item,
     NamingSeries,
     Party,
+    Project,
+    Unit,
     Warehouse,
     database,
 )
@@ -27,6 +32,7 @@ class SearchSelectError(ValueError):
     """Error validado para busquedas de campos seleccionables."""
 
     def __init__(self, message: str, status_code: int = 400) -> None:
+        """Initialize SearchSelectError with a message and HTTP status code."""
         super().__init__(message)
         self.status_code = status_code
 
@@ -47,6 +53,26 @@ class SearchSelectSpec:
 
 def _account_label(account: Accounts) -> str:
     return f"{account.code} - {account.name}"
+
+
+def _company_label(company: Entity) -> str:
+    return f"{company.code} - {company.company_name}"
+
+
+def _book_label(book: Book) -> str:
+    return f"{book.code} - {book.name}"
+
+
+def _cost_center_label(cost_center: CostCenter) -> str:
+    return f"{cost_center.code} - {cost_center.name}"
+
+
+def _unit_label(unit: Unit) -> str:
+    return f"{unit.code} - {unit.name}"
+
+
+def _project_label(project: Project) -> str:
+    return f"{project.code} - {project.name}"
 
 
 def _party_label(party: Party) -> str:
@@ -72,6 +98,15 @@ def _naming_series_label(naming_series: NamingSeries) -> str:
 
 
 SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
+    "company": SearchSelectSpec(
+        doctype="company",
+        model=Entity,
+        search_fields=("code", "company_name", "name", "tax_id"),
+        value_field="code",
+        label_builder=_company_label,
+        allowed_filters={"is_active": "enabled"},
+        default_filters={"enabled": True},
+    ),
     "account": SearchSelectSpec(
         doctype="account",
         model=Accounts,
@@ -80,6 +115,51 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         label_builder=_account_label,
         allowed_filters={"company": "entity", "account_type": "account_type", "is_active": "active"},
         default_filters={"group": False, "active": True, "enabled": True},
+    ),
+    "book": SearchSelectSpec(
+        doctype="book",
+        model=Book,
+        search_fields=("code", "name"),
+        value_field="code",
+        label_builder=_book_label,
+        allowed_filters={"company": "entity", "is_primary": "is_primary"},
+        default_filters={},
+    ),
+    "cost_center": SearchSelectSpec(
+        doctype="cost_center",
+        model=CostCenter,
+        search_fields=("code", "name"),
+        value_field="code",
+        label_builder=_cost_center_label,
+        allowed_filters={"company": "entity", "is_active": "active"},
+        default_filters={"group": False, "active": True, "enabled": True},
+    ),
+    "unit": SearchSelectSpec(
+        doctype="unit",
+        model=Unit,
+        search_fields=("code", "name"),
+        value_field="code",
+        label_builder=_unit_label,
+        allowed_filters={"company": "entity"},
+        default_filters={},
+    ),
+    "project": SearchSelectSpec(
+        doctype="project",
+        model=Project,
+        search_fields=("code", "name"),
+        value_field="code",
+        label_builder=_project_label,
+        allowed_filters={"company": "entity", "is_active": "enabled"},
+        default_filters={"enabled": True},
+    ),
+    "party": SearchSelectSpec(
+        doctype="party",
+        model=Party,
+        search_fields=("name", "comercial_name", "tax_id"),
+        value_field="id",
+        label_builder=_party_label,
+        allowed_filters={"company": "company", "party_type": "party_type", "is_active": "is_active"},
+        default_filters={"is_active": True},
     ),
     "customer": SearchSelectSpec(
         doctype="customer",
@@ -140,7 +220,6 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
 
 def search_select(doctype: str, query: str, filters: dict[str, list[str]], limit: int | None = None) -> dict[str, Any]:
     """Busca opciones para un doctype registrado y devuelve un payload uniforme."""
-
     spec = SEARCH_SELECT_REGISTRY.get(doctype)
     if spec is None:
         raise SearchSelectError("Tipo de seleccion no registrado.", 404)
@@ -254,7 +333,17 @@ def _serialize_result(spec: SearchSelectSpec, row: Any) -> dict[str, Any]:
     value = str(getattr(row, spec.value_field))
     label = spec.label_builder(row)
     payload: dict[str, Any] = {"id": value, "value": value, "label": label, "display_name": label}
-    for field in ("code", "name", "account_type", "party_type", "item_type", "account_name", "account_no", "entity_type"):
+    for field in (
+        "code",
+        "name",
+        "company_name",
+        "account_type",
+        "party_type",
+        "item_type",
+        "account_name",
+        "account_no",
+        "entity_type",
+    ):
         if hasattr(row, field):
             payload[field] = getattr(row, field)
     return payload

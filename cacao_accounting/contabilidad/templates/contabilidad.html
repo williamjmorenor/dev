@@ -89,7 +89,7 @@
 
       {% if acceso.autorizado %}
       <li>
-        <a href="{{ url_for('contabilidad.gl.gl_list') }}">Comprobantes Contables</a>
+        <a href="{{ url_for('contabilidad.listar_comprobantes') }}">Comprobantes Contables</a>
         <span class="ca-status-dot ca-status-ok" title="Acceso disponible"></span>
       </li>
       {% else %}
@@ -109,23 +109,23 @@
 
       {% if acceso.autorizado %}
       <li>
-        <a href="{{ url_for('contabilidad.gl.gl_list') }}">Diario</a>
+        <a href="{{ url_for('contabilidad.listar_comprobantes') }}">Diario</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       <li>
-        <a href="{{ url_for('contabilidad.gl.gl_list') }}">Mayor</a>
+        <a href="{{ url_for('reportes.subledger') }}">Mayor</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       <li>
-        <a href="{{ url_for('contabilidad.gl.gl_list') }}">Balanza de Comprobación</a>
+        <a href="{{ url_for('reportes.reconciliations') }}">Balanza de Comprobación</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       <li>
-        <a href="{{ url_for('contabilidad.gl.gl_list') }}">Balance General</a>
+        <a href="{{ url_for('reportes.subledger') }}">Balance General</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       <li>
-        <a href="{{ url_for('contabilidad.gl.gl_list') }}">Ganancias y Pérdidas</a>
+        <a href="{{ url_for('reportes.subledger') }}">Ganancias y Pérdidas</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       {% else %}

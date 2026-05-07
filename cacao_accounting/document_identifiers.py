@@ -38,7 +38,6 @@ class ExternalNumberDuplicateError(IdentifierConfigurationError):
 
 def parse_posting_date(posting_date_raw: date | str | None) -> date:
     """Normaliza la fecha contable para usarla en series y validaciones."""
-
     if isinstance(posting_date_raw, date):
         return posting_date_raw
     if not posting_date_raw:
@@ -52,7 +51,6 @@ def parse_posting_date(posting_date_raw: date | str | None) -> date:
 
 def validate_accounting_period(company: str | None, posting_date: date) -> None:
     """Valida que la fecha contable no caiga en un periodo cerrado."""
-
     if not company:
         raise IdentifierConfigurationError("Debe indicar la compania del documento.")
 
@@ -111,7 +109,6 @@ def _pick_naming_series(entity_type: str, company: str, naming_series_id: str | 
     4. Primera serie global activa
     5. Serie creada automaticamente por bootstrap
     """
-
     if naming_series_id:
         selected = database.session.get(NamingSeries, naming_series_id)
         if not selected or not selected.is_active:
@@ -142,9 +139,31 @@ def _pick_naming_series(entity_type: str, company: str, naming_series_id: str | 
     return sorted(global_matches, key=lambda row: row.name)[0]
 
 
+def ensure_default_naming_series_for_company(company: str, entity_types: list[str] | None = None) -> None:
+    """Crea las series predeterminadas para una compañia cuando no existen."""
+    if entity_types is None:
+        entity_types = [
+            "journal_entry",
+            "sales_invoice",
+            "purchase_invoice",
+            "payment_entry",
+            "stock_entry",
+            "purchase_order",
+            "purchase_receipt",
+            "purchase_request",
+            "purchase_quotation",
+            "supplier_quotation",
+            "sales_order",
+            "sales_request",
+            "sales_quotation",
+            "delivery_note",
+        ]
+    for entity_type in entity_types:
+        _pick_naming_series(entity_type=entity_type, company=company, naming_series_id=None)
+
+
 def _default_entity_code(entity_type: str) -> str:
     """Devuelve abreviacion de doctype para prefijos de series."""
-
     map_codes = {
         "purchase_request": "PREQ",
         "purchase_quotation": "RFQ",
@@ -169,7 +188,6 @@ def _create_default_series(entity_type: str, company: str) -> NamingSeries:
     La serie creada automaticamente se marca como predeterminada (is_default=True)
     ya que es la primera y unica para esta combinacion.
     """
-
     code = _default_entity_code(entity_type)
     sequence = Sequence(
         name=f"{company} {entity_type} sequence",
@@ -206,7 +224,6 @@ def _create_default_series(entity_type: str, company: str) -> NamingSeries:
 
 def _pick_sequence_id(naming_series_id: str) -> str:
     """Selecciona la secuencia con mayor prioridad para la serie."""
-
     mapping = (
         database.session.execute(
             database.select(SeriesSequenceMap)

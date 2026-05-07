@@ -34,6 +34,7 @@ from cacao_accounting.document_flow.repository import get_document
 from cacao_accounting.document_flow.service import get_source_items
 from cacao_accounting.document_flow.status import _, document_status_payload
 from cacao_accounting.document_flow.tracing import document_flow_tree
+from cacao_accounting.form_preferences import get_form_preference, reset_form_preference, save_form_preference
 from cacao_accounting.search_select import SearchSelectError, search_select
 
 api = Blueprint("api", __name__, template_folder="templates")
@@ -98,7 +99,6 @@ def test_appy():
 @login_required
 def api_search_select():
     """Devuelve opciones para campos de seleccion asistida."""
-
     doctype = request.args.get("doctype", "").strip()
     query = request.args.get("q", "").strip()
     raw_limit = request.args.get("limit")
@@ -114,6 +114,19 @@ def api_search_select():
             return jsonify({"error": _("Parametro invalido."), "message": str(exc)}), 400
         return jsonify({"error": _(str(exc)), "message": _(str(exc))}), exc.status_code
     return jsonify(payload)
+
+
+@api.route("/api/form-preferences/<path:form_key>/<view_key>", methods=["GET", "PUT", "DELETE"])
+@login_required
+def api_form_preferences(form_key: str, view_key: str):
+    """Lee, guarda o restablece preferencias de formulario del usuario actual."""
+    user_id = str(current_user.id)
+    if request.method == "GET":
+        return jsonify(get_form_preference(user_id=user_id, form_key=form_key, view_key=view_key))
+    if request.method == "DELETE":
+        return jsonify(reset_form_preference(user_id=user_id, form_key=form_key, view_key=view_key))
+    payload = request.get_json(silent=True) or {}
+    return jsonify(save_form_preference(user_id=user_id, form_key=form_key, view_key=view_key, payload=payload))
 
 
 @api.route("/api/buying/purchase-order/<order_id>/items")
@@ -199,7 +212,6 @@ def api_document_flow_items():
 @login_required
 def api_document_flow_source_documents():
     """Devuelve documentos fuente disponibles para un tipo destino."""
-
     target_type = request.args.get("target_document_type") or request.args.get("target_type") or ""
     company = request.args.get("company") or request.args.get("company_id")
     if not target_type:
@@ -215,7 +227,6 @@ def api_document_flow_source_documents():
 @login_required
 def api_document_flow_pending_lines():
     """Devuelve lineas pendientes desde uno o varios documentos fuente."""
-
     source_type = request.args.get("source_document_type") or request.args.get("source_type") or ""
     target_type = request.args.get("target_document_type") or request.args.get("target_type") or ""
     source_ids = request.args.getlist("source_document_ids[]") or request.args.getlist("source_document_ids")
@@ -239,7 +250,6 @@ def api_document_flow_pending_lines():
 @login_required
 def api_document_flow_create_target():
     """Crea un documento destino desde lineas fuente seleccionadas."""
-
     try:
         payload = request.get_json(silent=True) or {}
         result = create_target_document(payload)
@@ -254,7 +264,6 @@ def api_document_flow_create_target():
 @login_required
 def api_document_flow_close_line():
     """Cierra manualmente el saldo de una linea fuente."""
-
     payload = request.get_json(silent=True) or request.form.to_dict()
     try:
         state = close_line_balance(
@@ -274,7 +283,6 @@ def api_document_flow_close_line():
 @login_required
 def api_document_flow_close_document():
     """Cierra saldos pendientes de un documento fuente completo."""
-
     payload = request.get_json(silent=True) or request.form.to_dict()
     try:
         states = close_document_balances(
@@ -292,7 +300,6 @@ def api_document_flow_close_document():
 @login_required
 def api_document_flow_recalculate_status(document_type: str, document_id: str):
     """Devuelve el estado documental calculado."""
-
     return jsonify({"status": document_status_payload(document_type, document_id)})
 
 
@@ -300,7 +307,6 @@ def api_document_flow_recalculate_status(document_type: str, document_id: str):
 @login_required
 def api_document_flow_tree():
     """Devuelve trazabilidad upstream/downstream de un documento."""
-
     document_type = request.args.get("document_type", "")
     document_id = request.args.get("document_id", "")
     if not document_type or not document_id:
@@ -312,7 +318,6 @@ def api_document_flow_tree():
 @login_required
 def api_document_flow_summary():
     """Devuelve resumen agrupado por tipo documental de relaciones de un documento."""
-
     document_type = request.args.get("document_type", "")
     document_id = request.args.get("document_id", "")
     if not document_type or not document_id:
@@ -332,7 +337,6 @@ def _source_items_or_abort(source_type: str, source_id: str):
 @login_required
 def document_flow_related_list(doctype: str):
     """Muestra una lista de documentos filtrada por relacion documental."""
-
     from cacao_accounting.database import DocumentRelation, database
 
     doctype_key = normalize_doctype(doctype)

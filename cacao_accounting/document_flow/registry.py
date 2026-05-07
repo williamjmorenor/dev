@@ -389,24 +389,20 @@ ALLOWED_FLOWS: dict[tuple[str, str], FlowSpec] = {
 
 def normalize_doctype(value: str) -> str:
     """Normaliza nombres recibidos desde URLs o formularios."""
-
     return value.strip().lower().replace("-", "_").replace(" ", "_")
 
 
 def get_document_type(value: str) -> DocumentType:
     """Devuelve el contrato de un tipo documental conocido."""
-
     key = normalize_doctype(value)
     return DOCUMENT_TYPES[key]
 
 
 def get_flow(source_type: str, target_type: str) -> FlowSpec:
     """Devuelve la relacion permitida entre dos tipos documentales."""
-
     return ALLOWED_FLOWS[(normalize_doctype(source_type), normalize_doctype(target_type))]
 
 
 def is_allowed_flow(source_type: str, target_type: str) -> bool:
     """Indica si existe una relacion activa entre source y target."""
-
     return (normalize_doctype(source_type), normalize_doctype(target_type)) in ALLOWED_FLOWS

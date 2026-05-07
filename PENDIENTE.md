@@ -61,11 +61,18 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [ ] Implementar FIFO y Moving Average reales para consumo de capas.
 
 ### 1.6 Comprobante Contable Manual (Journal Entry)
-- [ ] Implementar servicio de posting completo en `contabilidad/gl/`.
-- [ ] Validar balance (`SUM(debit) == SUM(credit)`) por libro.
-- [ ] Generar `GLEntry` por cada línea y por cada libro activo.
+- [x] Implementar servicio/repository de captura en `contabilidad/` dejando `contabilidad/gl/` como legacy.
+- [x] Validar balance (`SUM(debit) == SUM(credit)`) y líneas de un solo lado antes de guardar borrador.
+- [x] Guardar borrador desde `/accounting/journal/new` en `ComprobanteContable` y `ComprobanteContableDetalle` sin generar `GLEntry`.
+- [x] Agregar acción separada `/accounting/journal/<id>/submit` para generar `GLEntry` desde el motor existente.
+- [x] Persistir configuración de columnas por usuario en backend para el formulario de Journal Entry.
+- [x] Generar `GLEntry` por cada línea y por cada libro activo desde una acción de submit; el comprobante manual puede limitarse a uno o varios libros activos.
+- [x] Permitir en `/accounting/journal/new` seleccionar libros activos con checkboxes preseleccionados y tratar “todos marcados” como afectar todos los libros activos.
+- [x] Permitir editar borradores del comprobante manual para cambiar libros y líneas antes del submit.
 - [ ] Soportar tipos: estándar, apertura, nota de crédito, nota de débito, contra asiento, ajuste, reversión.
-- [ ] Conectar rutas existentes (`/gl/new`, `/gl/list`, `/journal/new`, `/journal/<id>`) con el servicio real.
+- [ ] Completar edición de borradores y lista operacional; `/gl/new` y `/gl/list` quedan como legacy hasta retiro.
+- [x] Añadir cobertura HTTP del selector multi-book y del endpoint de libros activos del comprobante manual.
+- [ ] Resolver formalmente el comportamiento de `document_no` cuando un borrador cambia de serie antes de contabilizar.
 
 ---
 
@@ -236,8 +243,17 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Backend genérico `/api/search-select` con registry explícito de doctypes permitidos y filtros validados.
 - [x] Frontend Alpine.js reutilizable en `static/js/smart-select.js` para búsqueda, loading, errores, limpieza, valor inicial y filtros dinámicos.
 - [x] Instrucción permanente `.github/instructions/search-select-fields.instructions.md` para migraciones futuras.
+- [x] Registry extendido para el formulario GL con `company`, `book`, `cost_center`, `unit`, `project` y `party`.
+- [x] API `/api/form-preferences/<form_key>/<view_key>` para layouts persistidos por usuario.
 - [ ] Migrar progresivamente selects de catálogos grandes/contextuales en compras, ventas, bancos, inventario y GL.
 - [ ] Añadir cobertura específica por cada formulario migrado para confirmar filtros de compañía, permisos y valores guardados.
+
+## 🟡 BLOQUE 6.3 — Smoke Test de Rutas
+
+- [x] Crear `tests/test_routes_map.py` usando el `url_map` real de Flask para visitar rutas GET estáticas construibles.
+- [x] Detectar automáticamente rutas que renderizan 404/5xx por enlaces o endpoints rotos en vistas/templates.
+- [ ] Extender la cobertura a rutas dinámicas con parámetros mínimos por módulo.
+- [ ] Definir whitelist explícita para endpoints API cuyo 400/404 sin query params es comportamiento esperado y no error de routing.
 
 ---
 

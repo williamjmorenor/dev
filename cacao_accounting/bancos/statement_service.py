@@ -100,7 +100,6 @@ def _is_duplicate(
 
 def import_bank_statement(file: Any, mapping: dict[str, str], bank_account_id: str, preview: bool = False) -> BankImportResult:
     """Importa o previsualiza un extracto CSV."""
-
     bank_account = database.session.get(BankAccount, bank_account_id)
     if not bank_account:
         raise BankStatementError("La cuenta bancaria no existe.")
@@ -148,13 +147,11 @@ def import_bank_statement(file: Any, mapping: dict[str, str], bank_account_id: s
 
 def suggest_bank_matches(bank_transaction_id: str) -> list[BankCandidate]:
     """Alias publico para sugerencias de conciliacion bancaria."""
-
     return find_bank_reconciliation_candidates(bank_transaction_id)
 
 
 def apply_bank_matching_rule(rule_id: str, bank_account_id: str, date_range: tuple[date, date]) -> BankMatchingRun:
     """Ejecuta una regla y devuelve candidatos por transaccion."""
-
     rule = database.session.get(BankMatchingRule, rule_id)
     if not rule or not rule.is_active:
         raise BankStatementError("La regla de matching no existe o esta inactiva.")
@@ -176,7 +173,6 @@ def create_bank_difference_journal(
     reconciliation_id: str, amount: Decimal, account_id: str | None = None
 ) -> ComprobanteContable:
     """Crea un comprobante de ajuste por diferencia bancaria."""
-
     reconciliation = database.session.get(Reconciliation, reconciliation_id)
     if not reconciliation:
         raise BankStatementError("La conciliacion no existe.")

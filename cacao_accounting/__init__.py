@@ -181,6 +181,12 @@ def create_app(ajustes: dict | None = None) -> Flask:
     if ajustes:
         cacao_app.config.from_mapping(ajustes)
 
+    if not cacao_app.config.get("SECRET_KEY"):
+        if cacao_app.config.get("TESTING"):
+            cacao_app.config["SECRET_KEY"] = "test-secret-key"
+        else:
+            cacao_app.config["SECRET_KEY"] = "dev-secret-key"
+
     @cacao_app.cli.command()
     def cleandb():  # pragma: no cover
         """Elimina la base de datos, solo disponible para desarrollo."""

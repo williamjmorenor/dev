@@ -1,6 +1,6 @@
 # ESTADO ACTUAL DEL PROYECTO
 
-**Fecha de análisis:** 2026-05-06
+**Fecha de análisis:** 2026-05-07
 **Rama analizada:** `copilot/analyze-modules-and-create-docs`
 
 ---
@@ -70,24 +70,27 @@ El sistema está diseñado con soporte nativo para:
 ### `api` — API REST y Selección Asistida
 - Items de documentos operativos (PO, SO, Receipt, Invoice, etc.).
 - Endpoints de flujo documental (tree, summary, pending-lines, create-target, close-line/document).
-- Endpoint autenticado `/api/search-select` para campos Smart Select, con registry explícito de doctypes (`account`, `customer`, `supplier`, `item`, `warehouse`, `bank_account`, `naming_series`), filtros permitidos y límites de resultados.
+- Endpoint autenticado `/api/search-select` para campos Smart Select, con registry explícito de doctypes (`company`, `account`, `book`, `cost_center`, `unit`, `project`, `party`, `customer`, `supplier`, `item`, `warehouse`, `bank_account`, `naming_series`), filtros permitidos y límites de resultados.
+- Endpoint autenticado `/api/form-preferences/<form_key>/<view_key>` para persistir configuración de columnas por usuario en backend.
 
 ### `contabilidad` — Módulo Contable Central
 Rutas implementadas:
 - **Entidades (compañías):** CRUD completo (lista, ver, crear, editar, eliminar, activar/inactivar, predeterminar).
 - **Unidades de negocio:** lista, ver, crear, eliminar.
-- **Libros contables:** lista, ver, crear, eliminar.
+- **Libros contables:** CRUD operativo con moneda por libro, estado activo/inactivo y libro primario.
 - **Catálogo de cuentas:** lista y detalle de cuenta por entidad.
 - **Centros de costo:** lista y detalle.
 - **Proyectos:** lista.
+- **Proyectos:** lista, crear, editar y eliminar con endpoint operativo `contabilidad.proyectos` restituido para navegación del módulo.
 - **Tipo de cambio:** lista.
 - **Períodos contables:** lista.
 - **Monedas:** lista.
-- **Comprobante Contable (Journal Entry):** rutas de nuevo, ver y editar (backend desconectado del GL).
+- **Comprobante Contable (Journal Entry):** nuevo formulario backend-first en `/journal/new`, guarda borrador en `ComprobanteContable` + `ComprobanteContableDetalle`, permite ver `/journal/<id>` y contabilizar con `/journal/<id>/submit`. El formulario permite seleccionar por checkboxes uno o varios libros activos de la compañía; si todos quedan marcados, el posting afecta todos los libros activos.
+- **Edición de borradores de Comprobante Contable:** `/journal/edit/<id>` rehidrata cabecera, libros y líneas del borrador para modificarlo antes de contabilizar.
 - **Series (legacy `Serie`):** lista y crear.
 - **NamingSeries:** lista, nueva, toggle-default, toggle-active.
 - **Contadores externos (`ExternalCounter`):** lista, nuevo, ajuste con auditoría, log de auditoría.
-- **Sub-blueprint GL:** lista (`/gl/list`) y nuevo (`/gl/new`), sin posting real al GL.
+- **Sub-blueprint GL:** lista (`/gl/list`) y nuevo (`/gl/new`) conservados como implementación legacy desacoplada.
 - **Servicio de posting operativo:** `contabilidad/posting.py` genera `GLEntry` desde facturas, pagos y movimientos de inventario.
 - **Catálogos contables predefinidos:** `contabilidad/ctas/catalogos/base_es.csv` incluye `account_type` en inglés y las cuentas requeridas por el motor; `base_es.json` mapea las cuentas predeterminadas para inicializar compañías completas. También se creó `contabilidad/ctas/catalogos/base_en.csv` con nombres de cuentas en inglés y su JSON compañero `base_en.json`.
 
@@ -95,15 +98,15 @@ El posting contable actual:
 - Aprueba y contabiliza documentos operativos con `submit_document`.
 - Cancela documentos con reversos append-only mediante `cancel_document`.
 - Es idempotente: rechaza documentos ya contabilizados para evitar duplicar `GLEntry`.
-- Genera entradas por cada `Book` activo de la compañía y valida balance por libro.
+- Genera entradas por cada `Book` activo de la compañía y valida balance por libro; en comprobante manual admite subset explícito de libros activos.
 - Usa `PartyAccount`, `ItemAccount` y `CompanyDefaultAccount` para resolver cuentas.
 - Valida `Accounts.account_type` de forma estricta antes de persistir `GLEntry`: cuentas sin tipo explícito permiten afectación libre; cuentas tipadas se restringen al módulo/origen autorizado.
 - Mantiene trazabilidad con `voucher_type`, `voucher_id`, `document_no`, `naming_series_id`, tercero y período.
 
 Pendiente en contabilidad:
-- El comprobante contable manual (`ComprobanteContable` / UI de GL) sigue sin generar `GLEntry`.
 - No hay reportes financieros construidos sobre `GLEntry`.
 - Dimensiones adicionales y reglas diferenciales entre libros aún no están conectadas al posting.
+- La edición del borrador ya existe, pero aún no recalcula el identificador documental cuando cambia la serie seleccionada antes del submit.
 - Impuestos/cargos ya tienen configuración admin, cálculo de plantilla y posting GL básico en facturas de compra/venta.
 - `CompanyDefaultAccount` cubre efectivo, bancos, AR, AP, ingresos, gastos, inventario, COGS, ajustes de inventario, cuenta puente de compras, anticipos, diferencias bancarias, impuestos, redondeo, diferencias cambiarias, diferidos, descuentos de pago, resultado del período y resultados acumulados.
 
@@ -223,6 +226,7 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 | 🔴 Crítico | `cacao_accounting/compras/__init__.py` | Módulo más completo operacionalmente (47 KB, flujo S2P). |
 | 🔴 Crítico | `cacao_accounting/ventas/__init__.py` | Flujo O2C; crítico para ingresos. |
 | 🟠 Importante | `cacao_accounting/contabilidad/__init__.py` | Corazón contable; falta conectar el Journal Entry manual y reportes. |
+| 🟠 Importante | `tests/test_routes_map.py` | Smoke test de `url_map` para detectar rutas estáticas rotas y errores de renderizado temprano. |
 | 🟠 Importante | `cacao_accounting/document_identifiers.py` | Identificación transversal de documentos. |
 | 🟠 Importante | `cacao_accounting/document_flow/` | Trazabilidad documental upstream/downstream. |
 | 🟡 Relevante | `cacao_accounting/bancos/__init__.py` | Pagos y tesorería; lógica de reconciliación incompleta. |
@@ -238,8 +242,8 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 
 | Archivo | Problema |
 |---|---|
-| `cacao_accounting/contabilidad/gl/__init__.py` | Solo renderiza vistas; completamente desconectado del backend. El formulario de comprobante contable no genera GL entries. |
-| `cacao_accounting/contabilidad/__init__.py` | Rutas de Journal Entry (nuevo/ver/editar) existen pero no están conectadas al servicio de posting. |
+| `cacao_accounting/contabilidad/gl/__init__.py` | Implementación legacy desacoplada; no debe ser el punto de evolución del nuevo comprobante contable. |
+| `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html` | Primer formulario transaccional modelo; requiere validación UX continua con usuarios contables antes de replicar el patrón. |
 | `cacao_accounting/compras/templates/compras/proveedor_nuevo.html` | Formulario de nuevo proveedor operativo en el código; requiere verificación de datos y mejoras de UX tras la documentación FIXME. |
 | `cacao_accounting/compras/templates/compras/factura_compra_nuevo.html` | Documentado con "incompleto y con errores de HTML" en FIXME.md. |
 | `cacao_accounting/compras/templates/compras/recepcion_nuevo.html` | Documentado como "incompleto y con errores de HTML" en FIXME.md. |

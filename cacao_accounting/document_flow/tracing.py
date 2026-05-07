@@ -15,7 +15,6 @@ from cacao_accounting.document_flow.status import document_status_payload
 
 def _document_payload(document_type: str, document_id: str) -> dict[str, Any]:
     """Serializa datos minimos de un documento para arboles de flujo."""
-
     doctype = normalize_doctype(document_type)
     document = get_document(doctype, document_id)
     return {
@@ -29,7 +28,6 @@ def _document_payload(document_type: str, document_id: str) -> dict[str, Any]:
 
 def document_flow_tree(document_type: str, document_id: str) -> dict[str, Any]:
     """Construye una vista compacta de relaciones documentales."""
-
     doctype = normalize_doctype(document_type)
     upstream_rows = (
         database.session.execute(
@@ -58,7 +56,6 @@ def document_flow_tree(document_type: str, document_id: str) -> dict[str, Any]:
 
 def _relation_payload(relation: DocumentRelation, upstream: bool) -> dict[str, Any]:
     """Serializa una relacion de flujo."""
-
     related_type = relation.source_type if upstream else relation.target_type
     related_id = relation.source_id if upstream else relation.target_id
     return {
@@ -73,14 +70,12 @@ def _relation_payload(relation: DocumentRelation, upstream: bool) -> dict[str, A
 
 def _doctype_module(doctype: str) -> str:
     """Devuelve la etiqueta del modulo al que pertenece un tipo documental."""
-
     spec = DOCUMENT_TYPES.get(doctype)
     return spec.module_label if spec else "General"
 
 
 def _doctype_label(doctype: str) -> str:
     """Devuelve la etiqueta legible de un tipo documental."""
-
     spec = DOCUMENT_TYPES.get(doctype)
     return spec.label if spec and spec.label else doctype
 
@@ -92,7 +87,6 @@ def document_flow_summary(document_type: str, document_id: str) -> dict[str, Any
     documental, calculando contadores activos e historicos para el panel de
     trazabilidad en la vista de detalle.
     """
-
     doctype = normalize_doctype(document_type)
 
     upstream_rows: list[DocumentRelation] = list(
@@ -141,7 +135,6 @@ def _build_groups(
     current_type: str,
 ) -> list[dict[str, Any]]:
     """Agrupa relaciones por tipo documental con contadores y documentos."""
-
     from flask import url_for
 
     groups: dict[str, dict[str, Any]] = {}
