@@ -279,6 +279,124 @@ def test_submit_journal_without_selected_books_posts_all_active_books(app_ctx):
     assert {entry.ledger_id for entry in posted_entries} == {fiscal_book.id, ifrs_book.id}
 
 
+def test_submit_journal_allows_manual_closing_in_closed_period(app_ctx):
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft, submit_journal
+    from cacao_accounting.database import Accounts, AccountingPeriod, Book, GLEntry, database
+
+    debit_account = Accounts(entity="cacao", code="EXP-006", name="Gasto", active=True, enabled=True, group=False)
+    credit_account = Accounts(entity="cacao", code="CASH-006", name="Caja", active=True, enabled=True, group=False)
+    fiscal_book = Book(entity="cacao", code="FISC", name="Fiscal", status="activo", is_primary=True)
+    database.session.add_all([
+        debit_account,
+        credit_account,
+        fiscal_book,
+        AccountingPeriod(
+            entity="cacao",
+            fiscal_year_id=None,
+            name="Mayo 2026",
+            status="closed",
+            enabled=True,
+            is_closed=True,
+            start=date(2026, 5, 1),
+            end=date(2026, 5, 31),
+        ),
+    ])
+    database.session.commit()
+
+    journal = create_journal_draft(
+        {
+            "company": "cacao",
+            "posting_date": "2026-05-06",
+            "books": ["FISC"],
+            "is_closing": True,
+            "lines": [
+                {"account": debit_account.id, "debit": "20.00", "credit": "0"},
+                {"account": credit_account.id, "debit": "0", "credit": "20.00"},
+            ],
+        },
+        user_id="user-1",
+    )
+
+    entries = submit_journal(journal.id)
+    posted_entries = database.session.execute(database.select(GLEntry).filter_by(voucher_id=journal.id)).scalars().all()
+
+    assert len(entries) == 2
+    assert len(posted_entries) == 2
+    assert all(entry.ledger_id == fiscal_book.id for entry in posted_entries)
+
+
+def test_submit_journal_rejects_missing_exchange_rate_for_foreign_currency(app_ctx):
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft, submit_journal, JournalValidationError
+    from cacao_accounting.database import Accounts, Book, database
+
+    debit_account = Accounts(entity="cacao", code="EXP-007", name="Gasto", active=True, enabled=True, group=False)
+    credit_account = Accounts(entity="cacao", code="CASH-007", name="Caja", active=True, enabled=True, group=False)
+    fiscal_book = Book(entity="cacao", code="FISC", name="Fiscal", currency="NIO", status="activo", is_primary=True)
+    database.session.add_all([debit_account, credit_account, fiscal_book])
+    database.session.commit()
+
+    journal = create_journal_draft(
+        {
+            "company": "cacao",
+            "posting_date": "2026-05-06",
+            "books": ["FISC"],
+            "transaction_currency": "USD",
+            "lines": [
+                {"account": debit_account.id, "debit": "10.00", "credit": "0"},
+                {"account": credit_account.id, "debit": "0", "credit": "10.00"},
+            ],
+        },
+        user_id="user-1",
+    )
+
+    with pytest.raises(JournalValidationError, match="No existe tipo de cambio registrado"):
+        submit_journal(journal.id)
+
+
+def test_submit_journal_converts_foreign_currency_to_book_currency(app_ctx):
+    from decimal import Decimal
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft, submit_journal
+    from cacao_accounting.database import Accounts, Book, ExchangeRate, GLEntry, database
+
+    debit_account = Accounts(entity="cacao", code="EXP-008", name="Gasto", active=True, enabled=True, group=False)
+    credit_account = Accounts(entity="cacao", code="CASH-008", name="Caja", active=True, enabled=True, group=False)
+    fiscal_book = Book(entity="cacao", code="FISC", name="Fiscal", currency="NIO", status="activo", is_primary=True)
+    database.session.add_all([
+        debit_account,
+        credit_account,
+        fiscal_book,
+        ExchangeRate(origin="USD", destination="NIO", rate="36.00", date=date(2026, 5, 6)),
+    ])
+    database.session.commit()
+
+    journal = create_journal_draft(
+        {
+            "company": "cacao",
+            "posting_date": "2026-05-06",
+            "books": ["FISC"],
+            "transaction_currency": "USD",
+            "lines": [
+                {"account": debit_account.id, "debit": "10.00", "credit": "0"},
+                {"account": credit_account.id, "debit": "0", "credit": "10.00"},
+            ],
+        },
+        user_id="user-1",
+    )
+
+    submit_journal(journal.id)
+
+    posted_entries = database.session.execute(database.select(GLEntry).filter_by(voucher_id=journal.id)).scalars().all()
+    assert len(posted_entries) == 2
+    debit_entry = next(entry for entry in posted_entries if entry.debit > 0)
+    credit_entry = next(entry for entry in posted_entries if entry.credit > 0)
+
+    assert debit_entry.account_currency == "USD"
+    assert debit_entry.debit_in_account_currency == Decimal("10.00")
+    assert debit_entry.debit == Decimal("360.0000") or debit_entry.debit == Decimal("360.00")
+    assert credit_entry.credit_in_account_currency == Decimal("10.00")
+    assert credit_entry.credit == Decimal("360.0000") or credit_entry.credit == Decimal("360.00")
+
+
 def test_entity_creation_uses_setup_defaults_and_creates_required_book_cost_center_and_series(app_ctx):
     from cacao_accounting.database import (
         AccountingPeriod,
@@ -321,8 +439,8 @@ def test_entity_creation_uses_setup_defaults_and_creates_required_book_cost_cent
     book = database.session.execute(database.select(Book).filter_by(entity="mapco", code="FISC")).scalar_one()
     cost_center = database.session.execute(database.select(CostCenter).filter_by(entity="mapco", code="MAIN")).scalar_one()
     period = database.session.execute(
-        database.select(AccountingPeriod).filter_by(entity="mapco", name=str(date.today().year))
-    ).scalar_one_or_none()
+        database.select(AccountingPeriod).filter_by(entity="mapco").order_by(AccountingPeriod.start)
+    ).scalars().all()
     series = database.session.execute(
         database.select(NamingSeries).filter_by(company="mapco", entity_type="journal_entry")
     ).scalar_one_or_none()
@@ -332,7 +450,7 @@ def test_entity_creation_uses_setup_defaults_and_creates_required_book_cost_cent
     assert entity.currency == "NIO"
     assert book.currency == "NIO"
     assert cost_center.default is True
-    assert period is not None
+    assert len(period) == 12
     assert series is not None
     assert defaults is not None
 

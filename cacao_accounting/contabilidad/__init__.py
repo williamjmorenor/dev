@@ -179,6 +179,8 @@ def nueva_entidad():
                     "moneda": formulario.moneda.data,
                     "pais": formulario.pais.data,
                     "tipo_entidad": formulario.tipo_entidad.data,
+                    "inicio_anio_fiscal": formulario.inicio_anio_fiscal.data,
+                    "fin_anio_fiscal": formulario.fin_anio_fiscal.data,
                 },
                 catalogo_tipo=formulario.catalogo.data,
                 country=formulario.pais.data,
@@ -1216,6 +1218,7 @@ def nuevo_comprobante():
         view_key=DEFAULT_VIEW_KEY,
         initial_journal=None,
         submit_url=url_for("contabilidad.nuevo_comprobante"),
+        currencies=obtener_lista_monedas(),
     )
 
 
@@ -1300,6 +1303,7 @@ def editar_comprobante(identifier: str):
         view_key=DEFAULT_VIEW_KEY,
         initial_journal=serialize_journal_for_form(journal),
         submit_url=url_for("contabilidad.editar_comprobante", identifier=identifier),
+        currencies=obtener_lista_monedas(),
     )
 
 

@@ -40,6 +40,8 @@ class FormularioEntidad(FlaskForm):
     pais = SelectField("País", choices=COUNTRY_CHOICES, validators=[DataRequired()])
     idioma = SelectField("Idioma", choices=LANGUAGE_CHOICES, validators=[DataRequired()])
     moneda = SelectField("Moneda Principal", choices=[], validators=[DataRequired()])
+    inicio_anio_fiscal = DateField("Inicio Año Fiscal", validators=[Optional()])
+    fin_anio_fiscal = DateField("Fin Año Fiscal", validators=[Optional()])
     catalogo = RadioField("Catálogo contable", choices=CATALOG_CHOICES, default="preexistente", validators=[DataRequired()])
     catalogo_origen = SelectField("Catálogo existente", choices=[], validators=[])
     tipo_entidad = SelectField("Tipo de Entidad", choices=Entity.tipo_entidad_lista, validators=[DataRequired()])

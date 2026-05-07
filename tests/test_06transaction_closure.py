@@ -265,3 +265,76 @@ def test_payment_references_reject_cross_company_invoice(app_ctx):
     with app_ctx.test_request_context("/cash_management/payment/new", method="POST", data=data):
         with pytest.raises(Conflict):
             _save_payment_references(payment)
+
+
+def test_create_company_with_custom_fiscal_year_generates_12_periods(app_ctx):
+    from cacao_accounting.setup.service import create_company
+    from cacao_accounting.database import AccountingPeriod, FiscalYear, database
+
+    company_data = {
+        "id": "mapco",
+        "razon_social": "Mapco",
+        "nombre_comercial": "Mapco",
+        "id_fiscal": "M0001",
+        "moneda": "USD",
+        "pais": "US",
+        "tipo_entidad": "company",
+        "inicio_anio_fiscal": date(2025, 4, 1),
+        "fin_anio_fiscal": date(2026, 3, 31),
+    }
+
+    entity = create_company(
+        company_data,
+        catalogo_tipo="en_cero",
+        country="US",
+        idioma="en",
+        catalogo_archivo=None,
+        status="activo",
+        default=False,
+    )
+    database.session.commit()
+
+    fiscal_year = database.session.execute(
+        database.select(FiscalYear).filter_by(entity=entity.code)
+    ).scalar_one()
+    periods = database.session.execute(
+        database.select(AccountingPeriod).filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id).order_by(AccountingPeriod.start)
+    ).scalars().all()
+
+    assert len(periods) == 12
+    assert periods[0].start == date(2025, 4, 1)
+    assert periods[-1].end == date(2026, 3, 31)
+
+
+def test_closed_fiscal_year_blocks_all_postings(app_ctx):
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft, submit_journal, JournalValidationError
+    from cacao_accounting.database import Accounts, ExchangeRate, FiscalYear, Book, database
+
+    debit_account = Accounts(entity="cacao", code="EXP-009", name="Gasto", active=True, enabled=True, group=False)
+    credit_account = Accounts(entity="cacao", code="CASH-009", name="Caja", active=True, enabled=True, group=False)
+    fiscal_book = Book(entity="cacao", code="FISC", name="Fiscal", status="activo", is_primary=True)
+    database.session.add_all([
+        debit_account,
+        credit_account,
+        fiscal_book,
+        FiscalYear(entity="cacao", name="2026", year_start_date=date(2026, 1, 1), year_end_date=date(2026, 12, 31), is_closed=True),
+        ExchangeRate(origin="USD", destination="NIO", rate="35.00", date=date(2026, 5, 6)),
+    ])
+    database.session.commit()
+
+    journal = create_journal_draft(
+        {
+            "company": "cacao",
+            "posting_date": "2026-05-06",
+            "books": ["FISC"],
+            "transaction_currency": "USD",
+            "lines": [
+                {"account": debit_account.id, "debit": "10.00", "credit": "0"},
+                {"account": credit_account.id, "debit": "0", "credit": "10.00"},
+            ],
+        },
+        user_id="user-1",
+    )
+
+    with pytest.raises(JournalValidationError, match="año fiscal cerrado"):
+        submit_journal(journal.id)

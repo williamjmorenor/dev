@@ -5,8 +5,9 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
+import calendar
 
 from cacao_accounting.database import (
     AccountingPeriod,
@@ -106,13 +107,51 @@ def create_default_cost_center(entity: Entity) -> "CostCenter":
     return cost_center
 
 
-def create_default_fiscal_year(entity: Entity, reference_date: "date | None" = None) -> "FiscalYear":
+def _add_months(original_date: date, months: int) -> date:
+    year = original_date.year + (original_date.month - 1 + months) // 12
+    month = (original_date.month - 1 + months) % 12 + 1
+    day = original_date.day
+    last_day = calendar.monthrange(year, month)[1]
+    return date(year, month, min(day, last_day))
+
+
+def _generate_fiscal_period_ranges(start: date, end: date) -> list[tuple[date, date]]:
+    if start > end:
+        raise ValueError("La fecha de inicio del año fiscal debe ser anterior a la fecha de fin.")
+
+    ranges: list[tuple[date, date]] = []
+    current_start = start
+    for period_index in range(12):
+        next_start = _add_months(current_start, 1)
+        period_end = min(next_start - timedelta(days=1), end)
+        ranges.append((current_start, period_end))
+        if period_end == end:
+            break
+        current_start = next_start
+
+    if ranges and ranges[-1][1] != end:
+        ranges[-1] = (ranges[-1][0], end)
+
+    return ranges
+
+
+def create_default_fiscal_year(
+    entity: Entity,
+    year_start_date: "date | None" = None,
+    year_end_date: "date | None" = None,
+    reference_date: "date | None" = None,
+) -> "FiscalYear":
     from datetime import date as _date
     from cacao_accounting.database import FiscalYear
 
-    today = reference_date or _date.today()
-    start = _date(today.year, 1, 1)
-    end = _date(today.year, 12, 31)
+    if year_start_date is not None and year_end_date is not None:
+        start = year_start_date
+        end = year_end_date
+    else:
+        today = reference_date or _date.today()
+        start = _date(today.year, 1, 1)
+        end = _date(today.year, 12, 31)
+
     existing_year = database.session.execute(
         database.select(FiscalYear).filter_by(entity=entity.code, year_start_date=start, year_end_date=end)
     ).scalar_one_or_none()
@@ -121,7 +160,7 @@ def create_default_fiscal_year(entity: Entity, reference_date: "date | None" = N
 
     fiscal_year = FiscalYear(
         entity=entity.code,
-        name=str(today.year),
+        name=str(start.year) if start.year == end.year else f"{start.year}-{end.year}",
         year_start_date=start,
         year_end_date=end,
         is_closed=False,
@@ -136,23 +175,32 @@ def create_default_accounting_period(entity: Entity, fiscal_year: "FiscalYear") 
 
     existing_period = database.session.execute(
         database.select(AccountingPeriod)
-        .filter_by(entity=entity.code, name=str(fiscal_year.year_start_date.year))
+        .filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id)
     ).scalar_one_or_none()
     if existing_period is not None:
         return existing_period
 
-    period = AccountingPeriod(
-        entity=entity.code,
-        fiscal_year_id=fiscal_year.id,
-        name=str(fiscal_year.year_start_date.year),
-        status="open",
-        enabled=True,
-        is_closed=False,
-        start=fiscal_year.year_start_date,
-        end=fiscal_year.year_end_date,
-    )
-    database.session.add(period)
-    return period
+    period_ranges = _generate_fiscal_period_ranges(fiscal_year.year_start_date, fiscal_year.year_end_date)
+    for index, (start, end) in enumerate(period_ranges, start=1):
+        period_name = f"{start:%Y-%m}"
+        period = AccountingPeriod(
+            entity=entity.code,
+            fiscal_year_id=fiscal_year.id,
+            name=period_name,
+            status="open",
+            enabled=True,
+            is_closed=False,
+            start=start,
+            end=end,
+        )
+        database.session.add(period)
+
+    database.session.flush()
+    return database.session.execute(
+        database.select(AccountingPeriod)
+        .filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id)
+        .order_by(AccountingPeriod.start)
+    ).scalars().first()
 
 
 def get_default_entity() -> Entity | None:

@@ -86,7 +86,11 @@ def create_company(
     entity = create_default_entity(company_data, status=status, default=default)
     create_default_book(entity)
     create_default_cost_center(entity)
-    fiscal_year = create_default_fiscal_year(entity)
+    fiscal_year = create_default_fiscal_year(
+        entity,
+        year_start_date=company_data.get("inicio_anio_fiscal"),
+        year_end_date=company_data.get("fin_anio_fiscal"),
+    )
     create_default_accounting_period(entity, fiscal_year)
     ensure_default_naming_series_for_company(entity.code)
 

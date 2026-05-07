@@ -22,6 +22,8 @@ from cacao_accounting.database import (
     ComprobanteContableDetalle,
     DeliveryNote,
     DeliveryNoteItem,
+    ExchangeRate,
+    FiscalYear,
     GLEntry,
     Item,
     ItemAccount,
@@ -38,6 +40,7 @@ from cacao_accounting.database import (
     StockEntryItem,
     StockLedgerEntry,
     StockValuationLayer,
+    Entity,
     database,
 )
 from cacao_accounting.contabilidad.default_accounts import DefaultAccountError, validate_gl_account_usage
@@ -145,11 +148,16 @@ def _active_books(company: str, ledger_code: str | Sequence[str] | None = None) 
 def _document_contexts(document: Any, ledger_code: str | Sequence[str] | None = None) -> list[LedgerContext]:
     company = _company_for(document)
     posting_date = _posting_date_for(document)
-    validate_accounting_period(company, posting_date)
+    allow_closing = bool(getattr(document, "is_closing", False))
+    validate_accounting_period(company, posting_date, allow_closing=allow_closing)
     accounting_period_id, fiscal_year_id = _find_period_ids(company, posting_date)
     exchange_rate = getattr(document, "exchange_rate", None)
+    entity = database.session.get(Entity, company)
+    default_company_currency = getattr(entity, "currency", None) if entity else None
     contexts: list[LedgerContext] = []
     for book in _active_books(company, ledger_code):
+        book_currency = getattr(book, "currency", None)
+        company_currency = getattr(document, "base_currency", None) or book_currency or default_company_currency
         contexts.append(
             LedgerContext(
                 company=company,
@@ -162,7 +170,7 @@ def _document_contexts(document: Any, ledger_code: str | Sequence[str] | None = 
                 accounting_period_id=accounting_period_id,
                 fiscal_year_id=fiscal_year_id,
                 transaction_currency=getattr(document, "transaction_currency", None),
-                company_currency=getattr(document, "base_currency", None) or getattr(book, "currency", None),
+                company_currency=company_currency,
                 exchange_rate=_decimal_value(exchange_rate) if exchange_rate is not None else None,
                 document_remarks=getattr(document, "remarks", None),
             )
@@ -307,6 +315,8 @@ def _create_gl_entry(
     account_id: str,
     debit: Decimal,
     credit: Decimal,
+    debit_in_account_currency: Decimal | None = None,
+    credit_in_account_currency: Decimal | None = None,
     party_type: str | None = None,
     party_id: str | None = None,
     cost_center_code: str | None = None,
@@ -325,8 +335,8 @@ def _create_gl_entry(
         account_code=_account_code_for(account_id),
         debit=debit,
         credit=credit,
-        debit_in_account_currency=debit if context.transaction_currency else None,
-        credit_in_account_currency=credit if context.transaction_currency else None,
+        debit_in_account_currency=debit_in_account_currency if debit_in_account_currency is not None else (debit if context.transaction_currency else None),
+        credit_in_account_currency=credit_in_account_currency if credit_in_account_currency is not None else (credit if context.transaction_currency else None),
         account_currency=context.transaction_currency,
         company_currency=context.company_currency,
         exchange_rate=context.exchange_rate,
@@ -355,6 +365,30 @@ def _assert_entries_balance(entries: list[GLEntry]) -> None:
         credit_total = sum((_decimal_value(entry.credit) for entry in ledger_entries), Decimal("0"))
         if debit_total != credit_total:
             raise PostingError("Las entradas GL generadas no balancean por libro contable.")
+
+
+def _to_company_currency(amount: Decimal, exchange_rate: Decimal) -> Decimal:
+    if exchange_rate == 0:
+        raise PostingError("El tipo de cambio no puede ser cero.")
+    return (amount * exchange_rate).quantize(Decimal("0.0001"))
+
+
+def _lookup_exchange_rate(origin: str, destination: str, posting_date: Any) -> Decimal:
+    if origin == destination:
+        return Decimal("1")
+    rate = (
+        database.session.execute(
+            select(ExchangeRate)
+            .filter_by(origin=origin, destination=destination, date=posting_date)
+        )
+        .scalars()
+        .first()
+    )
+    if rate is None:
+        raise PostingError(
+            f"No existe tipo de cambio registrado para {origin} -> {destination} en la fecha {posting_date}."
+        )
+    return _decimal_value(rate.rate)
 
 
 def _add_entries(entries: list[GLEntry]) -> list[GLEntry]:
@@ -1553,17 +1587,34 @@ def post_comprobante_contable(document: ComprobanteContable, ledger_code: str | 
     entries: list[GLEntry] = []
     for context in _document_contexts(document, ledger_code=ledger_code):
         for line in lines:
-            value = _decimal_value(getattr(line, "value", None))
-            if value == 0:
+            original_value = _decimal_value(getattr(line, "value", None))
+            if original_value == 0:
                 raise PostingError("Las lineas del comprobante contable deben tener un valor distinto de cero.")
 
             account_id = _account_id_for_comprobante_line(line, company)
-            if value > 0:
-                debit = value
+            company_value = original_value
+            if context.transaction_currency and context.company_currency and context.company_currency != context.transaction_currency:
+                if context.exchange_rate is None:
+                    context_exchange_rate = _lookup_exchange_rate(
+                        context.transaction_currency,
+                        context.company_currency,
+                        context.posting_date,
+                    )
+                    context = context.__class__(
+                        **{**context.__dict__, "exchange_rate": context_exchange_rate}
+                    )
+                company_value = _to_company_currency(original_value, context.exchange_rate or Decimal("1"))
+
+            if company_value > 0:
+                debit = company_value
                 credit = Decimal("0")
+                debit_in_account_currency = original_value if context.transaction_currency else None
+                credit_in_account_currency = None
             else:
                 debit = Decimal("0")
-                credit = abs(value)
+                credit = abs(company_value)
+                debit_in_account_currency = None
+                credit_in_account_currency = abs(original_value) if context.transaction_currency else None
 
             entries.append(
                 _create_gl_entry(
@@ -1571,6 +1622,8 @@ def post_comprobante_contable(document: ComprobanteContable, ledger_code: str | 
                     account_id=account_id,
                     debit=debit,
                     credit=credit,
+                    debit_in_account_currency=debit_in_account_currency,
+                    credit_in_account_currency=credit_in_account_currency,
                     party_type=getattr(line, "third_type", None),
                     party_id=getattr(line, "third_code", None),
                     cost_center_code=getattr(line, "cost_center", None),

@@ -19,60 +19,33 @@ Al finalizar cada iteración actualiza:
 
 Issues actuales que deben corregirse:
 
-- smart-select.js:1  Failed to load resource: the server responded with a status of 404 ()
-   Al parecer el archivo cacao_accounting/static/js/smart-select.js no se esta distribuyendo correctamente al instalar como un paquete python, hay que asegurar que todo el contenido del directorio cacao_accounting se distribuya correctamente.
+- No esta clara la diferencia entre Año Fiscal y Período Contable, hay que aclarar ambos conceptos:
 
-- URL: /accounting/costs_center:
+Año fiscal es el contenedor de los periodos fiscales.
 
-   BuildError: werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'contabilidad.centro_costo' with values ['id_cc']. Did you mean 'contabilidad.nuevo_centro_costo' instead?
+Un año Fiscal puede tener varios años fiscales asociados.
 
-   Estos errores debería detectarlos el test tests/test_routes_map.py
+Un año fiscal representa un ejercicio contable completo.
 
-- URl: /accounting/currency/list
+Un periodo contable es una periodo de tiempo definido dentro de un año contable.
 
-   Nueva Moneda esta deshabilitado
+Si un Año Fiscal se cierra el ledger debe rechazar cualquier movimiento asociado a ese año fiscal.
 
-- URL: /accounting/accounts y /accounting/costs_center
+Si un periodo contable se cierra no es un cierre definitivo, puede seguir recibiendo movimiento unicamente desde el modulo contable, es decir cerrar un periodo contable equivale al cierre de transacciones operativas: Bancos, Compras, Ventas e Inventarios.
 
-   El arbol de cuentas contables y de centros de costos debe de mostrarse como un treeview colapsible, prefiero en el treeview
-   usar iconos como + para expandir y - para colaparsar
+Al cerrrar un periodo contable puede ser trabajando en el periodo en transacciones no operativas, para tal motivo el comprobante contable debe tener una una bandera boolena is_closing.
 
-   Tener las opciones "Expandir todo" y "Colapsar todo" es útil
+La unica diferencia entre ambos registros es esa bandera boolena.
 
-- URL: /accounting/accounting_period/new
+Manejarlo a nivel de UX como un selector Etapa de Cierre: Operativo / Cierre
 
-   Vincula a la entidad año fiscal pero no observo el CRUD de año fiscal implementado por lo que en la practica esta URL no es funcional
+Al crear una empresa en el sistema crear el año actual como año fiscal y los doce periodos contable respectivos
 
-   No me queda claro actualmente la diferencia entre Año y Fiscal y Periodo Contable
+Agregar en el setup inicial y en el formulario de creación de empresa la opción de inicio año fiscal (mes/día) fin del año fiscal (mes/día) para permtir periodos fiscales que inician a mediados de un año y finalizan el siguiente.
 
-   Supongo que los periodos contable son mensuales y agrupados en un año fiscal, si es así al crear una compañia al crearse debería crear los doce periodos contables y el año fiscal actual como predeterminado.
+El comprobante contable no tiene selector de moneda. El servicio de posting debe recibir el comprobante contable con la moneda definida por el usuario y en backend hacer la conversión a la moneda definida en el libro contable.
 
-   Dejar documentada desición de desarrollo Año Fiscal es en la practica padre de Perido Contable, conversar perido contable para cierres mensuales
+Para esa conversión se requiere el tipo de cambio registrado.
 
-- URL: /accounting/exchange
+Advertir al usuario si no existe tipo de cambio disponible para la moneda del registro y todas las monedas que requieran los libros contables activos.
 
-  No hay opción "Nuevo Tipo de Cambio"
-
-- URL: /accounting/entity/new
-
-   Seleccionar catalogo en cero debería de deshabilitar el selector de catalogos de cuenta predeterminado.
-
-   Agregar opción Activa/Inactiva como bandera booleana
-
-- URL: /accounting/accounts
-
-   No hay opción nueva cuenta, verificar mismo patron para centros de costos
-
-- URL: /accounting/unit/new
-
-   Agregar opción Activa/Inactiva como bandera booleana
-
-- URL: /accounting/project/new
-
-   Agregar enum de estados: Abierto, Cerrado, Detenido solo Abierto y Habilitado debe haceptar movimientos en el ledger
-
-Extender el posting service para atender los nuevos status y banderas booleanas de Activo/Inactivo
-
-- URL: /settings
-
-   Las opciones Inicio /Compras/Panel de Conciliación y Inicio/Compras/Conciliacion de Compras Pendiente no corresponden al menú de administración deben estar en el menú de Compras.

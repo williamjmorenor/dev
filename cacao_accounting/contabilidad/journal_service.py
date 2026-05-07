@@ -64,6 +64,9 @@ class JournalDraftInput:
     naming_series_id: str | None
     reference: str | None
     memo: str | None
+    transaction_currency: str | None
+    exchange_rate: Decimal | None
+    is_closing: bool
     lines: list[JournalLineInput]
 
 
@@ -83,6 +86,9 @@ def create_journal_draft(payload: dict[str, Any], user_id: str) -> ComprobanteCo
         voucher_type=JOURNAL_TRANSACTION_TYPE,
         naming_series_id=data.naming_series_id,
         book_codes=_serialize_book_codes(data.books),
+        transaction_currency=data.transaction_currency,
+        exchange_rate=data.exchange_rate,
+        is_closing=data.is_closing,
     )
     lines = [_line_model(data.company, data.posting_date, primary_book, line) for line in data.lines]
     journal = add_journal(journal, lines)
@@ -100,7 +106,7 @@ def submit_journal(journal_id: str) -> list[Any]:
         raise JournalValidationError("Solo se puede contabilizar un comprobante en borrador.")
     try:
         entries = post_comprobante_contable(journal, ledger_code=_selected_books_for_journal(journal))
-    except PostingError as exc:
+    except (PostingError, IdentifierConfigurationError) as exc:
         database.session.rollback()
         raise JournalValidationError(str(exc)) from exc
     journal.status = JOURNAL_STATUS_SUBMITTED
@@ -128,6 +134,9 @@ def update_journal_draft(journal_id: str, payload: dict[str, Any], user_id: str)
     journal.reference = data.reference
     journal.memo = data.memo
     journal.naming_series_id = data.naming_series_id
+    journal.transaction_currency = data.transaction_currency
+    journal.exchange_rate = data.exchange_rate
+    journal.is_closing = data.is_closing
     journal.user_id = user_id
 
     lines = [_line_model(data.company, data.posting_date, primary_book, line) for line in data.lines]
@@ -149,6 +158,9 @@ def serialize_journal_for_form(journal: ComprobanteContable) -> dict[str, Any]:
         "naming_series_label": journal.document_no or journal.serie or "",
         "reference": journal.reference or "",
         "memo": journal.memo or "",
+        "transaction_currency": journal.transaction_currency,
+        "exchange_rate": str(journal.exchange_rate) if journal.exchange_rate is not None else "",
+        "is_closing": bool(getattr(journal, "is_closing", False)),
         "lines": [_serialize_journal_line(line) for line in lines],
     }
 
@@ -169,6 +181,9 @@ def parse_journal_form(form_data: Any) -> dict[str, Any]:
         "naming_series_id": form_data.get("naming_series_id"),
         "reference": form_data.get("reference"),
         "memo": form_data.get("memo"),
+        "transaction_currency": form_data.get("transaction_currency"),
+        "exchange_rate": form_data.get("exchange_rate"),
+        "is_closing": form_data.get("is_closing") in ("true", "True", "1", "on"),
         "lines": [],
     }
 
@@ -193,6 +208,9 @@ def _normalize_journal_payload(payload: dict[str, Any]) -> JournalDraftInput:
         naming_series_id=_optional_text(payload.get("naming_series_id")),
         reference=_optional_text(payload.get("reference")),
         memo=_optional_text(payload.get("memo")),
+        transaction_currency=_optional_text(payload.get("transaction_currency")),
+        exchange_rate=None,
+        is_closing=_optional_bool(payload.get("is_closing")),
         lines=lines,
     )
 
@@ -397,3 +415,12 @@ def _optional_decimal(value: Any) -> Decimal | None:
     if value in (None, ""):
         return None
     return _decimal(value)
+
+
+def _optional_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    normalized = str(value).strip().lower()
+    return normalized in ("true", "1", "yes", "on")

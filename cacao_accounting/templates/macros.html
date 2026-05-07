@@ -196,8 +196,10 @@
 {% endmacro %}
 
 {% macro render_status(status=None, lista_status=None) %}
-<span class="badge" title="">
-  <i class="bi bi-circle-fill" style="color:{{ lista_status[status].color }}"></i>
+{%- set normalized_status = status if status is not none else 'activo' -%}
+{%- set status_info = lista_status[normalized_status] if lista_status and normalized_status in lista_status else None -%}
+<span class="badge" title="{{ status_info.label if status_info else 'Activo' }}">
+  <i class="bi bi-circle-fill" style="color:{{ status_info.color if status_info else '#6c757d' }}"></i>
 </span>
 {% endmacro %}
 

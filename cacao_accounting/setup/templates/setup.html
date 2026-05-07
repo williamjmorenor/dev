@@ -121,6 +121,20 @@
               <div class="text-danger small">{{ form.id_fiscal.errors[0] }}</div>
               {% endif %}
             </div>
+            <div class="col-md-6 col-lg-4">
+              <label class="form-label" for="inicio_anio_fiscal">Inicio Año Fiscal</label>
+              {{ form.inicio_anio_fiscal(class="form-control", id="inicio_anio_fiscal") }}
+              {% if form.inicio_anio_fiscal.errors %}
+              <div class="text-danger small">{{ form.inicio_anio_fiscal.errors[0] }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-6 col-lg-4">
+              <label class="form-label" for="fin_anio_fiscal">Fin Año Fiscal</label>
+              {{ form.fin_anio_fiscal(class="form-control", id="fin_anio_fiscal") }}
+              {% if form.fin_anio_fiscal.errors %}
+              <div class="text-danger small">{{ form.fin_anio_fiscal.errors[0] }}</div>
+              {% endif %}
+            </div>
             <div class="col-md-6 col-lg-6">
               <label class="form-label" for="razon_social">Razón social</label>
               {{ form.razon_social(class="form-control", id="razon_social") }}

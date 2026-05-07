@@ -14,6 +14,7 @@ from cacao_accounting.database import (
     ExternalCounter,
     ExternalCounterAuditLog,
     ExternalNumberUsage,
+    FiscalYear,
     NamingSeries,
     Sequence,
     SeriesExternalCounterMap,
@@ -49,10 +50,24 @@ def parse_posting_date(posting_date_raw: date | str | None) -> date:
         raise IdentifierConfigurationError("La fecha de contabilizacion es invalida.") from exc
 
 
-def validate_accounting_period(company: str | None, posting_date: date) -> None:
-    """Valida que la fecha contable no caiga en un periodo cerrado."""
+def validate_accounting_period(company: str | None, posting_date: date, allow_closing: bool = False) -> None:
+    """Valida que la fecha contable no caiga en un periodo cerrado.
+
+    Solo se permite un comprobante manual de cierre (`is_closing=True`) si el periodo
+    contable está cerrado. Si el año fiscal está cerrado, no se permite ningún movimiento.
+    """
     if not company:
         raise IdentifierConfigurationError("Debe indicar la compania del documento.")
+
+    closed_fiscal_year = database.session.execute(
+        database.select(FiscalYear)
+        .filter_by(entity=company, is_closed=True)
+        .where(FiscalYear.year_start_date <= posting_date)
+        .where(FiscalYear.year_end_date >= posting_date)
+    ).scalar_one_or_none()
+
+    if closed_fiscal_year:
+        raise IdentifierConfigurationError("No puede registrar documentos en un año fiscal cerrado.")
 
     closed_period = database.session.execute(
         database.select(AccountingPeriod)
@@ -61,7 +76,7 @@ def validate_accounting_period(company: str | None, posting_date: date) -> None:
         .where(AccountingPeriod.end >= posting_date)
     ).scalar_one_or_none()
 
-    if closed_period:
+    if closed_period and not allow_closing:
         raise IdentifierConfigurationError("No puede registrar documentos en un periodo contable cerrado.")
 
 

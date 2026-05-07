@@ -1579,6 +1579,9 @@ class ComprobanteContable(database.Model, BaseTransaccion):  # type: ignore[name
     document_no = database.Column(database.String(100), nullable=True, index=True)
     naming_series_id = database.Column(database.String(26), database.ForeignKey("naming_series.id"), nullable=True)
     book_codes = database.Column(database.Text(), nullable=True)
+    transaction_currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
+    exchange_rate = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
+    is_closing = database.Column(database.Boolean(), default=False, nullable=False)
 
 
 class ComprobanteContableDetalle(database.Model, GLBase):  # type: ignore[name-defined]
