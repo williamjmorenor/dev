@@ -149,7 +149,7 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         search_fields=("code", "name"),
         value_field="code",
         label_builder=_project_label,
-        allowed_filters={"company": "entity", "is_active": "enabled"},
+        allowed_filters={"company": "entity", "is_active": "enabled", "status": "status"},
         default_filters={"enabled": True},
     ),
     "party": SearchSelectSpec(

@@ -38,13 +38,15 @@
 
   <ul class="ca-tree">
     {%- for centrocostobase in base_centro_costos -%}
-    <li>
-      <a href="{{ url_for('contabilidad.centro_costo', id_cc=centrocostobase[0].code) }}">
-        <i class="bi bi-chevron-down me-1" style="font-size:.7rem;color:#94a3b8;"></i>
-        <strong>{{ centrocostobase[0].code }}</strong>&nbsp;{{ centrocostobase[0].name }}
-      </a>
+    <li x-data="{ open: true }">
+      <span @click="open = !open" style="cursor:pointer;" class="d-inline-flex align-items-center gap-1">
+        <i class="bi me-1" :class="open ? 'bi-chevron-down' : 'bi-chevron-right'" style="font-size:.7rem;color:#94a3b8;"></i>
+        <a href="{{ url_for('contabilidad.centro_costo', id_cc=centrocostobase[0].code) }}">
+          <strong>{{ centrocostobase[0].code }}</strong>&nbsp;{{ centrocostobase[0].name }}
+        </a>
+      </span>
       {% if centrocostobase[0].group %}
-      <ul>
+      <ul x-show="open">
         {% for ccosto01 in ccostos if ccosto01[0].parent == centrocostobase[0].code %}
         <li>
           <a href="{{ url_for('contabilidad.centro_costo', id_cc=ccosto01[0].code) }}">
