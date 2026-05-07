@@ -1403,6 +1403,10 @@ def naming_series_edit(series_id: str):
                 sequence.increment = form.increment.data or 1
                 sequence.padding = form.padding.data or 5
                 sequence.reset_policy = form.reset_policy.data or "never"
+            else:
+                from cacao_accounting.logs import log
+
+                log.warning(f"Sequence record not found for sequence_id={sequence_id} on series={serie.id}")
 
         database.session.commit()
         return redirect(url_for("contabilidad.naming_series_list"))
