@@ -19,33 +19,23 @@ Al finalizar cada iteración actualiza:
 
 Issues actuales que deben corregirse:
 
-- No esta clara la diferencia entre Año Fiscal y Período Contable, hay que aclarar ambos conceptos:
+- URL: /accounting/accounts y /accounting/costs_center
+  La opción de expandir o colapsar solo se esta aplicando a cuentas y centros de costos de primer nivel. La logica debe ser para expandir o colapsar si la cuenta o centro de costos es tipo parent y tiene hijos asociados. Si cumple esa caracteristica debe de poder expandirse y colapsarse.
 
-Año fiscal es el contenedor de los periodos fiscales.
+  Pendiente opción de expandir / colapsar todos.
+  
+- URL: /accounting/book/list
+  Al crear una compañia el libro contable por defecto llamarlo Local y no Fiscal
+  
+- URL: /accounting/journal/new
+  En el selector de compañia dado que el principal campo actualizar cacao_accounting/static/js/smart-select.js para aceptar x-data-preload para cargar la lista de entidades antes que el usuario comienze a escribir, es decir cuando el usuario se ubica en el campo ya estan precargadas las compañias y puede comenzar a escribir o seleccionar una compañia de la lista.
 
-Un año Fiscal puede tener varios años fiscales asociados.
+  En el selector de secuencia dado que la secuencia tiene un valor predeterminado actualizar cacao_accounting/static/js/smart-select.js para que si existe un campo predeterminado llenar el campo con el valor predeterminado, otros casos de uso a crear un Nuevo Cliente llenar la cuenta por cobrar por defecto o crear un nuevo proveedor llenar la cuenta por cobrar por defecto.
+  
+- He intentado llenar un comprobante de prueba pero no me permite grabar porque hay campos requeridos sin llenar pero no me indica cuales
+  <img width="1702" height="787" alt="image" src="https://github.com/user-attachments/assets/d9aedacc-d6e4-4b68-afef-f03858c09dfe" />
 
-Un año fiscal representa un ejercicio contable completo.
+- En el modal para ingresar información adicional en una linea de un comprobante ningun campo funciona y en cuenta esta mostrando el id interno de el registro
+  <img width="1902" height="913" alt="image" src="https://github.com/user-attachments/assets/811c378a-fb10-49c8-908a-f7c99c0e49be" />
 
-Un periodo contable es una periodo de tiempo definido dentro de un año contable.
-
-Si un Año Fiscal se cierra el ledger debe rechazar cualquier movimiento asociado a ese año fiscal.
-
-Si un periodo contable se cierra no es un cierre definitivo, puede seguir recibiendo movimiento unicamente desde el modulo contable, es decir cerrar un periodo contable equivale al cierre de transacciones operativas: Bancos, Compras, Ventas e Inventarios.
-
-Al cerrrar un periodo contable puede ser trabajando en el periodo en transacciones no operativas, para tal motivo el comprobante contable debe tener una una bandera boolena is_closing.
-
-La unica diferencia entre ambos registros es esa bandera boolena.
-
-Manejarlo a nivel de UX como un selector Etapa de Cierre: Operativo / Cierre
-
-Al crear una empresa en el sistema crear el año actual como año fiscal y los doce periodos contable respectivos
-
-Agregar en el setup inicial y en el formulario de creación de empresa la opción de inicio año fiscal (mes/día) fin del año fiscal (mes/día) para permtir periodos fiscales que inician a mediados de un año y finalizan el siguiente.
-
-El comprobante contable no tiene selector de moneda. El servicio de posting debe recibir el comprobante contable con la moneda definida por el usuario y en backend hacer la conversión a la moneda definida en el libro contable.
-
-Para esa conversión se requiere el tipo de cambio registrado.
-
-Advertir al usuario si no existe tipo de cambio disponible para la moneda del registro y todas las monedas que requieran los libros contables activos.
-
+  Este modal requiere una revisión completa.
