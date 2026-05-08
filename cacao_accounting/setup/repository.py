@@ -171,8 +171,6 @@ def create_default_fiscal_year(
 
 
 def create_default_accounting_period(entity: Entity, fiscal_year: "FiscalYear") -> "AccountingPeriod":
-    from cacao_accounting.database import AccountingPeriod
-
     existing_period = database.session.execute(
         database.select(AccountingPeriod).filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id)
     ).scalar_one_or_none()
@@ -195,7 +193,7 @@ def create_default_accounting_period(entity: Entity, fiscal_year: "FiscalYear") 
         database.session.add(period)
 
     database.session.flush()
-    return (
+    first_period = (
         database.session.execute(
             database.select(AccountingPeriod)
             .filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id)
@@ -204,6 +202,9 @@ def create_default_accounting_period(entity: Entity, fiscal_year: "FiscalYear") 
         .scalars()
         .first()
     )
+    if first_period is None:
+        raise ValueError("No se pudo crear el período contable inicial.")
+    return first_period
 
 
 def get_default_entity() -> Entity | None:

@@ -343,6 +343,7 @@ def document_flow_related_list(doctype: str):
     spec = DOCUMENT_TYPES.get(doctype_key)
     if not spec:
         abort(404)
+    assert spec is not None
 
     related_doctype = normalize_doctype(request.args.get("related_doctype", ""))
     related_id = request.args.get("related_id", "")

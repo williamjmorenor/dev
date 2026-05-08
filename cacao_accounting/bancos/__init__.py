@@ -14,6 +14,7 @@ from typing import cast
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask.typing import ResponseReturnValue
 from flask_login import login_required
 
 # ---------------------------------------------------------------------------------------
@@ -358,7 +359,7 @@ def bancos_conciliacion_bancaria_cuenta(bank_account_id: str):
 @bancos.route("/bank-reconciliation/apply", methods=["POST"])
 @modulo_activo("cash")
 @login_required
-def bancos_conciliacion_bancaria_aplicar():
+def bancos_conciliacion_bancaria_aplicar() -> ResponseReturnValue:
     """Aplica conciliaciones bancarias seleccionadas."""
     company = request.form.get("company") or "cacao"
     matches: list[BankReconciliationMatch] = []
