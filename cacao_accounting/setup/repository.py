@@ -18,6 +18,7 @@ from cacao_accounting.database import (
     FiscalYear,
     database,
 )
+from cacao_accounting.document_flow.status import _
 
 
 def get_setup_value(key: str, default: Any = None) -> Any:
@@ -203,7 +204,7 @@ def create_default_accounting_period(entity: Entity, fiscal_year: "FiscalYear") 
         .first()
     )
     if first_period is None:
-        raise ValueError("No se pudo crear el período contable inicial.")
+        raise ValueError(_("No se pudo crear el período contable inicial."))
     return first_period
 
 

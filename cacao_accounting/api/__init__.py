@@ -7,7 +7,7 @@
 # Libreria estandar
 # --------------------------------------------------------------------------------------
 from functools import wraps
-from typing import Any
+from typing import Any, cast
 
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
@@ -340,10 +340,10 @@ def document_flow_related_list(doctype: str):
     from cacao_accounting.database import DocumentRelation, database
 
     doctype_key = normalize_doctype(doctype)
-    spec_candidate = DOCUMENT_TYPES.get(doctype_key)
-    if not spec_candidate:
+    spec = DOCUMENT_TYPES.get(doctype_key)
+    if not spec:
         abort(404)
-    spec: DocumentType = spec_candidate
+    spec = cast(DocumentType, spec)
 
     related_doctype = normalize_doctype(request.args.get("related_doctype", ""))
     related_id = request.args.get("related_id", "")
