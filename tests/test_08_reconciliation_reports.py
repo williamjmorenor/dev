@@ -517,9 +517,15 @@ def test_setup_with_predefined_catalog_creates_bootstrap_records(app_ctx):
     fiscal_year = database.session.execute(
         database.select(FiscalYear).filter_by(entity="mapco", name=str(date.today().year))
     ).scalar_one()
-    period = database.session.execute(
-        database.select(AccountingPeriod).filter_by(entity="mapco", name=str(date.today().year))
-    ).scalar_one()
+    period = (
+        database.session.execute(
+            database.select(AccountingPeriod)
+            .filter_by(entity="mapco", fiscal_year_id=fiscal_year.id)
+            .order_by(AccountingPeriod.start)
+        )
+        .scalars()
+        .first()
+    )
     series = database.session.execute(
         database.select(NamingSeries).filter_by(company="mapco", entity_type="journal_entry")
     ).scalar_one_or_none()

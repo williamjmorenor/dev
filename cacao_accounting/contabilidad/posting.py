@@ -23,7 +23,6 @@ from cacao_accounting.database import (
     DeliveryNote,
     DeliveryNoteItem,
     ExchangeRate,
-    FiscalYear,
     GLEntry,
     Item,
     ItemAccount,
@@ -335,8 +334,16 @@ def _create_gl_entry(
         account_code=_account_code_for(account_id),
         debit=debit,
         credit=credit,
-        debit_in_account_currency=debit_in_account_currency if debit_in_account_currency is not None else (debit if context.transaction_currency else None),
-        credit_in_account_currency=credit_in_account_currency if credit_in_account_currency is not None else (credit if context.transaction_currency else None),
+        debit_in_account_currency=(
+            debit_in_account_currency
+            if debit_in_account_currency is not None
+            else (debit if context.transaction_currency else None)
+        ),
+        credit_in_account_currency=(
+            credit_in_account_currency
+            if credit_in_account_currency is not None
+            else (credit if context.transaction_currency else None)
+        ),
         account_currency=context.transaction_currency,
         company_currency=context.company_currency,
         exchange_rate=context.exchange_rate,
@@ -377,17 +384,12 @@ def _lookup_exchange_rate(origin: str, destination: str, posting_date: Any) -> D
     if origin == destination:
         return Decimal("1")
     rate = (
-        database.session.execute(
-            select(ExchangeRate)
-            .filter_by(origin=origin, destination=destination, date=posting_date)
-        )
+        database.session.execute(select(ExchangeRate).filter_by(origin=origin, destination=destination, date=posting_date))
         .scalars()
         .first()
     )
     if rate is None:
-        raise PostingError(
-            f"No existe tipo de cambio registrado para {origin} -> {destination} en la fecha {posting_date}."
-        )
+        raise PostingError(f"No existe tipo de cambio registrado para {origin} -> {destination} en la fecha {posting_date}.")
     return _decimal_value(rate.rate)
 
 
@@ -1593,16 +1595,18 @@ def post_comprobante_contable(document: ComprobanteContable, ledger_code: str | 
 
             account_id = _account_id_for_comprobante_line(line, company)
             company_value = original_value
-            if context.transaction_currency and context.company_currency and context.company_currency != context.transaction_currency:
+            if (
+                context.transaction_currency
+                and context.company_currency
+                and context.company_currency != context.transaction_currency
+            ):
                 if context.exchange_rate is None:
                     context_exchange_rate = _lookup_exchange_rate(
                         context.transaction_currency,
                         context.company_currency,
                         context.posting_date,
                     )
-                    context = context.__class__(
-                        **{**context.__dict__, "exchange_rate": context_exchange_rate}
-                    )
+                    context = context.__class__(**{**context.__dict__, "exchange_rate": context_exchange_rate})
                 company_value = _to_company_currency(original_value, context.exchange_rate or Decimal("1"))
 
             if company_value > 0:

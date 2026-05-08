@@ -100,10 +100,7 @@ def create_company(
         catalogo = choose_catalog_file(country, idioma, catalogo_archivo)
         if catalogo is None:
             raise ValueError(
-                _(
-                    "El catálogo seleccionado no está disponible o no tiene mapping JSON "
-                    "de cuentas por defecto."
-                )
+                _("El catálogo seleccionado no está disponible o no tiene mapping JSON " "de cuentas por defecto.")
             )
         cargar_catalogos(catalogo, entity)
         try:
