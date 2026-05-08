@@ -1306,3 +1306,39 @@ Implementar los 8 ítems listados en FIXME.md: treeviews colapsables, nuevos for
 - `python -m ruff check` -> All checks passed
 - `python -m mypy --ignore-missing-imports` -> Success: no issues found
 - `CACAO_TEST=True ... python -m pytest tests/ -q --slow=True` -> 331 passed, 25 warnings
+
+## 2026-05-08 (corrección de issues detectados en revisión manual)
+
+### Peticion del usuario
+Analizar el archivo FIXME.md y corregir los issues reportados en revisión manual.
+
+### Plan implementado
+1. Corregir expand/collapse en `cuenta_lista.html` y `centro-costo_lista.html` para aplicarse a TODOS los niveles que son tipo parent con hijos, no solo al primer nivel.
+2. Agregar botones "Expandir todos / Colapsar todos" en ambas vistas de árbol.
+3. Renombrar el libro contable por defecto de "Fiscal" a "Local" en `setup/repository.py`.
+4. Actualizar `smart-select.js` para soportar `preload: true` — carga opciones al hacer foco en el campo antes de escribir.
+5. Actualizar `smart-select.js` para soportar `autoSelectDefault: true` — selecciona automáticamente la opción marcada como `is_default`.
+6. Actualizar `search_select.py` para: (a) soportar consulta vacía devolviendo resultados sin filtrar por texto; (b) incluir campo `is_default` en los resultados serializados.
+7. Actualizar `journal_nuevo.html`:
+   - Selector de compañía con `preload: true` para cargar compañías al hacer foco.
+   - Selector de secuencia con `preload: true` y `autoSelectDefault: true`.
+   - Validación mejorada que lista específicamente cuáles campos requeridos faltan.
+   - Modal de detalle de línea refactorizado: usa patrón `modalLine` (copia de la línea activa), `x-if` para re-montar smart-selects con valores correctos al abrir, campos de cuenta/cc/tercero/unidad/proyecto/banco con smart-select.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/setup/repository.py`: `Book.name` cambiado de "Fiscal" a "Local".
+- `cacao_accounting/search_select.py`: `search_select()` acepta query vacío devolviendo todos los registros ordenados; `_apply_search()` maneja query vacío sin filtros; `_serialize_result()` incluye `is_default` en el payload.
+- `cacao_accounting/static/js/smart-select.js`: nuevas opciones `preload` y `autoSelectDefault`; nuevo método `preloadOptions()`; método `onFocus()` para abrir dropdown en foco; `handleFilterChange()` reinicia preload al cambiar filtros.
+- `cacao_accounting/contabilidad/templates/contabilidad/cuenta_lista.html`: expand/collapse en todos los niveles con detección de hijos via Jinja (`selectattr`); botones expandir/colapsar todos.
+- `cacao_accounting/contabilidad/templates/contabilidad/centro-costo_lista.html`: idem para centros de costo con 5 niveles de profundidad y detección de hijos.
+- `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html`: validación detallada; preload en compañía y secuencia; modal refactorizado con `modalLine`/`saveModalLine()`/`x-if` + smart-selects en todos los campos de búsqueda.
+
+### Verificacion ejecutada
+- `python3.12 -m black` → archivos Python formateados.
+- `python3.12 -m flake8 --max-line-length=130` → sin errores en archivos modificados.
+- `python3.12 -m ruff check` → sin errores en archivos modificados.
+- `CACAO_TEST=True ... python3.12 -m pytest tests/ -q --slow=True` → 335 passed (1 deselected — falla pre-existente en test_08 no relacionada con estos cambios).
+
+### Notas para siguiente iteracion
+1. El test `test_setup_with_predefined_catalog_creates_bootstrap_records` en `test_08_reconciliation_reports.py` falla por una lógica de creación de `AccountingPeriod` pre-existente no relacionada con estos cambios.
+2. Los botones "Expandir todos / Colapsar todos" usan `_x_dataStack` de Alpine.js interno — verificar compatibilidad si se actualiza Alpine.

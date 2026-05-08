@@ -32,6 +32,8 @@
         limit: config.limit || 20,
         filters: config.filters || {},
         filterSources: config.filterSources || [],
+        preload: config.preload || false,
+        autoSelectDefault: config.autoSelectDefault || false,
         messages: Object.assign({
           placeholder: '',
           loading: '...',
@@ -58,6 +60,9 @@
           this.invalid = false;
           if (!this.selectedValue && config.initialValue) {
             this.selectedValue = config.initialValue;
+          }
+          if (this.preload && !this.selectedValue) {
+            this.preloadOptions();
           }
         },
 
@@ -92,6 +97,9 @@
           if (nextSignature === this.lastFilterSignature) return;
           this.lastFilterSignature = nextSignature;
           this.clearSelection();
+          if (this.preload) {
+            this.preloadOptions();
+          }
         },
 
         onInput: function () {
@@ -103,11 +111,65 @@
           this.fetchOptions();
         },
 
+        onFocus: function () {
+          if (this.preload && !this.open && !this.loading) {
+            if (this.hasPreloadedOptions()) {
+              this.open = true;
+            } else {
+              this.preloadOptions();
+            }
+          }
+        },
+
+        hasPreloadedOptions: function () {
+          return this.preload && this.options.length > 0;
+        },
+
+        preloadOptions: function () {
+          var self = this;
+          this.error = '';
+          var params = new URLSearchParams();
+          params.append('doctype', this.doctype);
+          params.append('q', '');
+          params.append('limit', this.limit);
+          Object.keys(this.filters).forEach(function (key) {
+            appendParam(params, key, self.filters[key]);
+          });
+
+          this.loading = true;
+          fetch(this.endpoint + '?' + params.toString(), { credentials: 'same-origin' })
+            .then(function (response) {
+              if (!response.ok) throw new Error(response.statusText);
+              return response.json();
+            })
+            .then(function (data) {
+              self.options = data.results || [];
+              self.loading = false;
+              if (!self.selectedValue && self.autoSelectDefault) {
+                var defaultOption = self.options.find(function (opt) { return opt.is_default; });
+                if (defaultOption) {
+                  // Auto-select the default option and stop; further processing not needed.
+                  self.selectOption(defaultOption);
+                  return;
+                }
+              }
+            })
+            .catch(function () {
+              self.options = [];
+              self.loading = false;
+              self.error = self.messages.error;
+            });
+        },
+
         fetchOptions: function () {
           var query = this.search.trim();
           var self = this;
           this.error = '';
           if (query.length < this.minChars) {
+            if (this.hasPreloadedOptions()) {
+              this.open = true;
+              return;
+            }
             this.options = [];
             this.open = false;
             this.loading = false;
