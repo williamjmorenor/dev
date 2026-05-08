@@ -18,7 +18,13 @@ from cacao_accounting.database import (
     FiscalYear,
     database,
 )
-from cacao_accounting.document_flow.status import _
+
+try:
+    from flask_babel import gettext as _
+except ImportError:  # pragma: no cover
+
+    def _(value: str) -> str:
+        return value
 
 
 def get_setup_value(key: str, default: Any = None) -> Any:
