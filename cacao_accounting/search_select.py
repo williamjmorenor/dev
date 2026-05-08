@@ -230,8 +230,6 @@ def search_select(doctype: str, query: str, filters: dict[str, list[str]], limit
 
     max_results = _normalize_limit(limit, spec.limit)
     normalized_query = query.strip()
-    if not normalized_query:
-        return {"doctype": doctype, "query": normalized_query, "results": [], "has_more": False}
 
     statement = select(spec.model)
     if spec.model is Party and filters.get("company"):
@@ -284,6 +282,10 @@ def _apply_request_filters(
 
 
 def _apply_search(statement: Select[tuple[Any]], spec: SearchSelectSpec, query: str) -> Select[tuple[Any]]:
+    if not query:
+        searchable_columns = [_column_for(spec.model, field) for field in spec.search_fields]
+        first_sort = searchable_columns[0]
+        return statement.order_by(first_sort)
     like_query = f"%{query.lower()}%"
     prefix_query = f"{query.lower()}%"
     searchable_columns = [_column_for(spec.model, field) for field in spec.search_fields]
@@ -343,6 +345,7 @@ def _serialize_result(spec: SearchSelectSpec, row: Any) -> dict[str, Any]:
         "account_name",
         "account_no",
         "entity_type",
+        "is_default",
     ):
         if hasattr(row, field):
             payload[field] = getattr(row, field)
