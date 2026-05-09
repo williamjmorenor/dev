@@ -315,7 +315,7 @@
               return Object.assign({}, line, {
                 order: index + 1,
                 account: account,
-                currency: this.header.transaction_currency || ''
+                currency: this.header.transaction_currency || null
               });
             }, this).filter(function (line) {
               return line.account || Number(line.debit || 0) || Number(line.credit || 0);
