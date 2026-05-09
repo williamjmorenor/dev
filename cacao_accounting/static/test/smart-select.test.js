@@ -35,8 +35,7 @@ function loadSmartSelect(overrides = {}) {
 }
 
 async function flushPromises() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setImmediate(resolve));
 }
 
 describe('smart-select', function () {
@@ -58,6 +57,7 @@ describe('smart-select', function () {
       doctype: 'naming_series',
       name: 'naming_series_id',
       preload: true,
+      preloadOnFocus: false,
       initialValue: 'SER-001',
       minChars: 1,
     });
@@ -95,7 +95,13 @@ describe('smart-select', function () {
 
   it('clears dependent state on filter change without fetching when preload is disabled', async function () {
     let fetchCalls = 0;
-    const companyElement = { value: 'cafe', addEventListener: () => {} };
+    const companyElement = {
+      value: 'cafe',
+      listeners: {},
+      addEventListener: function (eventName, callback) {
+        this.listeners[eventName] = callback;
+      },
+    };
     const create = loadSmartSelect({
       elements: { '#company': companyElement },
       fetch: () => {
@@ -144,6 +150,7 @@ describe('smart-select', function () {
       filters: {
         company: () => ({ value: 'cafe' }),
         entity_type: { id: 'journal_entry' },
+        ignored_filter: { unexpected_key: 'x' },
       },
     });
 
@@ -154,6 +161,34 @@ describe('smart-select', function () {
     const queryString = decodeURIComponent(requestUrl.split('?')[1] || '');
     assert.ok(queryString.includes('company=cafe'));
     assert.ok(queryString.includes('entity_type=journal_entry'));
+    assert.strictEqual(queryString.includes('ignored_filter='), false);
     assert.strictEqual(queryString.includes('[object Object]'), false);
+  });
+
+  it('skips object filters without supported scalar keys', async function () {
+    let requestUrl = '';
+    const create = loadSmartSelect({
+      fetch: (url) => {
+        requestUrl = url;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+      },
+    });
+    const component = create({
+      doctype: 'naming_series',
+      name: 'naming_series_id',
+      minChars: 1,
+      filters: {
+        company: { code: 'cafe' },
+        unsupported: { label: 'Not allowed as scalar' },
+      },
+    });
+
+    component.search = 'caf';
+    component.fetchOptions();
+    await flushPromises();
+
+    const queryString = decodeURIComponent(requestUrl.split('?')[1] || '');
+    assert.ok(queryString.includes('company=cafe'));
+    assert.strictEqual(queryString.includes('unsupported='), false);
   });
 });

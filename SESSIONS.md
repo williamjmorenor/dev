@@ -1367,9 +1367,9 @@ Corregir `cacao_accounting/static/js/smart-select.js` para que los campos depend
 - `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html`:
   - campo compañía configurado con `preloadOnFocus: true` para conservar la UX esperada.
 - `cacao_accounting/static/test/smart-select.test.js`:
-  - suite Mocha con 4 casos que cubren el bug reportado y la serialización de filtros.
+  - suite Mocha con 5 casos que cubren el bug reportado, limpieza por cambio de filtros y serialización segura.
 
 ### Verificacion ejecutada
 - `bash run_test.sh` (baseline) → falla por dependencias faltantes del entorno: `black`, `flake8`, `ruff`, `bandit`, `pytest`.
 - `npm --prefix cacao_accounting/static ci` → instalación de dependencias JS para pruebas.
-- `npx --prefix cacao_accounting/static mocha cacao_accounting/static/test/smart-select.test.js` → **4 passing**.
+- `npx --prefix cacao_accounting/static mocha cacao_accounting/static/test/smart-select.test.js` → **5 passing**.

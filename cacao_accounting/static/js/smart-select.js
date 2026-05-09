@@ -2,6 +2,15 @@
 // SPDX-FileCopyrightText: 2025 - 2026 William Jose Moreno Reyes
 
 (function () {
+  function normalizeObjectValue(value) {
+    var scalarKeys = ['value', 'id', 'code'];
+    for (var index = 0; index < scalarKeys.length; index += 1) {
+      var key = scalarKeys[index];
+      if (value[key] !== undefined && value[key] !== null) return value[key];
+    }
+    return '';
+  }
+
   function normalizeValue(value) {
     if (typeof value === 'function') return normalizeValue(value());
     if (value && typeof value === 'object' && value.selector) {
@@ -9,10 +18,7 @@
       return element ? element.value : '';
     }
     if (value && typeof value === 'object') {
-      if (value.value !== undefined && value.value !== null) return value.value;
-      if (value.id !== undefined && value.id !== null) return value.id;
-      if (value.code !== undefined && value.code !== null) return value.code;
-      return '';
+      return normalizeObjectValue(value);
     }
     return value;
   }
