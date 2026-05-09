@@ -446,22 +446,30 @@ def get_account_movement_detail(filters: FinancialReportFilters) -> PaginatedRep
 
     count_query = query.order_by(None).with_only_columns(func.count())
     total_rows = database.session.execute(count_query).scalar_one()
+    page = max(filters.page, 1)
+    page_size = max(filters.page_size, 1)
+    row_offset = (page - 1) * page_size
+    display_from_index = 0
     if not filters.export_all:
-        page = max(filters.page, 1)
-        page_size = max(filters.page_size, 1)
-        query = query.offset((page - 1) * page_size).limit(page_size)
+        if filters.include_running_balance and row_offset > 0:
+            query = query.limit(row_offset + page_size)
+            display_from_index = row_offset
+        else:
+            query = query.offset(row_offset).limit(page_size)
 
     running_per_account: dict[str, Decimal] = defaultdict(Decimal)
     rows: list[ReportRow] = []
     total_debit = Decimal("0")
     total_credit = Decimal("0")
-    for entry, account, period in database.session.execute(query).all():
+    for index, (entry, account, period) in enumerate(database.session.execute(query).all()):
         account_code = entry.account_code or (account.code if account else None) or ""
         debit = _decimal_value(entry.debit)
         credit = _decimal_value(entry.credit)
+        running_per_account[account_code] += debit - credit
+        if index < display_from_index:
+            continue
         total_debit += debit
         total_credit += credit
-        running_per_account[account_code] += debit - credit
         row_values: dict[str, Any] = {
             "posting_date": entry.posting_date,
             "accounting_period": period.name if period else None,
@@ -494,8 +502,8 @@ def get_account_movement_detail(filters: FinancialReportFilters) -> PaginatedRep
         totals={"debit": total_debit, "credit": total_credit, "difference": total_debit - total_credit},
         columns=columns,
         total_rows=total_rows,
-        page=max(filters.page, 1),
-        page_size=max(filters.page_size, 1),
+        page=page,
+        page_size=page_size,
         ledger_currency=selected_ledger.currency,
     )
 

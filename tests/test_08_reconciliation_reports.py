@@ -464,6 +464,18 @@ def test_financial_reports_framework_uses_gl_and_supports_export(app_ctx):
         voucher_number="2026-05",
     )
     movement = get_account_movement_detail(filters)
+    movement_page_two = get_account_movement_detail(
+        FinancialReportFilters(
+            company="cacao",
+            ledger="FISC",
+            accounting_period="2026-05",
+            account_code="1.01.01",
+            include_running_balance=True,
+            page=2,
+            page_size=1,
+            voucher_number="2026-05",
+        )
+    )
     trial_balance = get_trial_balance_report(
         FinancialReportFilters(company="cacao", ledger="FISC", accounting_period="2026-05")
     )
@@ -482,6 +494,7 @@ def test_financial_reports_framework_uses_gl_and_supports_export(app_ctx):
         if row.values.get("account_code") == "1.01.01" and "running_balance" in row.values
     ]
     assert cash_running_balances == [Decimal("100.0000"), Decimal("70.0000")]
+    assert movement_page_two.rows[0].values.get("running_balance") == Decimal("70.0000")
     assert trial_balance.totals["debit"] == Decimal("130.00")
     assert trial_balance.totals["credit"] == Decimal("130.00")
     assert income_statement.totals["net_profit"] == Decimal("70.00")
@@ -955,8 +968,8 @@ def test_default_accounts_view_uses_smart_select_without_rendering_full_account_
     assert f'<option value="{receivable.id}"' not in html
 
 
-def test_manual_journal_rejects_restricted_account_types_but_allows_untyped_accounts(app_ctx):
-    from cacao_accounting.contabilidad.posting import PostingError, post_document_to_gl
+def test_manual_journal_allows_bank_and_untyped_accounts(app_ctx):
+    from cacao_accounting.contabilidad.posting import post_document_to_gl
     from cacao_accounting.database import Accounts, ComprobanteContable, ComprobanteContableDetalle, GLEntry, database
 
     bank = Accounts(entity="cacao", code="BANK-M", name="Banco", active=True, enabled=True, account_type="bank")
@@ -964,34 +977,33 @@ def test_manual_journal_rejects_restricted_account_types_but_allows_untyped_acco
     database.session.add_all([bank, free])
     database.session.flush()
 
-    blocked_journal = ComprobanteContable(entity="cacao", date=date(2026, 5, 6), memo="Manual bloqueado")
-    database.session.add(blocked_journal)
+    bank_journal = ComprobanteContable(entity="cacao", date=date(2026, 5, 6), memo="Manual banco")
+    database.session.add(bank_journal)
     database.session.flush()
     database.session.add_all(
         [
             ComprobanteContableDetalle(
                 entity="cacao",
                 account=bank.code,
-                date=blocked_journal.date,
-                transaction=blocked_journal.__tablename__,
-                transaction_id=blocked_journal.id,
+                date=bank_journal.date,
+                transaction=bank_journal.__tablename__,
+                transaction_id=bank_journal.id,
                 value=Decimal("10.00"),
             ),
             ComprobanteContableDetalle(
                 entity="cacao",
                 account=free.code,
-                date=blocked_journal.date,
-                transaction=blocked_journal.__tablename__,
-                transaction_id=blocked_journal.id,
+                date=bank_journal.date,
+                transaction=bank_journal.__tablename__,
+                transaction_id=bank_journal.id,
                 value=Decimal("-10.00"),
             ),
         ]
     )
     database.session.commit()
 
-    with pytest.raises(PostingError):
-        post_document_to_gl(blocked_journal)
-    database.session.rollback()
+    bank_entries = post_document_to_gl(bank_journal)
+    assert len(bank_entries) == 2
 
     free_journal = ComprobanteContable(entity="cacao", date=date(2026, 5, 6), memo="Manual libre")
     database.session.add(free_journal)
