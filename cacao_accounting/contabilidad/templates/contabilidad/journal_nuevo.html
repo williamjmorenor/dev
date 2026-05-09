@@ -307,16 +307,20 @@
           books: selectedBooks,
           naming_series_id: document.getElementById('naming_series_id').value,
           reference: this.header.reference,
-          memo: this.header.memo,
-          transaction_currency: this.header.transaction_currency,
-          is_closing: this.header.is_closing,
-          lines: this.lines.map(function (line, index) {
-            var account = line.account || line.account_label;
-            return Object.assign({}, line, { order: index + 1, account: account });
-          }).filter(function (line) {
-            return line.account || Number(line.debit || 0) || Number(line.credit || 0);
-          })
-        });
+           memo: this.header.memo,
+           transaction_currency: this.header.transaction_currency,
+           is_closing: this.header.is_closing,
+           lines: this.lines.map(function (line, index) {
+              var account = line.account || line.account_label;
+              return Object.assign({}, line, {
+                order: index + 1,
+                account: account,
+                currency: this.header.transaction_currency || null
+              });
+            }, this).filter(function (line) {
+              return line.account || Number(line.debit || 0) || Number(line.credit || 0);
+            })
+         });
       },
 
       formatMoney: function (value) {
@@ -908,8 +912,8 @@
                 <input class="form-control" type="number" step="0.0001" min="0" x-model="modalLine.credit">
               </div>
               <div>
-                <label class="form-label">{{ _('Moneda') }}</label>
-                <input class="form-control" x-model="modalLine.currency">
+                <label class="form-label">{{ _('Moneda del comprobante') }}</label>
+                <input class="form-control" :value="header.transaction_currency || {{ _('Moneda local')|tojson }}" readonly>
               </div>
               <div>
                 <label class="form-label">{{ _('Tipo de referencia') }}</label>

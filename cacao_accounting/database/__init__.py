@@ -1588,6 +1588,8 @@ class ComprobanteContableDetalle(database.Model, GLBase):  # type: ignore[name-d
     """Comprobante contable manual detalle."""
 
     __tablename__ = "comprobante_contable_detalle"
+    is_advance = database.Column(database.Boolean(), default=False, nullable=False)
+    bank_account_id = database.Column(database.String(26), database.ForeignKey("bank_account.id"), nullable=True, index=True)
 
 
 class GLEntry(database.Model):  # type: ignore[name-defined]
@@ -1644,6 +1646,8 @@ class GLEntry(database.Model):  # type: ignore[name-defined]
     # Tercero (AR/AP) — requerido si la cuenta es receivable o payable
     party_type = database.Column(database.String(20), nullable=True, index=True)
     party_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
+    bank_account_id = database.Column(database.String(26), database.ForeignKey("bank_account.id"), nullable=True, index=True)
+    is_advance = database.Column(database.Boolean(), default=False, nullable=False)
     # Trazabilidad de voucher — permite rastrear el origen de cada entrada
     voucher_type = database.Column(database.String(50), nullable=False, index=True)
     voucher_id = database.Column(database.String(26), nullable=False, index=True)

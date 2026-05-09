@@ -87,6 +87,7 @@ Rutas implementadas:
 - **Monedas:** lista.
 - **Comprobante Contable (Journal Entry):** nuevo formulario backend-first en `/journal/new`, guarda borrador en `ComprobanteContable` + `ComprobanteContableDetalle`, permite ver `/journal/<id>` y contabilizar con `/journal/<id>/submit`. El formulario permite seleccionar por checkboxes uno o varios libros activos de la compañía; si todos quedan marcados, el posting afecta todos los libros activos.
 - **Edición de borradores de Comprobante Contable:** `/journal/edit/<id>` rehidrata cabecera, libros y líneas del borrador para modificarlo antes de contabilizar.
+- **Validaciones del comprobante manual:** exige balance, líneas de un solo lado, centro de costo para cuentas de gasto, moneda única por comprobante y persistencia de `is_advance` / cuenta bancaria desde el modal hasta `ComprobanteContableDetalle` y `GLEntry`.
 - **Series (legacy `Serie`):** lista y crear.
 - **NamingSeries:** lista, nueva, toggle-default, toggle-active.
 - **Contadores externos (`ExternalCounter`):** lista, nuevo, ajuste con auditoría, log de auditoría.
@@ -102,6 +103,7 @@ El posting contable actual:
 - Usa `PartyAccount`, `ItemAccount` y `CompanyDefaultAccount` para resolver cuentas.
 - Valida `Accounts.account_type` de forma estricta antes de persistir `GLEntry`: cuentas sin tipo explícito permiten afectación libre; cuentas tipadas se restringen al módulo/origen autorizado.
 - Mantiene trazabilidad con `voucher_type`, `voucher_id`, `document_no`, `naming_series_id`, tercero y período.
+- Conserva en GL metadatos operativos de línea usados por conciliación/manual journal (`bank_account_id`, `is_advance`) cuando el comprobante manual los captura.
 
 Pendiente en contabilidad:
 - No hay reportes financieros construidos sobre `GLEntry`.
@@ -295,3 +297,18 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 - Formulario de comprobante (`journal_nuevo.html`):
   - solo el campo **Compañía** mantiene apertura/carga por foco (`preloadOnFocus: true`).
 - Cobertura JS agregada en `cacao_accounting/static/test/smart-select.test.js` con escenarios del bug.
+
+## Actualización 2026-05-09 — Validación de comprobante contable
+
+- Validación integral ejecutada contra build + lint + pytest del workflow CI local:
+  - `python -m build`
+  - `python -m flake8 cacao_accounting/`
+  - `python -m ruff check cacao_accounting/`
+  - `python -m mypy cacao_accounting/`
+  - `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True`
+- Resultado: **342 pruebas en verde** en el clone local.
+- Ajustes realizados durante la validación:
+  - el formulario de Journal Entry ya no permite tratar la moneda como atributo libre por línea; las líneas heredan la moneda del comprobante;
+  - el modal avanzado persiste anticipo y cuenta bancaria tanto en detalle como en `GLEntry`;
+  - el bootstrap de datos demo vuelve a preservar web/correo/teléfonos/fax para las vistas smoke de CI;
+  - `smart-select.js` conserva las opciones pre-cargadas al auto-seleccionar una opción default y sus pruebas JS ya funcionan desde rutas reales del repositorio.
