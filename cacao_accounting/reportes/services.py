@@ -444,13 +444,14 @@ def get_account_movement_detail(filters: FinancialReportFilters) -> PaginatedRep
     query = _apply_gl_filters(query, filters, period_start, period_end).where(GLEntry.ledger_id == selected_ledger.id)
     query = _sorted_gl_query(query, filters.sort_by, filters.sort_dir)
 
-    total_rows = database.session.execute(select(func.count()).select_from(query.subquery())).scalar_one()
+    count_query = query.order_by(None).with_only_columns(func.count())
+    total_rows = database.session.execute(count_query).scalar_one()
     if not filters.export_all:
         page = max(filters.page, 1)
         page_size = max(filters.page_size, 1)
         query = query.offset((page - 1) * page_size).limit(page_size)
 
-    running_per_account: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+    running_per_account: dict[str, Decimal] = defaultdict(Decimal)
     rows: list[ReportRow] = []
     total_debit = Decimal("0")
     total_credit = Decimal("0")
@@ -693,8 +694,8 @@ def get_balance_sheet_report(filters: FinancialReportFilters) -> PaginatedReport
         ReportRow(
             values={
                 "section": "equity",
-                "account_code": "period_profit",
-                "account_name": "period_profit",
+                "account_code": None,
+                "account_name": "period_profit_summary",
                 "amount": period_profit,
             }
         )

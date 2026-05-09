@@ -460,7 +460,7 @@ def test_financial_reports_framework_uses_gl_and_supports_export(app_ctx):
         accounting_period="2026-05",
         include_running_balance=True,
         page=1,
-        page_size=2,
+        page_size=10,
         voucher_number="2026-05",
     )
     movement = get_account_movement_detail(filters)
@@ -476,7 +476,12 @@ def test_financial_reports_framework_uses_gl_and_supports_export(app_ctx):
 
     assert movement.total_rows == 4
     assert movement.totals["difference"] == Decimal("0")
-    assert any("running_balance" in row.values for row in movement.rows)
+    cash_running_balances = [
+        row.values.get("running_balance")
+        for row in movement.rows
+        if row.values.get("account_code") == "1.01.01" and "running_balance" in row.values
+    ]
+    assert cash_running_balances == [Decimal("100.0000"), Decimal("70.0000")]
     assert trial_balance.totals["debit"] == Decimal("130.00")
     assert trial_balance.totals["credit"] == Decimal("130.00")
     assert income_statement.totals["net_profit"] == Decimal("70.00")

@@ -126,7 +126,7 @@
           {% for row in rows %}
           <tr>
             {% for column in columns %}
-            <td>{{ row.values.get(column) }}</td>
+            <td>{{ row.values.get(column, '—') }}</td>
             {% endfor %}
           </tr>
           {% else %}

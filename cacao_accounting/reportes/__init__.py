@@ -103,7 +103,7 @@ def _financial_filters() -> FinancialReportFilters:
 
 
 def _report_to_matrix(report) -> tuple[list[str], list[list[object]]]:
-    columns = report.columns or list(report.rows[0].values.keys()) if report.rows else []
+    columns = report.columns or (list(report.rows[0].values.keys()) if report.rows else [])
     data_rows = [[row.values.get(column) for column in columns] for row in report.rows]
     return columns, data_rows
 
