@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block contenido %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb lh-sm">
+    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark">{{ _("Inicio") }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('contabilidad.conta') }}" class="link-dark">{{ _("Contabilidad") }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ report_title }}</li>
+  </ol>
+</nav>
+
+<div x-data="{ collapsed: false }" class="ca-report-layout">
+  <aside class="ca-report-filters ca-card" :class="{ 'ca-report-filters-collapsed': collapsed }">
+    <div class="ca-card-header d-flex justify-content-between align-items-center">
+      <h5 class="ca-card-title mb-0">{{ _("Filtros") }}</h5>
+      <button type="button" class="btn btn-sm btn-outline-secondary" @click="collapsed = !collapsed">
+        <span x-show="!collapsed">{{ _("Colapsar") }}</span>
+        <span x-show="collapsed">{{ _("Expandir") }}</span>
+      </button>
+    </div>
+    <div class="p-3" x-show="!collapsed">
+      <form method="get" class="d-grid gap-2">
+        <label class="form-label mb-0">
+          {{ _("Compañía") }}
+          <input name="company" class="form-control" value="{{ request.args.get('company', 'cacao') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Libro contable") }}
+          <input name="ledger" class="form-control" value="{{ request.args.get('ledger', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Periodo contable") }}
+          <input name="accounting_period" class="form-control" placeholder="2026-05" value="{{ request.args.get('accounting_period', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("ID visible del comprobante") }}
+          <input name="voucher_number" class="form-control" value="{{ request.args.get('voucher_number', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Cuenta contable") }}
+          <input name="account_code" class="form-control" value="{{ request.args.get('account_code', '') }}">
+        </label>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label mb-0">
+              {{ _("Rango cuenta desde") }}
+              <input name="account_from" class="form-control" value="{{ request.args.get('account_from', '') }}">
+            </label>
+          </div>
+          <div class="col-6">
+            <label class="form-label mb-0">
+              {{ _("Rango cuenta hasta") }}
+              <input name="account_to" class="form-control" value="{{ request.args.get('account_to', '') }}">
+            </label>
+          </div>
+        </div>
+        <label class="form-label mb-0">
+          {{ _("Centro de costos") }}
+          <input name="cost_center_code" class="form-control" value="{{ request.args.get('cost_center_code', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Unidad de negocio") }}
+          <input name="unit_code" class="form-control" value="{{ request.args.get('unit_code', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Proyecto") }}
+          <input name="project_code" class="form-control" value="{{ request.args.get('project_code', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Tipo de tercero") }}
+          <input name="party_type" class="form-control" value="{{ request.args.get('party_type', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Tercero") }}
+          <input name="party_id" class="form-control" value="{{ request.args.get('party_id', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Tipo de comprobante") }}
+          <input name="voucher_type" class="form-control" value="{{ request.args.get('voucher_type', '') }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Estado") }}
+          <select name="status" class="form-select">
+            <option value="submitted" {% if request.args.get('status', 'submitted') == 'submitted' %}selected{% endif %}>{{ _("Contabilizado") }}</option>
+            <option value="cancelled" {% if request.args.get('status') == 'cancelled' %}selected{% endif %}>{{ _("Cancelado") }}</option>
+          </select>
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Página") }}
+          <input type="number" min="1" name="page" class="form-control" value="{{ request.args.get('page', page) }}">
+        </label>
+        <label class="form-label mb-0">
+          {{ _("Tamaño de página") }}
+          <input type="number" min="1" name="page_size" class="form-control" value="{{ request.args.get('page_size', page_size or 100) }}">
+        </label>
+        <label class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" name="include_running_balance" value="1" {% if request.args.get('include_running_balance') in ('1', 'true', 'yes', 'on') %}checked{% endif %}>
+          <span class="form-check-label">{{ _("Mostrar balance acumulado") }}</span>
+        </label>
+        <button class="btn btn-primary mt-2" type="submit">{{ _("Aplicar filtros") }}</button>
+      </form>
+    </div>
+  </aside>
+
+  <section class="ca-report-results ca-card">
+    <div class="ca-card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <h5 class="ca-card-title mb-0">{{ report_title }}</h5>
+      <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-success" href="{{ request.path }}?{{ request.query_string.decode() }}{% if request.query_string %}&{% endif %}export=xlsx">{{ _("Exportar Excel") }}</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ request.path }}?{{ request.query_string.decode() }}{% if request.query_string %}&{% endif %}export=csv">{{ _("Exportar CSV") }}</a>
+      </div>
+    </div>
+    <div class="p-3 small text-muted">
+      {{ _("Registros totales") }}: {{ total_rows }}{% if ledger_currency %} · {{ _("Moneda") }}: {{ ledger_currency }}{% endif %}
+    </div>
+    <div class="ca-report-table-wrapper">
+      <table class="ca-table ca-report-table">
+        <caption style="display:none;">{{ report_title }}</caption>
+        <thead>
+          <tr>
+            {% for column in columns %}
+            <th scope="col">{{ column }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            {% for column in columns %}
+            <td>{{ row.values.get(column) }}</td>
+            {% endfor %}
+          </tr>
+          {% else %}
+          <tr><td colspan="{{ columns|length if columns else 1 }}">{{ _("No hay registros para los filtros seleccionados.") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="p-3 border-top d-flex flex-wrap gap-2">
+      {% for key, value in totals.items() %}
+      <span class="badge bg-secondary">{{ key }}: {{ value }}</span>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<style>
+  .ca-report-layout{display:flex;gap:1rem;min-height:70vh}
+  .ca-report-filters{width:320px;position:sticky;top:88px;align-self:flex-start;max-height:calc(100vh - 110px);overflow-y:auto;flex-shrink:0}
+  .ca-report-filters-collapsed{width:auto}
+  .ca-report-results{flex:1;min-width:0;display:flex;flex-direction:column}
+  .ca-report-table-wrapper{overflow:auto;max-height:calc(100vh - 260px)}
+  .ca-report-table thead th{position:sticky;top:0;z-index:2;white-space:nowrap}
+  .ca-report-table td,.ca-report-table th{white-space:nowrap}
+  @media (max-width: 1100px){.ca-report-layout{flex-direction:column}.ca-report-filters{position:static;width:100%;max-height:none}}
+</style>
+
+{% endblock %}

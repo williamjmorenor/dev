@@ -363,15 +363,17 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 ## 🟢 BLOQUE 14 — Reportes Financieros
 
 ### Contabilidad
-- [ ] Balance General (por compañía, libro, fecha, moneda).
-- [ ] Estado de Resultados (por compañía, libro y período).
-- [ ] Mayor General (por cuenta y tercero).
-- [ ] Libro Diario (asientos cronológicos).
-- [ ] Balanza de Comprobación (saldos por cuenta).
+- [x] Balance General (por compañía, libro, fecha, moneda) — versión base desde GL.
+- [x] Estado de Resultados (por compañía, libro y período) — versión base desde GL.
+- [x] Mayor General (por cuenta y tercero) — unificado en Detalle de Movimiento Contable.
+- [x] Libro Diario (asientos cronológicos) — unificado en Detalle de Movimiento Contable.
+- [x] Balanza de Comprobación (saldos por cuenta) — versión base desde GL.
 - [x] Aging AR/AP MVP (saldos por antigüedad).
 - [ ] Saldos por dimensión (cost_center, unit, project).
 - [ ] Revalorización cambiaria histórica.
 - [ ] Anticipos de clientes/proveedores (aplicado, pendiente, remanente).
+- [ ] Drill-down universal (balance -> cuenta -> detalle -> comprobante) y jerarquías expandibles completas.
+- [ ] Exportación avanzada consistente (agrupaciones, formato monetario y totales configurables en todos los reportes).
 
 ### Compras
 - [ ] Órdenes de compra pendientes (por proveedor, ítem, estado).

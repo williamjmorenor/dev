@@ -1,5 +1,45 @@
 # SESSIONS
 
+## 2026-05-09 (framework base de reportes financieros)
+
+### Peticion del usuario
+Implementar un framework robusto de reportes contables basado en GL, con soporte multi-ledger, filtros multidimensionales, UX tipo ERP (panel lateral + resultados), paginación server-side y exportación para reportes financieros clave.
+
+### Plan implementado
+1. Extender `reportes/services.py` con reportes financieros derivados únicamente de `GLEntry`.
+2. Exponer nuevas rutas financieras en `reportes/__init__.py` con filtros comunes y exportación CSV/XLSX.
+3. Crear plantilla de UI ERP para reportes con filtros en barra lateral colapsable y tabla con sticky headers.
+4. Enlazar el módulo de contabilidad a los nuevos reportes.
+5. Agregar pruebas focalizadas de servicios y exportación.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/reportes/services.py`:
+  - nuevo `FinancialReportFilters`.
+  - nuevos servicios: `get_account_movement_detail`, `get_trial_balance_report`, `get_income_statement_report`, `get_balance_sheet_report`.
+  - filtros por compañía/libro/período/ID visible/cuenta/rango/dimensiones/tercero/tipo de comprobante/estado.
+  - paginación para detalle de movimientos y totales contables.
+- `cacao_accounting/reportes/__init__.py`:
+  - nuevas rutas:
+    - `/reports/account-movement`
+    - `/reports/trial-balance`
+    - `/reports/income-statement`
+    - `/reports/balance-sheet`
+  - exportación CSV/XLSX en detalle de movimiento con `export=csv|xlsx`.
+- `cacao_accounting/reportes/templates/reportes/financial_report.html`:
+  - layout ERP de dos paneles con sidebar de filtros colapsable y scroll independiente.
+  - panel de resultados con tabla de scroll horizontal/vertical y encabezados sticky.
+- `cacao_accounting/contabilidad/templates/contabilidad.html`:
+  - enlaces del bloque de reportes conectados a los nuevos reportes financieros.
+- `tests/test_08_reconciliation_reports.py`:
+  - nueva prueba `test_financial_reports_framework_uses_gl_and_supports_export`.
+
+### Verificacion ejecutada
+- `python -m black cacao_accounting/reportes/__init__.py cacao_accounting/reportes/services.py tests/test_08_reconciliation_reports.py`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s tests/test_08_reconciliation_reports.py -k "financial_reports_framework_uses_gl_and_supports_export or reports_return_subledger_aging_kardex_and_reconciliations"`
+- `python -m flake8 cacao_accounting/reportes/__init__.py cacao_accounting/reportes/services.py`
+- `python -m ruff check cacao_accounting/reportes/__init__.py cacao_accounting/reportes/services.py`
+- `python -m mypy cacao_accounting/reportes/__init__.py cacao_accounting/reportes/services.py`
+
 ## 2026-05-09 (Contabilizar con caja y feedback visible)
 
 ### Peticion del usuario
