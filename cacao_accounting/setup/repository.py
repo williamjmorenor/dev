@@ -19,6 +19,13 @@ from cacao_accounting.database import (
     database,
 )
 
+try:
+    from flask_babel import gettext as _
+except ImportError:  # pragma: no cover
+
+    def _(value: str) -> str:
+        return value
+
 
 def get_setup_value(key: str, default: Any = None) -> Any:
     """Recupera un valor de configuración por clave."""
@@ -75,7 +82,7 @@ def create_default_book(entity: Entity) -> "Book":
 
     book = Book(
         code="FISC",
-        name="Fiscal",
+        name="Local",
         entity=entity.code,
         currency=entity.currency,
         is_primary=True,
@@ -171,11 +178,8 @@ def create_default_fiscal_year(
 
 
 def create_default_accounting_period(entity: Entity, fiscal_year: "FiscalYear") -> "AccountingPeriod":
-    from cacao_accounting.database import AccountingPeriod
-
     existing_period = database.session.execute(
-        database.select(AccountingPeriod)
-        .filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id)
+        database.select(AccountingPeriod).filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id)
     ).scalar_one_or_none()
     if existing_period is not None:
         return existing_period
@@ -196,11 +200,18 @@ def create_default_accounting_period(entity: Entity, fiscal_year: "FiscalYear") 
         database.session.add(period)
 
     database.session.flush()
-    return database.session.execute(
-        database.select(AccountingPeriod)
-        .filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id)
-        .order_by(AccountingPeriod.start)
-    ).scalars().first()
+    first_period = (
+        database.session.execute(
+            database.select(AccountingPeriod)
+            .filter_by(entity=entity.code, fiscal_year_id=fiscal_year.id)
+            .order_by(AccountingPeriod.start)
+        )
+        .scalars()
+        .first()
+    )
+    if first_period is None:
+        raise ValueError(_("No se pudo crear el período contable inicial."))
+    return first_period
 
 
 def get_default_entity() -> Entity | None:

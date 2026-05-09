@@ -7,7 +7,7 @@
 # Libreria estandar
 # --------------------------------------------------------------------------------------
 from functools import wraps
-from typing import Any
+from typing import Any, cast
 
 # ---------------------------------------------------------------------------------------
 # Librerias de terceros
@@ -29,7 +29,7 @@ from cacao_accounting.document_flow import (
     get_pending_lines,
     list_source_documents,
 )
-from cacao_accounting.document_flow.registry import DOCUMENT_TYPES, normalize_doctype
+from cacao_accounting.document_flow.registry import DOCUMENT_TYPES, DocumentType, normalize_doctype
 from cacao_accounting.document_flow.repository import get_document
 from cacao_accounting.document_flow.service import get_source_items
 from cacao_accounting.document_flow.status import _, document_status_payload
@@ -343,6 +343,7 @@ def document_flow_related_list(doctype: str):
     spec = DOCUMENT_TYPES.get(doctype_key)
     if not spec:
         abort(404)
+    spec = cast(DocumentType, spec)
 
     related_doctype = normalize_doctype(request.args.get("related_doctype", ""))
     related_id = request.args.get("related_id", "")

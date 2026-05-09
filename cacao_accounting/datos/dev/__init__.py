@@ -14,6 +14,8 @@
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
+from datetime import date
+
 from cacao_accounting.auth.roles import asigna_rol_a_usuario
 from cacao_accounting.database import database
 from cacao_accounting.datos.dev.data import (
@@ -66,8 +68,30 @@ def demo_usuarios():
 
 def demo_entidad():
     """Entidad de demostración."""
+    from cacao_accounting.compras.purchase_reconciliation_service import seed_matching_config_for_company
+    from cacao_accounting.setup.service import create_company
+
+    fiscal_year_start = date(date.today().year, 1, 1)
+    fiscal_year_end = date(date.today().year, 12, 31)
+
     for e in _make_entidades():
-        database.session.add(e)
+        company_data = {
+            "id": e.code,
+            "razon_social": e.company_name,
+            "nombre_comercial": e.name,
+            "id_fiscal": e.tax_id,
+            "moneda": e.currency,
+            "pais": e.country,
+            "tipo_entidad": e.entity_type,
+            "inicio_anio_fiscal": fiscal_year_start,
+            "fin_anio_fiscal": fiscal_year_end,
+        }
+        create_company(
+            company_data,
+            status=e.status or "active",
+            default=bool(e.default),
+        )
+        seed_matching_config_for_company(e.code)
     database.session.commit()
 
 

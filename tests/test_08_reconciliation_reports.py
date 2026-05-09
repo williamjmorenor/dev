@@ -518,7 +518,7 @@ def test_setup_with_predefined_catalog_creates_bootstrap_records(app_ctx):
         database.select(FiscalYear).filter_by(entity="mapco", name=str(date.today().year))
     ).scalar_one()
     period = database.session.execute(
-        database.select(AccountingPeriod).filter_by(entity="mapco", name=str(date.today().year))
+        database.select(AccountingPeriod).filter_by(entity="mapco", name=f"{date.today().year}-01")
     ).scalar_one()
     series = database.session.execute(
         database.select(NamingSeries).filter_by(company="mapco", entity_type="journal_entry")
@@ -558,6 +558,48 @@ def test_example_seed_creates_company_default_accounts(app_ctx):
             ).scalar_one_or_none()
             assert defaults is not None
             assert all(getattr(defaults, field) for field in DEFAULT_ACCOUNT_FIELDS)
+
+
+def test_example_seed_creates_company_base_records(app_ctx):
+    from cacao_accounting.database import (
+        AccountingPeriod,
+        Book,
+        CompanyDefaultAccount,
+        CostCenter,
+        Entity,
+        FiscalYear,
+        NamingSeries,
+        PurchaseMatchingConfig,
+        database,
+    )
+    from cacao_accounting.database.helpers import inicia_base_de_datos
+
+    app = create_app(
+        {
+            **configuracion,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+            "WTF_CSRF_ENABLED": False,
+            "TESTING": True,
+        }
+    )
+    with app.app_context():
+        database.drop_all()
+        database.create_all()
+        assert inicia_base_de_datos(app=app, user="cacao", passwd="cacao", with_examples=True)
+
+        for company in ("cacao", "dulce", "cafe"):
+            assert database.session.execute(database.select(Entity).filter_by(code=company)).scalar_one_or_none()
+            assert database.session.execute(database.select(Book).filter_by(entity=company, code="FISC")).scalar_one_or_none()
+            assert database.session.execute(database.select(CostCenter).filter_by(entity=company, code="MAIN")).scalar_one_or_none()
+            assert database.session.execute(database.select(FiscalYear).filter_by(entity=company)).scalar_one_or_none()
+            assert database.session.execute(database.select(AccountingPeriod).filter_by(entity=company)).scalars().first()
+            assert database.session.execute(
+                database.select(NamingSeries).filter_by(company=company, entity_type="journal_entry")
+            ).scalar_one_or_none()
+            assert database.session.execute(
+                database.select(PurchaseMatchingConfig).filter_by(company=company)
+            ).scalar_one_or_none()
 
 
 def test_default_account_admin_crud_rejects_incompatible_types(app_ctx):

@@ -139,6 +139,8 @@ def test_journal_new_route_renders_new_backend_form(app_ctx):
     assert "smartSelect" in html
     assert 'doctype: "company"' in html
     assert 'entity_type: "journal_entry"' in html
+    assert 'loadOnFilterChange: true' in html
+    assert 'requiredFilters: ["company"]' in html
     assert "/accounting/gl/new" not in html
 
 
