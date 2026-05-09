@@ -392,13 +392,17 @@ def _normalize_transaction_currency(
     if transaction_currency:
         if line_currencies and line_currencies != {transaction_currency}:
             raise JournalValidationError("Todas las lineas deben usar la moneda del comprobante.")
-        return transaction_currency, [replace(line, currency=transaction_currency) for line in lines]
+        return transaction_currency, _apply_currency_to_lines(lines, transaction_currency)
     if len(line_currencies) > 1:
         raise JournalValidationError("No se permite mezclar monedas en un mismo comprobante.")
     if not line_currencies:
         return None, lines
     inferred_currency = next(iter(line_currencies))
-    return inferred_currency, [replace(line, currency=inferred_currency) for line in lines]
+    return inferred_currency, _apply_currency_to_lines(lines, inferred_currency)
+
+
+def _apply_currency_to_lines(lines: list[JournalLineInput], currency: str) -> list[JournalLineInput]:
+    return [replace(line, currency=currency) for line in lines]
 
 
 def _account_record(company: str, account_value: str) -> Accounts | None:

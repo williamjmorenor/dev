@@ -46,7 +46,14 @@ def _login(client, user_id: str) -> None:
 
 def test_create_journal_draft_preserves_lines_and_does_not_post_gl(app_ctx):
     from cacao_accounting.contabilidad.journal_service import create_journal_draft
-    from cacao_accounting.database import Bank, BankAccount, Accounts, ComprobanteContableDetalle, GLEntry, database
+    from cacao_accounting.database import (
+        Accounts,
+        Bank,
+        BankAccount,
+        ComprobanteContableDetalle,
+        GLEntry,
+        database,
+    )
 
     debit_account = Accounts(entity="cacao", code="EXP-001", name="Gasto", active=True, enabled=True, group=False)
     credit_account = Accounts(entity="cacao", code="CASH-001", name="Caja", active=True, enabled=True, group=False)
@@ -168,6 +175,38 @@ def test_journal_service_requires_cost_center_for_expense_accounts(app_ctx):
             },
             user_id="user-1",
         )
+
+
+def test_journal_service_allows_non_expense_accounts_without_cost_center(app_ctx):
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft
+    from cacao_accounting.database import Accounts, database
+
+    asset_account = Accounts(
+        entity="cacao",
+        code="AST-001",
+        name="Caja general",
+        active=True,
+        enabled=True,
+        group=False,
+        account_type="cash",
+    )
+    offset_account = Accounts(entity="cacao", code="CAP-001", name="Capital", active=True, enabled=True, group=False)
+    database.session.add_all([asset_account, offset_account])
+    database.session.commit()
+
+    journal = create_journal_draft(
+        {
+            "company": "cacao",
+            "posting_date": "2026-05-06",
+            "lines": [
+                {"account": asset_account.id, "debit": "10.00", "credit": "0"},
+                {"account": offset_account.id, "debit": "0", "credit": "10.00"},
+            ],
+        },
+        user_id="user-1",
+    )
+
+    assert journal.status == "draft"
 
 
 def test_journal_new_route_renders_new_backend_form(app_ctx):
