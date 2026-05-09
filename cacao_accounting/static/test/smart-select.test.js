@@ -217,6 +217,5 @@ describe('smart-select', function () {
     const queryString = decodeURIComponent(requestUrl.split('?')[1] || '');
     assert.ok(queryString.includes('account_type=asset'));
     assert.ok(queryString.includes('account_type=expense'));
-    assert.strictEqual(queryString.includes('account_type='), true);
   });
 });
