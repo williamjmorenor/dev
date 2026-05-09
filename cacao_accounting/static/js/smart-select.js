@@ -13,6 +13,11 @@
 
   function normalizeValue(value) {
     if (typeof value === 'function') return normalizeValue(value());
+    if (Array.isArray(value)) {
+      return value
+        .map(function (item) { return normalizeValue(item); })
+        .filter(function (item) { return item !== undefined && item !== null && item !== ''; });
+    }
     if (value && typeof value === 'object' && value.selector) {
       var element = document.querySelector(value.selector);
       return element ? element.value : '';

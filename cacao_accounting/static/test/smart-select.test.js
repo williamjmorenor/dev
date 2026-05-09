@@ -191,4 +191,32 @@ describe('smart-select', function () {
     assert.ok(queryString.includes('company=cafe'));
     assert.strictEqual(queryString.includes('unsupported='), false);
   });
+
+  it('preserves array filters and appends each value', async function () {
+    let requestUrl = '';
+    const create = loadSmartSelect({
+      fetch: (url) => {
+        requestUrl = url;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+      },
+    });
+    const component = create({
+      doctype: 'account',
+      name: 'account',
+      minChars: 1,
+      filters: {
+        company: 'cafe',
+        account_type: ['asset', 'expense'],
+      },
+    });
+
+    component.search = 'ca';
+    component.fetchOptions();
+    await flushPromises();
+
+    const queryString = decodeURIComponent(requestUrl.split('?')[1] || '');
+    assert.ok(queryString.includes('account_type=asset'));
+    assert.ok(queryString.includes('account_type=expense'));
+    assert.strictEqual(queryString.includes('account_type='), true);
+  });
 });
