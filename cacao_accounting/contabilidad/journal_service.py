@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -52,6 +52,7 @@ class JournalLineInput:
     reference2: str | None
     remarks: str | None
     is_advance: bool
+    bank_account_id: str | None
 
 
 @dataclass(frozen=True)
@@ -73,7 +74,7 @@ class JournalDraftInput:
 def create_journal_draft(payload: dict[str, Any], user_id: str) -> ComprobanteContable:
     """Crea un comprobante contable manual en borrador."""
     data = _normalize_journal_payload(payload)
-    _validate_balanced_lines(data.lines)
+    _validate_balanced_lines(data.company, data.lines)
     primary_book = data.books[0] if data.books else None
     journal = ComprobanteContable(
         entity=data.company,
@@ -90,7 +91,10 @@ def create_journal_draft(payload: dict[str, Any], user_id: str) -> ComprobanteCo
         exchange_rate=data.exchange_rate,
         is_closing=data.is_closing,
     )
-    lines = [_line_model(data.company, data.posting_date, primary_book, line) for line in data.lines]
+    lines = [
+        _line_model(data.company, data.posting_date, primary_book, data.transaction_currency, line)
+        for line in data.lines
+    ]
     journal = add_journal(journal, lines)
     _assign_identifier_if_needed(journal, data.naming_series_id)
     database.session.commit()
@@ -124,7 +128,7 @@ def update_journal_draft(journal_id: str, payload: dict[str, Any], user_id: str)
         raise JournalValidationError("Solo se puede editar un comprobante en borrador.")
 
     data = _normalize_journal_payload(payload)
-    _validate_balanced_lines(data.lines)
+    _validate_balanced_lines(data.company, data.lines)
     primary_book = data.books[0] if data.books else None
 
     journal.entity = data.company
@@ -139,7 +143,10 @@ def update_journal_draft(journal_id: str, payload: dict[str, Any], user_id: str)
     journal.is_closing = data.is_closing
     journal.user_id = user_id
 
-    lines = [_line_model(data.company, data.posting_date, primary_book, line) for line in data.lines]
+    lines = [
+        _line_model(data.company, data.posting_date, primary_book, data.transaction_currency, line)
+        for line in data.lines
+    ]
     journal = replace_journal_lines(journal, lines)
     database.session.commit()
     return journal
@@ -201,6 +208,7 @@ def _normalize_journal_payload(payload: dict[str, Any]) -> JournalDraftInput:
     books = _normalize_books(payload.get("books"))
     if books is None and (book := _optional_text(payload.get("book"))):
         books = [book]
+    transaction_currency, lines = _normalize_transaction_currency(_optional_text(payload.get("transaction_currency")), lines)
     return JournalDraftInput(
         company=company,
         posting_date=posting_date,
@@ -208,7 +216,7 @@ def _normalize_journal_payload(payload: dict[str, Any]) -> JournalDraftInput:
         naming_series_id=_optional_text(payload.get("naming_series_id")),
         reference=_optional_text(payload.get("reference")),
         memo=_optional_text(payload.get("memo")),
-        transaction_currency=_optional_text(payload.get("transaction_currency")),
+        transaction_currency=transaction_currency,
         exchange_rate=None,
         is_closing=_optional_bool(payload.get("is_closing")),
         lines=lines,
@@ -238,10 +246,11 @@ def _normalize_line(raw_line: Any, fallback_order: int) -> JournalLineInput:
         reference2=_optional_text(raw_line.get("reference2")),
         remarks=_optional_text(raw_line.get("remarks")),
         is_advance=bool(raw_line.get("is_advance")),
+        bank_account_id=_optional_text(raw_line.get("bank_account") or raw_line.get("bank_account_id")),
     )
 
 
-def _validate_balanced_lines(lines: list[JournalLineInput]) -> None:
+def _validate_balanced_lines(company: str, lines: list[JournalLineInput]) -> None:
     total_debit = Decimal("0")
     total_credit = Decimal("0")
     for line in lines:
@@ -253,6 +262,12 @@ def _validate_balanced_lines(lines: list[JournalLineInput]) -> None:
             raise JournalValidationError("Una linea no puede tener debe y haber positivos al mismo tiempo.")
         if line.debit == 0 and line.credit == 0:
             raise JournalValidationError("Cada linea debe tener un importe en debe o en haber.")
+        if (
+            (account := _account_record(company, line.account)) is not None
+            and account.account_type == "expense"
+            and not line.cost_center
+        ):
+            raise JournalValidationError("Las cuentas de gasto requieren centro de costo.")
         total_debit += line.debit
         total_credit += line.credit
     if total_debit != total_credit:
@@ -263,6 +278,7 @@ def _line_model(
     company: str,
     posting_date: date,
     book: str | None,
+    transaction_currency: str | None,
     line: JournalLineInput,
 ) -> ComprobanteContableDetalle:
     amount = line.debit if line.debit > 0 else -line.credit
@@ -277,7 +293,7 @@ def _line_model(
         transaction=ComprobanteContable.__tablename__,
         order=line.order,
         value=amount,
-        currency_id=line.currency,
+        currency_id=transaction_currency,
         exchange_rate=line.exchange_rate,
         value_default=amount,
         memo=line.remarks,
@@ -289,6 +305,8 @@ def _line_model(
         reference2=line.reference2,
         third_type=line.party_type,
         third_code=line.party,
+        bank_account_id=line.bank_account_id,
+        is_advance=line.is_advance,
         voucher_type=JOURNAL_TRANSACTION_TYPE,
     )
 
@@ -362,8 +380,33 @@ def _serialize_journal_line(line: ComprobanteContableDetalle) -> dict[str, Any]:
         "reference2": line.reference2 or "",
         "remarks": line.memo or line.line_memo or "",
         "is_advance": bool(getattr(line, "is_advance", False)),
-        "bank_account": getattr(line, "bank_account", "") or "",
+        "bank_account": getattr(line, "bank_account_id", "") or "",
     }
+
+
+def _normalize_transaction_currency(
+    transaction_currency: str | None, lines: list[JournalLineInput]
+) -> tuple[str | None, list[JournalLineInput]]:
+    line_currencies = {line.currency for line in lines if line.currency}
+    if transaction_currency:
+        if line_currencies and line_currencies != {transaction_currency}:
+            raise JournalValidationError("Todas las lineas deben usar la moneda del comprobante.")
+        return transaction_currency, [replace(line, currency=transaction_currency) for line in lines]
+    if len(line_currencies) > 1:
+        raise JournalValidationError("No se permite mezclar monedas en un mismo comprobante.")
+    if not line_currencies:
+        return None, lines
+    inferred_currency = next(iter(line_currencies))
+    return inferred_currency, [replace(line, currency=inferred_currency) for line in lines]
+
+
+def _account_record(company: str, account_value: str) -> Accounts | None:
+    account = database.session.get(Accounts, account_value)
+    if account is not None:
+        return account if account.entity == company else None
+    return (
+        database.session.execute(database.select(Accounts).filter_by(entity=company, code=account_value)).scalars().first()
+    )
 
 
 def _account_code(company: str, account_value: str) -> str:

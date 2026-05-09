@@ -46,11 +46,22 @@ def _login(client, user_id: str) -> None:
 
 def test_create_journal_draft_preserves_lines_and_does_not_post_gl(app_ctx):
     from cacao_accounting.contabilidad.journal_service import create_journal_draft
-    from cacao_accounting.database import Accounts, ComprobanteContableDetalle, GLEntry, database
+    from cacao_accounting.database import Bank, BankAccount, Accounts, ComprobanteContableDetalle, GLEntry, database
 
     debit_account = Accounts(entity="cacao", code="EXP-001", name="Gasto", active=True, enabled=True, group=False)
     credit_account = Accounts(entity="cacao", code="CASH-001", name="Caja", active=True, enabled=True, group=False)
-    database.session.add_all([debit_account, credit_account])
+    bank = Bank(name="Banco Demo", is_active=True)
+    database.session.add_all([debit_account, credit_account, bank])
+    database.session.commit()
+    bank_account = BankAccount(
+        bank_id=bank.id,
+        company="cacao",
+        account_name="Cuenta operativa",
+        account_no="001",
+        currency="NIO",
+        is_active=True,
+    )
+    database.session.add(bank_account)
     database.session.commit()
 
     journal = create_journal_draft(
@@ -75,6 +86,8 @@ def test_create_journal_draft_preserves_lines_and_does_not_post_gl(app_ctx):
                     "credit": "100.00",
                     "reference_type": "purchase_invoice",
                     "reference_name": "PI-001",
+                    "is_advance": True,
+                    "bank_account": bank_account.id,
                 },
             ],
         },
@@ -94,6 +107,8 @@ def test_create_journal_draft_preserves_lines_and_does_not_post_gl(app_ctx):
     assert lines[0].cost_center == "MAIN"
     assert lines[0].project == "PRJ"
     assert lines[1].third_type == "supplier"
+    assert lines[1].is_advance is True
+    assert lines[1].bank_account_id == bank_account.id
     assert gl_entries == []
 
 
@@ -118,6 +133,37 @@ def test_journal_service_rejects_unbalanced_and_double_sided_lines(app_ctx):
                 "lines": [
                     {"account": "EXP-001", "debit": "10", "credit": "0"},
                     {"account": "CASH-001", "debit": "0", "credit": "9"},
+                ],
+            },
+            user_id="user-1",
+        )
+
+
+def test_journal_service_requires_cost_center_for_expense_accounts(app_ctx):
+    from cacao_accounting.contabilidad.journal_service import JournalValidationError, create_journal_draft
+    from cacao_accounting.database import Accounts, database
+
+    expense_account = Accounts(
+        entity="cacao",
+        code="EXP-CC",
+        name="Gasto con centro",
+        active=True,
+        enabled=True,
+        group=False,
+        account_type="expense",
+    )
+    offset_account = Accounts(entity="cacao", code="CASH-CC", name="Caja", active=True, enabled=True, group=False)
+    database.session.add_all([expense_account, offset_account])
+    database.session.commit()
+
+    with pytest.raises(JournalValidationError, match="centro de costo"):
+        create_journal_draft(
+            {
+                "company": "cacao",
+                "posting_date": "2026-05-06",
+                "lines": [
+                    {"account": expense_account.id, "debit": "10.00", "credit": "0"},
+                    {"account": offset_account.id, "debit": "0", "credit": "10.00"},
                 ],
             },
             user_id="user-1",
@@ -397,6 +443,79 @@ def test_submit_journal_converts_foreign_currency_to_book_currency(app_ctx):
     assert debit_entry.debit == Decimal("360.0000") or debit_entry.debit == Decimal("360.00")
     assert credit_entry.credit_in_account_currency == Decimal("10.00")
     assert credit_entry.credit == Decimal("360.0000") or credit_entry.credit == Decimal("360.00")
+
+
+def test_journal_service_rejects_mixed_line_currencies(app_ctx):
+    from cacao_accounting.contabilidad.journal_service import JournalValidationError, create_journal_draft
+    from cacao_accounting.database import Accounts, database
+
+    debit_account = Accounts(entity="cacao", code="EXP-009", name="Gasto", active=True, enabled=True, group=False)
+    credit_account = Accounts(entity="cacao", code="CASH-009", name="Caja", active=True, enabled=True, group=False)
+    database.session.add_all([debit_account, credit_account])
+    database.session.commit()
+
+    with pytest.raises(JournalValidationError, match="moneda"):
+        create_journal_draft(
+            {
+                "company": "cacao",
+                "posting_date": "2026-05-06",
+                "transaction_currency": "USD",
+                "lines": [
+                    {"account": debit_account.id, "debit": "10.00", "credit": "0", "currency": "USD"},
+                    {"account": credit_account.id, "debit": "0", "credit": "10.00", "currency": "NIO"},
+                ],
+            },
+            user_id="user-1",
+        )
+
+
+def test_submit_journal_persists_advance_and_bank_account_on_gl_entries(app_ctx):
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft, submit_journal
+    from cacao_accounting.database import Bank, BankAccount, Accounts, Book, GLEntry, database
+
+    debit_account = Accounts(entity="cacao", code="EXP-010", name="Gasto", active=True, enabled=True, group=False)
+    credit_account = Accounts(entity="cacao", code="CASH-010", name="Caja", active=True, enabled=True, group=False)
+    fiscal_book = Book(entity="cacao", code="FISC", name="Fiscal", status="activo", is_primary=True)
+    bank = Bank(name="Banco GL", is_active=True)
+    database.session.add_all([debit_account, credit_account, fiscal_book, bank])
+    database.session.commit()
+    bank_account = BankAccount(
+        bank_id=bank.id,
+        company="cacao",
+        account_name="Cuenta GL",
+        account_no="010",
+        currency="NIO",
+        is_active=True,
+    )
+    database.session.add(bank_account)
+    database.session.commit()
+
+    journal = create_journal_draft(
+        {
+            "company": "cacao",
+            "posting_date": "2026-05-06",
+            "books": ["FISC"],
+            "lines": [
+                {
+                    "account": debit_account.id,
+                    "cost_center": "MAIN",
+                    "debit": "10.00",
+                    "credit": "0",
+                    "is_advance": True,
+                    "bank_account": bank_account.id,
+                },
+                {"account": credit_account.id, "debit": "0", "credit": "10.00"},
+            ],
+        },
+        user_id="user-1",
+    )
+
+    submit_journal(journal.id)
+
+    posted_entries = database.session.execute(database.select(GLEntry).filter_by(voucher_id=journal.id)).scalars().all()
+    debit_entry = next(entry for entry in posted_entries if entry.debit > 0)
+    assert debit_entry.is_advance is True
+    assert debit_entry.bank_account_id == bank_account.id
 
 
 def test_entity_creation_uses_setup_defaults_and_creates_required_book_cost_center_and_series(app_ctx):

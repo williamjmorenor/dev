@@ -1,5 +1,49 @@
 # SESSIONS
 
+## 2026-05-09 (validación de comprobantes contables)
+
+### Peticion del usuario
+Validar la implementación del módulo de Comprobante Contable contra los criterios CA-001..CA-033, asegurar que los checks de `.github/workflows/python-package.yml` pasen y actualizar `SESSIONS.md`, `ESTADO_ACTUAL.md` y `PENDIENTE.md` con el resultado.
+
+### Plan implementado
+1. Auditar la implementación actual del Journal Entry manual en backend, posting, smart selects, modelo y pruebas.
+2. Corregir gaps contables/funcionales de bajo riesgo detectados durante la validación.
+3. Ejecutar build, lint y pruebas equivalentes al workflow CI para dejar el branch listo para merge.
+4. Registrar el resultado de la validación y el estado residual en la documentación de seguimiento.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/journal_service.py`:
+  - ahora exige centro de costo para cuentas de gasto,
+  - impide mezcla de monedas dentro de un mismo comprobante,
+  - normaliza la moneda de líneas para que hereden la moneda del comprobante,
+  - persiste `is_advance` y cuenta bancaria por línea.
+- `cacao_accounting/database/__init__.py` y `cacao_accounting/contabilidad/posting.py`:
+  - `ComprobanteContableDetalle` y `GLEntry` ahora conservan `is_advance` y `bank_account_id`.
+- `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html`:
+  - la moneda avanzada de línea deja de capturarse libremente y refleja la moneda del comprobante.
+- `tests/test_09_journal_entry_form.py`:
+  - nuevas pruebas para persistencia de anticipo/cuenta bancaria, validación de centro de costo en gastos y bloqueo de mezcla de monedas.
+- `cacao_accounting/datos/dev/__init__.py` y `cacao_accounting/setup/repository.py`:
+  - el bootstrap de compañías de ejemplo vuelve a propagar web/correo/teléfonos/fax para no romper las vistas smoke de CI.
+- `cacao_accounting/static/js/smart-select.js` y `tests/test_10_smart_select_js.py`:
+  - `preloadOptions()` / `fetchOptions()` retornan promesas,
+  - el auto-select de opciones default mantiene la lista pre-cargada,
+  - la prueba JS resuelve `smart-select.js` desde la ruta real del repositorio.
+
+### Verificacion ejecutada
+- `python -m build`
+- `python -m flake8 cacao_accounting/`
+- `python -m ruff check cacao_accounting/`
+- `python -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -q tests/test_09_journal_entry_form.py` -> 17 passed.
+- `python -m pytest -q tests/test_10_smart_select_js.py` -> 2 passed.
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True` -> 342 passed.
+
+### Notas para siguiente iteracion
+1. Implementar selector real de documentos abiertos dependiente de compañía/tipo de tercero/tercero/tipo documental.
+2. Completar estados operativos del comprobante (cancelado, reversado, cierre visible) y sus restricciones de UI.
+3. Resolver el recálculo formal de `document_no` cuando cambia la serie de un borrador antes del submit.
+
 ## 2026-05-04 (diagnóstico del proyecto)
 
 ### Peticion del usuario
@@ -1373,4 +1417,3 @@ Corregir `cacao_accounting/static/js/smart-select.js` para que los campos depend
 - `bash run_test.sh` (baseline) → falla por dependencias faltantes del entorno: `black`, `flake8`, `ruff`, `bandit`, `pytest`.
 - `npm --prefix cacao_accounting/static ci` → instalación de dependencias JS para pruebas.
 - `npx --prefix cacao_accounting/static mocha cacao_accounting/static/test/smart-select.test.js` → **5 passing**.
-

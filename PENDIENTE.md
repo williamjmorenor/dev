@@ -69,10 +69,15 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Generar `GLEntry` por cada línea y por cada libro activo desde una acción de submit; el comprobante manual puede limitarse a uno o varios libros activos.
 - [x] Permitir en `/accounting/journal/new` seleccionar libros activos con checkboxes preseleccionados y tratar “todos marcados” como afectar todos los libros activos.
 - [x] Permitir editar borradores del comprobante manual para cambiar libros y líneas antes del submit.
+- [x] Exigir centro de costo en líneas de cuentas de gasto.
+- [x] Forzar moneda única por comprobante y bloquear mezcla de monedas en líneas.
+- [x] Persistir `is_advance` y cuenta bancaria del modal avanzado en `ComprobanteContableDetalle` y `GLEntry`.
 - [ ] Soportar tipos: estándar, apertura, nota de crédito, nota de débito, contra asiento, ajuste, reversión.
 - [ ] Completar edición de borradores y lista operacional; `/gl/new` y `/gl/list` quedan como legacy hasta retiro.
 - [x] Añadir cobertura HTTP del selector multi-book y del endpoint de libros activos del comprobante manual.
 - [ ] Resolver formalmente el comportamiento de `document_no` cuando un borrador cambia de serie antes de contabilizar.
+- [ ] Implementar selector de documentos abiertos dependiente de compañía / tipo de tercero / tercero / tipo documental.
+- [ ] Completar estados operativos visibles del comprobante (cancelado, reversado, cierre) y sus restricciones.
 
 ---
 
@@ -522,3 +527,5 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Mantener excepción de UX para compañía (`preloadOnFocus: true`) en `/accounting/journal/new`.
 - [x] Evitar serialización de filtros como `[object Object]` normalizando objetos a valores escalares.
 - [x] Agregar y ejecutar pruebas unitarias JS de `smart-select` para cubrir regressions del issue.
+- [x] Hacer que `preloadOptions()` / `fetchOptions()` retornen promesas para poder validarlas de forma determinista en pruebas.
+- [x] Mantener disponibles las opciones pre-cargadas después del auto-select de una opción default.
