@@ -516,3 +516,9 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 
 - [x] Implementar `adjustment_positive` y `adjustment_negative` en Inventario (rutas + posting).
 - [x] Completar soporte de conciliación de inventario en posting de `StockEntry`.
+
+### Iteración 2026-05-09 — Smart Select
+- [x] Corregir `onFocus` en `smart-select.js` para que no dispare búsquedas en campos dependientes por defecto.
+- [x] Mantener excepción de UX para compañía (`preloadOnFocus: true`) en `/accounting/journal/new`.
+- [x] Evitar serialización de filtros como `[object Object]` normalizando objetos a valores escalares.
+- [x] Agregar y ejecutar pruebas unitarias JS de `smart-select` para cubrir regressions del issue.

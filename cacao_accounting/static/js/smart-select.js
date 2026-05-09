@@ -2,11 +2,28 @@
 // SPDX-FileCopyrightText: 2025 - 2026 William Jose Moreno Reyes
 
 (function () {
+  function normalizeObjectValue(value) {
+    var scalarKeys = ['value', 'id', 'code'];
+    for (var index = 0; index < scalarKeys.length; index += 1) {
+      var key = scalarKeys[index];
+      if (value[key] !== undefined && value[key] !== null) return value[key];
+    }
+    return '';
+  }
+
   function normalizeValue(value) {
     if (typeof value === 'function') return normalizeValue(value());
+    if (Array.isArray(value)) {
+      return value
+        .map(function (item) { return normalizeValue(item); })
+        .filter(function (item) { return item !== undefined && item !== null && item !== ''; });
+    }
     if (value && typeof value === 'object' && value.selector) {
       var element = document.querySelector(value.selector);
       return element ? element.value : '';
+    }
+    if (value && typeof value === 'object') {
+      return normalizeObjectValue(value);
     }
     return value;
   }
@@ -33,8 +50,7 @@
         filters: config.filters || {},
         filterSources: config.filterSources || [],
         preload: config.preload || false,
-        loadOnFilterChange: config.loadOnFilterChange || false,
-        requiredFilters: config.requiredFilters || [],
+        preloadOnFocus: config.preloadOnFocus || false,
         autoSelectDefault: config.autoSelectDefault || false,
         messages: Object.assign({
           placeholder: '',
@@ -54,8 +70,6 @@
         error: '',
         invalid: false,
         lastFilterSignature: '',
-        _preloadedCache: [],
-        _fetchSeq: 0,
         onSelect: config.onSelect || null,
 
         init: function () {
@@ -66,9 +80,6 @@
             this.selectedValue = config.initialValue;
           }
           if (this.preload && !this.selectedValue) {
-            this.preloadOptions();
-          }
-          if (this.loadOnFilterChange && this.requiredFiltersPresent() && !this.selectedValue) {
             this.preloadOptions();
           }
         },
@@ -104,7 +115,7 @@
           if (nextSignature === this.lastFilterSignature) return;
           this.lastFilterSignature = nextSignature;
           this.clearSelection();
-          if (this.preload || this.loadOnFilterChange) {
+          if (this.preload) {
             this.preloadOptions();
           }
         },
@@ -119,80 +130,23 @@
         },
 
         onFocus: function () {
-          if ((this.preload || this.loadOnFilterChange) && !this.open && !this.loading) {
-            if (this._preloadedCache && this._preloadedCache.length > 0) {
-              this.options = this._preloadedCache.slice();
+          if (this.preload && this.preloadOnFocus && !this.open && !this.loading) {
+            if (this.hasPreloadedOptions()) {
               this.open = true;
-            } else if (this.loadOnFilterChange && this.requiredFiltersPresent()) {
-              this.preloadOptions();
-            } else if (this.preload) {
+            } else {
               this.preloadOptions();
             }
           }
         },
 
         hasPreloadedOptions: function () {
-          return this.options.length > 0;
-        },
-
-        notifyValueChange: function () {
-          if (!this.$root) {
-            return;
-          }
-
-          var input = this.$root.querySelector('input[type="hidden"][name="' + this.name + '"]');
-          if (!input) {
-            return;
-          }
-
-          input.value = this.selectedValue || '';
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        },
-
-        requiredFiltersPresent: function () {
-          var self = this;
-          return !this.requiredFilters.some(function (key) {
-            return !normalizeValue(self.filters[key]);
-          });
-        },
-
-        applySelection: function (option, settings) {
-          var selectionSettings = settings || {};
-
-          this.selectedValue = option.value || option.id;
-          this.selectedLabel = option.display_name || option.label || '';
-          this.search = this.selectedLabel;
-          if (!selectionSettings.keepOptions) {
-            this.options = [];
-          }
-          this.open = false;
-          this.invalid = false;
-          this.error = '';
-
-          if (typeof this.onSelect === 'function') {
-            try {
-              this.onSelect(option);
-            } catch (ignore) {
-              // No-op: do not break select flow
-            }
-          }
-
-          this.notifyValueChange();
+          return this.preload && this.options.length > 0;
         },
 
         preloadOptions: function () {
-          if (this.requiredFilters.length && !this.requiredFiltersPresent()) {
-            this.options = [];
-            this.open = false;
-            this.loading = false;
-            return;
-          }
-
           var self = this;
           this.error = '';
           var params = new URLSearchParams();
-          var seq = this._fetchSeq;
           params.append('doctype', this.doctype);
           params.append('q', '');
           params.append('limit', this.limit);
@@ -207,47 +161,30 @@
               return response.json();
             })
             .then(function (data) {
-              if (seq !== self._fetchSeq) return;
               self.options = data.results || [];
-              self._preloadedCache = self.options.slice();
               self.loading = false;
               if (!self.selectedValue && self.autoSelectDefault) {
                 var defaultOption = self.options.find(function (opt) { return opt.is_default; });
                 if (defaultOption) {
-                  self.applySelection(defaultOption, { keepOptions: true });
+                  // Auto-select the default option and stop; further processing not needed.
+                  self.selectOption(defaultOption);
                   return;
                 }
               }
             })
             .catch(function () {
-              if (seq !== self._fetchSeq) return;
               self.options = [];
               self.loading = false;
               self.error = self.messages.error;
             });
         },
 
-        filterPreloadedOptions: function (query) {
-          var lower = query.toLowerCase();
-          return this._preloadedCache.filter(function (opt) {
-            var label = (opt.display_name || opt.label || '').toLowerCase();
-            return label.indexOf(lower) !== -1;
-          });
-        },
-
         fetchOptions: function () {
           var query = this.search.trim();
           var self = this;
           this.error = '';
-          if (this.requiredFilters.length && !this.requiredFiltersPresent()) {
-            this.options = [];
-            this.open = false;
-            this.loading = false;
-            return;
-          }
           if (query.length < this.minChars) {
-            if (this._preloadedCache && this._preloadedCache.length > 0) {
-              this.options = query.length === 0 ? this._preloadedCache.slice() : this.filterPreloadedOptions(query);
+            if (this.hasPreloadedOptions()) {
               this.open = true;
               return;
             }
@@ -265,8 +202,6 @@
             appendParam(params, key, self.filters[key]);
           });
 
-          this._fetchSeq += 1;
-          var seq = this._fetchSeq;
           this.loading = true;
           this.open = true;
           fetch(this.endpoint + '?' + params.toString(), { credentials: 'same-origin' })
@@ -275,13 +210,11 @@
               return response.json();
             })
             .then(function (data) {
-              if (seq !== self._fetchSeq) return;
               self.options = data.results || [];
               self.loading = false;
               self.open = true;
             })
             .catch(function () {
-              if (seq !== self._fetchSeq) return;
               self.options = [];
               self.loading = false;
               self.error = self.messages.error;
@@ -290,7 +223,26 @@
         },
 
         selectOption: function (option) {
-          this.applySelection(option);
+          this.selectedValue = option.value || option.id;
+          this.selectedLabel = option.display_name || option.label || '';
+          this.search = this.selectedLabel;
+          this.options = [];
+          this.open = false;
+          this.invalid = false;
+          this.error = '';
+          if (typeof this.onSelect === 'function') {
+            try {
+              this.onSelect(option);
+            } catch (ignore) {
+              // No-op: do not break select flow
+            }
+          }
+          if (this.$root) {
+            var input = this.$root.querySelector('input[type="hidden"][name="' + this.name + '"]');
+            if (input) {
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
         },
 
         clearSelection: function () {
@@ -298,28 +250,14 @@
           this.selectedLabel = '';
           this.search = '';
           this.options = [];
-          this._preloadedCache = [];
-          this._fetchSeq += 1;
           this.open = false;
           this.invalid = false;
           this.error = '';
-          this.notifyValueChange();
         },
 
         closeSoon: function () {
           var self = this;
           window.setTimeout(function () {
-            if (self.search.trim() && !self.selectedValue && self.options.length) {
-              var exactMatch = self.options.find(function (option) {
-                var label = option.display_name || option.label || '';
-                return label === self.search.trim();
-              });
-              if (exactMatch) {
-                self.selectOption(exactMatch);
-              } else if (self.options.length === 1) {
-                self.selectOption(self.options[0]);
-              }
-            }
             self.open = false;
             var restoredInitialLabel = self.selectedLabel && self.search === self.selectedLabel;
             self.invalid = Boolean(self.search.trim() && !self.selectedValue && !restoredInitialLabel);

@@ -1342,3 +1342,35 @@ Analizar el archivo FIXME.md y corregir los issues reportados en revisión manua
 ### Notas para siguiente iteracion
 1. El test `test_setup_with_predefined_catalog_creates_bootstrap_records` en `test_08_reconciliation_reports.py` falla por una lógica de creación de `AccountingPeriod` pre-existente no relacionada con estos cambios.
 2. Los botones "Expandir todos / Colapsar todos" usan `_x_dataStack` de Alpine.js interno — verificar compatibilidad si se actualiza Alpine.
+
+## 2026-05-09 (fix smart-select en campos dependientes)
+
+### Peticion del usuario
+Corregir `cacao_accounting/static/js/smart-select.js` para que los campos dependientes no carguen resultados al hacer focus, evitar filtros serializados como `[object Object]` y fortalecer las pruebas unitarias JavaScript.
+
+### Plan implementado
+1. Revisar comportamiento de `onFocus`, `preload` y serialización de filtros en `smart-select.js`.
+2. Aplicar cambio mínimo para permitir preload por foco solo cuando se configure explícitamente.
+3. Ajustar serialización de filtros para normalizar objetos a valores escalares (`value/id/code`) y no enviar objetos crudos.
+4. Mantener comportamiento esperado en compañía (`preload` + apertura por foco) configurando explícitamente `preloadOnFocus`.
+5. Agregar pruebas unitarias JS específicas para:
+   - no buscar en focus cuando no corresponde,
+   - permitir focus preload cuando sí corresponde,
+   - limpiar estado al cambiar filtro sin preload,
+   - serializar filtros sin `[object Object]`.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/static/js/smart-select.js`:
+  - nuevo flag `preloadOnFocus`,
+  - `onFocus()` ahora solo pre-carga si `preloadOnFocus` es `true`,
+  - `normalizeValue()` ahora transforma objetos a escalar (`value`, `id`, `code`) o vacío.
+- `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html`:
+  - campo compañía configurado con `preloadOnFocus: true` para conservar la UX esperada.
+- `cacao_accounting/static/test/smart-select.test.js`:
+  - suite Mocha con 5 casos que cubren el bug reportado, limpieza por cambio de filtros y serialización segura.
+
+### Verificacion ejecutada
+- `bash run_test.sh` (baseline) → falla por dependencias faltantes del entorno: `black`, `flake8`, `ruff`, `bandit`, `pytest`.
+- `npm --prefix cacao_accounting/static ci` → instalación de dependencias JS para pruebas.
+- `npx --prefix cacao_accounting/static mocha cacao_accounting/static/test/smart-select.test.js` → **5 passing**.
+
