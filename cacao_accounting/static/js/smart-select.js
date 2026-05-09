@@ -8,6 +8,12 @@
       var element = document.querySelector(value.selector);
       return element ? element.value : '';
     }
+    if (value && typeof value === 'object') {
+      if (value.value !== undefined && value.value !== null) return value.value;
+      if (value.id !== undefined && value.id !== null) return value.id;
+      if (value.code !== undefined && value.code !== null) return value.code;
+      return '';
+    }
     return value;
   }
 
@@ -33,6 +39,7 @@
         filters: config.filters || {},
         filterSources: config.filterSources || [],
         preload: config.preload || false,
+        preloadOnFocus: config.preloadOnFocus || false,
         autoSelectDefault: config.autoSelectDefault || false,
         messages: Object.assign({
           placeholder: '',
@@ -112,7 +119,7 @@
         },
 
         onFocus: function () {
-          if (this.preload && !this.open && !this.loading) {
+          if (this.preload && this.preloadOnFocus && !this.open && !this.loading) {
             if (this.hasPreloadedOptions()) {
               this.open = true;
             } else {

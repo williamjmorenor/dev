@@ -282,3 +282,16 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 | API | N/A | 🟡 Parcial | ✅ Flow endpoints | N/A |
 | Document Flow | ✅ Completo | ✅ API completa | ✅ Relaciones activas | ❌ Sin reportes |
 | Identificadores | ✅ Completo | ✅ NamingSeries UI | ✅ Generación activa | 🟡 Solo log |
+
+---
+
+## Actualización 2026-05-09 — Smart Select (frontend)
+
+- `smart-select.js` ahora separa preload general vs preload en foco:
+  - `preload` sigue permitiendo carga por inicialización/cambio de filtros.
+  - nuevo `preloadOnFocus` controla si el foco puede disparar carga y apertura del menú.
+- Normalización de filtros fortalecida para evitar query params con objetos (`[object Object]`):
+  - prioriza `value`, `id` o `code` cuando el filtro es objeto.
+- Formulario de comprobante (`journal_nuevo.html`):
+  - solo el campo **Compañía** mantiene apertura/carga por foco (`preloadOnFocus: true`).
+- Cobertura JS agregada en `cacao_accounting/static/test/smart-select.test.js` con escenarios del bug.
