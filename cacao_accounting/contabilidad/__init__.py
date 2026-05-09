@@ -15,6 +15,22 @@ from flask.helpers import url_for
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
+try:  # pragma: no cover - fallback defensivo para contextos sin Flask-Babel inicializado.
+    from flask_babel import gettext as _babel_gettext
+except ImportError:  # pragma: no cover
+
+    def _(value: str) -> str:
+        return value
+
+else:
+
+    def _(value: str) -> str:
+        try:
+            return _babel_gettext(value)
+        except (KeyError, RuntimeError):
+            return value
+
+
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
@@ -1218,6 +1234,7 @@ def nuevo_comprobante():
         view_key=DEFAULT_VIEW_KEY,
         initial_journal=None,
         submit_url=url_for("contabilidad.nuevo_comprobante"),
+        cancel_url=url_for("contabilidad.conta"),
         currencies=obtener_lista_monedas(),
     )
 
@@ -1239,6 +1256,40 @@ def contabilizar_comprobante(identifier: str):
     return redirect(url_for("contabilidad.ver_comprobante", identifier=identifier))
 
 
+@contabilidad.route("/journal/<identifier>/reject", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def rechazar_comprobante(identifier: str):
+    """Rechaza un comprobante contable manual en borrador sin afectar ledger."""
+    from cacao_accounting.contabilidad.journal_service import JournalValidationError, reject_journal_draft
+
+    try:
+        reject_journal_draft(identifier, user_id=str(current_user.id))
+    except JournalValidationError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("Comprobante contable rechazado.", "warning")
+    return redirect(url_for("contabilidad.ver_comprobante", identifier=identifier))
+
+
+@contabilidad.route("/journal/<identifier>/cancel", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def anular_comprobante(identifier: str):
+    """Anula un comprobante contabilizado aplicando reversa en el ledger."""
+    from cacao_accounting.contabilidad.journal_service import JournalValidationError, cancel_submitted_journal
+
+    try:
+        cancel_submitted_journal(identifier, user_id=str(current_user.id))
+    except JournalValidationError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("Comprobante contable anulado con reversa contable.", "warning")
+    return redirect(url_for("contabilidad.ver_comprobante", identifier=identifier))
+
+
 @contabilidad.route("/journal/<identifier>")
 @login_required
 @modulo_activo("accounting")
@@ -1247,18 +1298,162 @@ def ver_comprobante(identifier: str):
     """Ver comprobante contable."""
     from cacao_accounting.contabilidad.journal_repository import get_journal, list_journal_lines
     from cacao_accounting.contabilidad.journal_service import serialize_journal_for_form
+    from cacao_accounting.database import Accounts, Book, CostCenter, Currency, Entity, User
 
     journal = get_journal(identifier)
     if journal is None:
         flash("El comprobante contable indicado no existe.", "warning")
         return redirect(url_for("contabilidad.conta"))
+    creator = database.session.get(User, journal.user_id) if journal.user_id else None
+    creator_nickname = creator.user if creator is not None else (journal.user_id or "")
+    lineas_raw = list_journal_lines(identifier)
+
+    selected_book_codes = serialize_journal_for_form(journal).get("books") or []
+    selected_book_rows = (
+        database.session.execute(
+            database.select(Book).filter(Book.entity == journal.entity).where(Book.code.in_(selected_book_codes))
+        )
+        .scalars()
+        .all()
+        if selected_book_codes
+        else []
+    )
+    selected_books = [
+        f"{book.code} - {book.name}" + (f" ({book.currency})" if getattr(book, "currency", None) else "")
+        for book in selected_book_rows
+    ]
+    if not selected_books:
+        fallback_book_rows = (
+            database.session.execute(
+                database.select(Book)
+                .filter(Book.entity == journal.entity)
+                .where(Book.status.is_(None) | (Book.status == "activo"))
+            )
+            .scalars()
+            .all()
+        )
+        selected_books = [
+            f"{book.code} - {book.name}" + (f" ({book.currency})" if getattr(book, "currency", None) else "")
+            for book in fallback_book_rows
+        ]
+    if not selected_books and journal.book:
+        selected_books = [str(journal.book)]
+
+    entity = database.session.get(Entity, journal.entity) if journal.entity else None
+    company_currency_code = getattr(entity, "currency", None)
+    currency_label = ""
+    if journal.transaction_currency:
+        currency_row = database.session.get(Currency, journal.transaction_currency)
+        if currency_row is not None:
+            currency_label = f"{currency_row.code} - {currency_row.name}"
+        else:
+            currency_label = str(journal.transaction_currency)
+    elif company_currency_code:
+        company_currency_row = database.session.get(Currency, company_currency_code)
+        if company_currency_row is not None:
+            currency_label = f"{company_currency_row.code} - {company_currency_row.name}"
+        else:
+            currency_label = f"{company_currency_code} - {_('Moneda local')}"
+    else:
+        currency_label = _("Moneda local")
+
+    account_codes = {line.account for line in lineas_raw if line.account}
+    cost_center_codes = {line.cost_center for line in lineas_raw if line.cost_center}
+    account_rows = (
+        database.session.execute(
+            database.select(Accounts).filter(Accounts.entity == journal.entity).where(Accounts.code.in_(account_codes))
+        )
+        .scalars()
+        .all()
+        if account_codes
+        else []
+    )
+    cost_center_rows = (
+        database.session.execute(
+            database.select(CostCenter)
+            .filter(CostCenter.entity == journal.entity)
+            .where(CostCenter.code.in_(cost_center_codes))
+        )
+        .scalars()
+        .all()
+        if cost_center_codes
+        else []
+    )
+    account_labels = {row.code: f"{row.code} - {row.name}" if row.name else row.code for row in account_rows}
+    cost_center_labels = {row.code: f"{row.code} - {row.name}" if row.name else row.code for row in cost_center_rows}
+
+    lineas = []
+    for line in lineas_raw:
+        account_code = line.account or ""
+        cost_center_code = line.cost_center or ""
+        lineas.append(
+            {
+                "order": line.order,
+                "account": account_code,
+                "account_label": account_labels.get(account_code, account_code),
+                "cost_center": cost_center_code,
+                "cost_center_label": cost_center_labels.get(cost_center_code, cost_center_code),
+                "third_type": line.third_type,
+                "third_code": line.third_code,
+                "value": line.value,
+                "unit": line.unit,
+                "project": line.project,
+                "internal_reference": line.internal_reference,
+                "internal_reference_id": line.internal_reference_id,
+                "reference": line.reference,
+                "reference1": line.reference1,
+                "reference2": line.reference2,
+                "is_advance": line.is_advance,
+                "memo": line.memo,
+                "line_memo": line.line_memo,
+            }
+        )
+
     return render_template(
         "contabilidad/journal.html",
         registro=journal,
-        lineas=list_journal_lines(identifier),
-        selected_books=(serialize_journal_for_form(journal).get("books") or []),
+        lineas=lineas,
+        selected_books=selected_books,
+        currency_label=currency_label,
+        creator_nickname=creator_nickname,
         titulo="Comprobante Contable - " + APPNAME,
     )
+
+
+@contabilidad.route("/journal/<identifier>/duplicate", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def duplicar_comprobante(identifier: str):
+    """Duplica un comprobante y crea un nuevo borrador editable."""
+    from cacao_accounting.contabilidad.journal_service import JournalValidationError, duplicate_journal_as_draft
+
+    try:
+        duplicated = duplicate_journal_as_draft(identifier, user_id=str(current_user.id))
+    except JournalValidationError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("contabilidad.ver_comprobante", identifier=identifier))
+
+    flash("Comprobante duplicado como nuevo borrador.", "success")
+    return redirect(url_for("contabilidad.editar_comprobante", identifier=duplicated.id))
+
+
+@contabilidad.route("/journal/<identifier>/revert", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def revertir_comprobante(identifier: str):
+    """Crea borrador de reversión invirtiendo débitos y créditos del comprobante origen."""
+    from cacao_accounting.contabilidad.journal_service import JournalValidationError, duplicate_journal_as_reversal_draft
+
+    try:
+        reversed_draft = duplicate_journal_as_reversal_draft(identifier, user_id=str(current_user.id))
+    except JournalValidationError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("contabilidad.ver_comprobante", identifier=identifier))
+
+    flash("Reversión creada como nuevo borrador editable.", "success")
+    return redirect(url_for("contabilidad.editar_comprobante", identifier=reversed_draft.id))
 
 
 @contabilidad.route("/journal/edit/<identifier>", methods=["GET", "POST"])
@@ -1303,6 +1498,7 @@ def editar_comprobante(identifier: str):
         view_key=DEFAULT_VIEW_KEY,
         initial_journal=serialize_journal_for_form(journal),
         submit_url=url_for("contabilidad.editar_comprobante", identifier=identifier),
+        cancel_url=url_for("contabilidad.ver_comprobante", identifier=identifier),
         currencies=obtener_lista_monedas(),
     )
 

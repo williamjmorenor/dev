@@ -1,253 +1,687 @@
-Sí: con lo que describes, el problema está claramente en el contrato de comportamiento del frontend, no en la API.
+# Criterios de aceptación — Implementación de Comprobante Contable
 
-El archivo actual permite preload, loadOnFilterChange y lógica activa en onFocus, por eso un campo puede mostrar resultados solo al recibir foco. Ese comportamiento existe explícitamente en onFocus() y preloadOptions() dentro de smart-select.js. 
-Tu requerimiento funcional confirma que solo compañía debe precargar, y que los demás campos solo deben consultar backend cuando el usuario escriba. 
+## Objetivo
 
-Diagnóstico del issue
-
-El comportamiento incorrecto viene de esta regla actual:
-
-onFocus: function () {
-  if ((this.preload || this.loadOnFilterChange) && !this.open && !this.loading) {
-    ...
-    this.preloadOptions();
-  }
-}
-
-Eso permite que un campo como naming_series abra opciones solo por foco, especialmente si tiene:
-
-loadOnFilterChange: true
-
-o
-
-preload: true
-
-Para tu caso ERP, eso es incorrecto.
-
+Definir los criterios funcionales, contables, técnicos y de experiencia de usuario que debe cumplir la implementación del módulo de Comprobante Contable del sistema Cacao Accounting.
 
 ---
 
-Requerimiento técnico propuesto
+# 1. Arquitectura General del Comprobante
 
-Título
+## CA-001 — Estructura maestro/detalle
 
-Corrección del comportamiento de Smart Select para evitar precarga no deseada en campos dependientes
+### Criterio de aceptación
 
-Contexto
+El comprobante contable debe estar compuesto por:
 
-En formularios contables y operativos, la compañía funciona como dimensión principal del documento. El campo compañía puede precargar registros activos porque normalmente el volumen es bajo y porque define el contexto operativo del formulario.
+1. Un registro maestro (header).
+2. Uno o múltiples registros de líneas contables (detail).
 
-Los demás campos dependientes —secuencia, tercero, cuenta, producto, centro de costo, proyecto, unidad, etc.— no deben precargar resultados al recibir foco ni al cambiar filtros. Deben esperar interacción explícita del usuario mediante escritura.
+### Validaciones
 
-Problema
+* El registro maestro debe almacenar:
 
-En /accounting/journal/new, el campo de secuencia muestra resultados al recibir foco. Este comportamiento no es esperado.
+  * ID único interno.
+  * Referencia visible para usuario.
+  * Compañía.
+  * Fecha de contabilización.
+  * Serie/secuencia.
+  * Moneda del comprobante.
+  * Concepto global.
+  * Indicador `is_closing`.
+  * Estado del comprobante.
 
-Además, al escribir en el campo de secuencia, la API recibe parámetros incorrectos como:
+* Las líneas deben almacenar:
 
-company=[object Object]
-
-Esto indica que el frontend está enviando un objeto completo como filtro en lugar del valor real esperado, probablemente company_id o código de compañía.
-
-Comportamiento esperado
-
-Campo compañía
-
-Debe:
-
-1. Precargar compañías activas.
-
-
-2. Mostrar opciones al recibir foco.
-
-
-3. Filtrar localmente o vía backend al escribir.
-
-
-4. Al seleccionarse, establecer el filtro de compañía para el resto del formulario.
-
-
-5. Disparar actualización contextual de campos dependientes.
-
-
-
-Campo secuencia / naming series
-
-Debe:
-
-1. No mostrar lista al recibir foco.
-
-
-2. No consultar backend al recibir foco.
-
-
-3. No precargar todas las secuencias de la compañía.
-
-
-4. Al cambiar compañía, cargar únicamente la secuencia predeterminada aplicable.
-
-
-5. Permitir que el usuario borre la secuencia predeterminada.
-
-
-6. Al comenzar a escribir, consultar backend usando:
-
-doctype=naming_series
-
-q=<texto digitado>
-
-company=<valor real de compañía>
-
-entity_type=journal_entry
-
-limit=20
-
-
-
-
-Campos dependientes en general
-
-Deben:
-
-1. Limpiarse cuando cambia un filtro del que dependen.
-
-
-2. No consultar backend automáticamente por foco.
-
-
-3. No consultar backend automáticamente por cambio de filtro, salvo que el campo tenga una acción explícita de carga de default.
-
-
-4. Consultar backend únicamente cuando el usuario escriba el mínimo de caracteres requerido.
-
-
-5. Enviar filtros normalizados, nunca objetos JavaScript crudos.
-
-
-
+  * Cuenta contable.
+  * Débito.
+  * Crédito.
+  * Centro de costo.
+  * Unidad de negocio.
+  * Proyecto.
+  * Tipo de tercero.
+  * Tercero.
+  * Documento referenciado.
+  * Comentario de línea.
+  * Indicador de anticipo.
 
 ---
 
-Cambio requerido en la librería
+# 2. Año Fiscal y Periodos Contables
 
-1. Separar dos conceptos
+## CA-002 — Inferencia automática de periodo contable
 
-Actualmente loadOnFilterChange mezcla dos comportamientos:
+### Criterio de aceptación
 
-reaccionar al cambio de filtro;
+El sistema debe inferir automáticamente el periodo contable y año fiscal utilizando únicamente la fecha de contabilización.
 
-cargar opciones.
+### Validaciones
 
+* El usuario NO debe seleccionar manualmente:
 
-Debe separarse en:
+  * Periodo contable.
+  * Año fiscal.
 
-clearOnFilterChange: true
-loadDefaultOnFilterChange: false
-preloadOptionsOnFocus: false
+* La fecha contable debe determinar automáticamente:
 
-2. Nuevo contrato recomendado
-
-{
-  preload: false,
-  openOnFocus: false,
-  searchOnFocus: false,
-  clearOnFilterChange: true,
-  loadDefaultOnFilterChange: false,
-  searchOnlyOnInput: true
-}
-
-3. Regla global
-
-Para todos los Smart Select excepto compañía:
-
-El evento focus no debe ejecutar fetch.
-
-4. Regla específica para compañía
-
-Solo compañía puede usar:
-
-preload: true,
-openOnFocus: true
-
-5. Regla específica para secuencia
-
-Secuencia debe usar:
-
-preload: false,
-openOnFocus: false,
-loadOnFilterChange: false,
-clearOnFilterChange: true,
-autoLoadDefaultOnCompanyChange: true
-
+  * Año fiscal.
+  * Periodo contable.
 
 ---
 
-Corrección importante de filtros
+## CA-003 — Bloqueo por año fiscal cerrado
 
-El log muestra:
+### Criterio de aceptación
 
-company=[object Object]
+El sistema debe impedir registrar comprobantes en años fiscales cerrados.
 
-Eso debe corregirse. El frontend debe enviar un valor escalar.
+### Validaciones
 
-Incorrecto:
+* Si el año fiscal está cerrado:
 
-filters: {
-  company: someCompanyObject
-}
+  * Debe bloquearse cualquier posteo.
+  * Debe mostrarse mensaje de error funcional.
 
-Correcto:
-
-filters: {
-  company: function () {
-    return document.querySelector('[name="company"]').value;
-  }
-}
-
-o:
-
-filters: {
-  company: { selector: '[name="company"]' }
-}
-
+* La bandera `is_closing` NO debe ignorar el cierre fiscal.
 
 ---
 
-Pruebas unitarias que faltan
+## CA-004 — Restricción por periodo contable cerrado
 
-Las pruebas actuales no capturan el error porque probablemente validan búsqueda, pero no validan ausencia de efectos secundarios.
+### Criterio de aceptación
 
-Agregar pruebas para:
+Los periodos contables cerrados deben bloquear transacciones normales.
 
-Caso 1: campo no preload no consulta en focus
+### Validaciones
 
-Dado un smart select con preload=false y loadOnFilterChange=false
-Cuando el usuario hace focus
-Entonces no se debe llamar fetch
-Y no se debe abrir la lista de opciones
+* Si el periodo está cerrado:
 
-Caso 2: campo dependiente se limpia al cambiar compañía
+  * Solo se permiten comprobantes con `is_closing = true`.
 
-Dado un campo secuencia con valor seleccionado
-Cuando cambia compañía
-Entonces selectedValue, selectedLabel, search y options deben quedar vacíos
-Y no debe ejecutarse fetch
+* Si `is_closing = false`:
 
-Caso 3: búsqueda solo por input
-
-Dado un campo secuencia dependiente de compañía
-Cuando el usuario escribe al menos minChars caracteres
-Entonces se ejecuta fetch con company como valor escalar
-
-Caso 4: nunca enviar objetos como filtros
-
-Dado un filtro company configurado
-Cuando se construyen parámetros
-Entonces company no debe ser "[object Object]"
-
+  * El sistema debe impedir guardar y contabilizar.
 
 ---
 
-Requerimiento resumido para implementación
+# 3. Smart Select y Experiencia de Usuario
 
-El formulario de comprobante contable debe implementar un comportamiento de Smart Select orientado a formularios ERP. El campo compañía será el único campo con precarga y apertura automática al recibir foco. Los demás campos deberán permanecer inactivos al recibir foco y solo deberán consultar el backend cuando el usuario escriba el mínimo de caracteres requerido. Los cambios en compañía u otros filtros deberán limpiar campos dependientes, aplicar nuevos filtros contextuales y, únicamente cuando exista una regla explícita de default, asignar un valor predeterminado sin abrir listas ni precargar resultados.
+## CA-005 — Precarga inteligente de compañía
+
+### Criterio de aceptación
+
+El selector de compañía debe precargar registros automáticamente al abrir el formulario.
+
+### Validaciones
+
+* Debe existir búsqueda incremental.
+* Debe existir filtrado por escritura.
+* El usuario debe poder:
+
+  * Seleccionar desde lista.
+  * Escribir para buscar.
+
+---
+
+## CA-006 — Campo oculto de compañía
+
+### Criterio de aceptación
+
+Al seleccionar una compañía, el sistema debe actualizar automáticamente un campo oculto interno.
+
+### Validaciones
+
+* El campo oculto debe ser la fuente oficial de verdad para:
+
+  * Filtrado de secuencias.
+  * Filtrado de terceros.
+  * Filtrado de documentos.
+  * Filtrado de libros.
+  * Filtrado de proyectos.
+  * Filtrado de centros de costo.
+
+* Los filtros NO deben depender del texto visible del selector.
+
+---
+
+## CA-007 — Smart Select dependiente
+
+### Criterio de aceptación
+
+Todos los Smart Select dependientes deben reaccionar automáticamente a los cambios de contexto.
+
+### Validaciones
+
+* Cambio de compañía:
+
+  * Actualiza secuencias.
+  * Actualiza libros.
+  * Actualiza terceros.
+  * Actualiza documentos.
+
+* Cambio de tipo de tercero:
+
+  * Actualiza selector de terceros.
+
+* Cambio de tercero:
+
+  * Actualiza documentos disponibles.
+
+---
+
+# 4. Series y Secuencias
+
+## CA-008 — Secuencia predeterminada
+
+### Criterio de aceptación
+
+Al seleccionar una compañía, el sistema debe cargar automáticamente la secuencia predeterminada.
+
+### Validaciones
+
+* La secuencia debe obtenerse desde PADM.
+
+* Debe existir una secuencia predeterminada por:
+
+  * Compañía.
+  * Tipo de documento.
+
+* El usuario debe poder cambiar manualmente la secuencia.
+
+---
+
+## CA-009 — Búsqueda de secuencias
+
+### Criterio de aceptación
+
+El selector de secuencia debe soportar búsqueda incremental.
+
+### Validaciones
+
+* Debe permitir escribir para filtrar.
+* Debe permitir seleccionar secuencias activas.
+* Debe impedir seleccionar secuencias inactivas.
+
+---
+
+# 5. Libros Contables y Multi-Ledger
+
+## CA-010 — Carga automática de libros activos
+
+### Criterio de aceptación
+
+Al seleccionar compañía, deben cargarse automáticamente los libros contables activos.
+
+### Validaciones
+
+* Los libros deben mostrarse preseleccionados.
+* El usuario puede desmarcar libros específicos.
+* Si todos permanecen seleccionados:
+
+  * El comprobante afecta todos los libros.
+
+---
+
+## CA-011 — Generación automática de líneas por ledger
+
+### Criterio de aceptación
+
+El sistema debe generar automáticamente líneas contables independientes por cada libro seleccionado.
+
+### Validaciones
+
+* El usuario NO debe crear líneas separadas manualmente.
+* El motor contable debe:
+
+  * Crear una línea por ledger.
+  * Realizar conversiones monetarias automáticamente.
+
+### Ejemplo esperado
+
+Si existen:
+
+* Ledger local en Córdoba.
+* Ledger financiero en USD.
+
+Entonces:
+
+* Debe generarse una línea en moneda local.
+* Debe generarse otra línea convertida en USD.
+
+---
+
+# 6. Moneda del Comprobante
+
+## CA-012 — Moneda única por comprobante
+
+### Criterio de aceptación
+
+El comprobante debe manejar una única moneda transaccional.
+
+### Validaciones
+
+* Todas las líneas deben heredar la moneda del comprobante.
+* Las líneas NO pueden definir moneda propia.
+* Debe bloquearse mezcla de monedas.
+
+---
+
+## CA-013 — Conversión automática de monedas
+
+### Criterio de aceptación
+
+El sistema debe convertir automáticamente montos para ledgers con moneda distinta.
+
+### Validaciones
+
+* La conversión debe ejecutarse automáticamente.
+* Debe utilizar configuración monetaria definida en PADM.
+* Debe registrar equivalentes correctamente por ledger.
+
+---
+
+# 7. Validaciones Contables
+
+## CA-014 — Balance contable obligatorio
+
+### Criterio de aceptación
+
+El comprobante solo puede contabilizarse si está balanceado.
+
+### Validaciones
+
+* Total débitos = Total créditos.
+* Si existe diferencia:
+
+  * Debe bloquear contabilización.
+  * Debe resaltarse visualmente la diferencia.
+
+---
+
+## CA-015 — Validación de cuentas de gasto
+
+### Criterio de aceptación
+
+Las cuentas de gasto deben requerir centro de costo.
+
+### Validaciones
+
+* Si cuenta es tipo gasto:
+
+  * Centro de costo obligatorio.
+
+* Si no se define:
+
+  * Debe bloquear guardado.
+
+---
+
+## CA-016 — Validación de débitos/créditos
+
+### Criterio de aceptación
+
+Cada línea debe contener únicamente débito o crédito.
+
+### Validaciones
+
+* No puede existir:
+
+  * Débito y crédito simultáneamente.
+  * Débito y crédito vacíos.
+
+---
+
+# 8. Terceros y Subledgers
+
+## CA-017 — Soporte de terceros
+
+### Criterio de aceptación
+
+El comprobante debe soportar afectación de terceros.
+
+### Validaciones
+
+* Tipos soportados:
+
+  * Cliente.
+  * Proveedor.
+  * Empleado.
+
+* El selector de tercero debe depender del tipo seleccionado.
+
+---
+
+## CA-018 — Integración con AR/AP Ledger
+
+### Criterio de aceptación
+
+Las líneas contables deben poder afectar subledgers de cuentas por cobrar y cuentas por pagar.
+
+### Validaciones
+
+* Los movimientos deben reflejarse en:
+
+  * Estado de cuenta de clientes.
+  * Estado de cuenta de proveedores.
+
+* El saldo debe calcularse por:
+
+  * Transacciones abiertas.
+  * Independientemente del origen.
+
+---
+
+## CA-019 — Restricción sobre inventarios
+
+### Criterio de aceptación
+
+El comprobante contable NO debe afectar inventario.
+
+### Validaciones
+
+* Debe bloquear:
+
+  * Movimientos de stock.
+  * Ajustes de existencias.
+  * Afectación de Kardex.
+
+* Inventario solo puede modificarse desde módulos logísticos.
+
+---
+
+# 9. Documentos Referenciados
+
+## CA-020 — Selección de documentos abiertos
+
+### Criterio de aceptación
+
+El comprobante debe permitir seleccionar documentos abiertos de terceros.
+
+### Validaciones
+
+* El selector debe depender de:
+
+  * Compañía.
+  * Tipo de tercero.
+  * Tercero.
+  * Tipo de documento.
+
+* Solo deben mostrarse documentos:
+
+  * Activos.
+  * Con saldo pendiente.
+
+### Documentos soportados
+
+* Facturas.
+* Notas de débito.
+* Notas de crédito.
+* Devoluciones.
+* Otros documentos configurados.
+
+---
+
+## CA-021 — Soporte de cancelaciones contables
+
+### Criterio de aceptación
+
+El comprobante debe permitir cancelar parcial o totalmente saldos de AR/AP.
+
+### Validaciones
+
+* Debe permitir:
+
+  * Castigos.
+  * Ajustes.
+  * Reclasificaciones.
+  * Cancelaciones contables.
+
+* Los saldos abiertos deben actualizarse automáticamente.
+
+---
+
+# 10. Modal Expandido de Línea
+
+## CA-022 — Modal de detalle de línea
+
+### Criterio de aceptación
+
+Cada línea debe poder expandirse a un modal avanzado.
+
+### Validaciones
+
+* El modal debe permitir editar:
+
+  * Proyecto.
+  * Unidad.
+  * Referencias.
+  * Tipo de documento.
+  * Documento relacionado.
+  * Comentario.
+  * Cuenta bancaria.
+  * Anticipo.
+
+---
+
+## CA-023 — Persistencia completa de dimensiones
+
+### Criterio de aceptación
+
+Las dimensiones configuradas desde el modal deben persistirse correctamente.
+
+### Validaciones
+
+* Al cerrar y reabrir:
+
+  * Deben mantenerse los datos.
+
+* Al guardar:
+
+  * Deben persistirse todas las dimensiones.
+
+---
+
+# 11. Comentarios y Referencias
+
+## CA-024 — Comentario global y comentario por línea
+
+### Criterio de aceptación
+
+El comprobante debe soportar comentarios globales y específicos por línea.
+
+### Validaciones
+
+* Debe existir:
+
+  * Concepto general.
+  * Comentario individual por línea.
+
+* Ambos deben persistirse independientemente.
+
+---
+
+# 12. Anticipos
+
+## CA-025 — Marcado de anticipos
+
+### Criterio de aceptación
+
+Las líneas deben poder marcarse como anticipo.
+
+### Validaciones
+
+* Debe existir indicador `is_advance`.
+* Debe persistirse en ledger.
+* Debe ser visible posteriormente en conciliaciones.
+
+---
+
+# 13. Experiencia de Usuario
+
+## CA-026 — Vista simplificada y avanzada
+
+### Criterio de aceptación
+
+La tabla principal debe mostrar únicamente dimensiones frecuentes.
+
+### Validaciones
+
+* Vista principal:
+
+  * Cuenta.
+  * Centro de costo.
+  * Tipo tercero.
+  * Tercero.
+  * Débito.
+  * Crédito.
+
+* Vista avanzada:
+
+  * Modal expandido.
+
+---
+
+## CA-027 — Indicadores visuales
+
+### Criterio de aceptación
+
+El sistema debe mostrar indicadores visuales de balance.
+
+### Validaciones
+
+* Debe mostrar:
+
+  * Total débitos.
+  * Total créditos.
+  * Diferencia.
+
+* Diferencias deben resaltarse visualmente.
+
+---
+
+# 14. Persistencia y Auditoría
+
+## CA-028 — Trazabilidad completa
+
+### Criterio de aceptación
+
+Toda transacción debe ser completamente auditable.
+
+### Validaciones
+
+* Registrar:
+
+  * Usuario creador.
+  * Fecha creación.
+  * Usuario modificación.
+  * Fecha modificación.
+  * Ledger afectado.
+  * Moneda.
+  * Tasa de cambio.
+
+---
+
+## CA-029 — Integridad transaccional
+
+### Criterio de aceptación
+
+La contabilización debe ejecutarse de manera atómica.
+
+### Validaciones
+
+* Si falla una línea:
+
+  * Debe revertirse toda la transacción.
+
+* No pueden existir:
+
+  * Ledgers parciales.
+  * Posteos incompletos.
+
+---
+
+# 15. Estados del Comprobante
+
+## CA-030 — Estados operativos
+
+### Criterio de aceptación
+
+El comprobante debe soportar estados operativos visibles.
+
+### Estados mínimos
+
+* Borrador.
+* Contabilizado.
+* Cancelado.
+* Reversado.
+* Cierre.
+
+### Validaciones
+
+* Los estados deben mostrarse visualmente mediante badges.
+* Deben existir restricciones según estado.
+
+---
+
+# 16. Restricciones Funcionales
+
+## CA-031 — Restricción de edición
+
+### Criterio de aceptación
+
+Los comprobantes contabilizados no deben editarse libremente.
+
+### Validaciones
+
+* Debe bloquearse edición directa.
+* La corrección debe realizarse mediante:
+
+  * Reversión.
+  * Ajuste.
+  * Cancelación.
+
+---
+
+# 17. Rendimiento
+
+## CA-032 — Rendimiento aceptable
+
+### Criterio de aceptación
+
+El formulario debe responder fluidamente.
+
+### Validaciones
+
+* Smart Select:
+
+  * Debe responder en tiempo razonable.
+
+* Apertura de modal:
+
+  * No debe congelar interfaz.
+
+* Cambios de compañía:
+
+  * Deben refrescar dependencias automáticamente.
+
+---
+
+# 18. Criterio Final de Aprobación
+
+## CA-033 — Validación integral
+
+### El módulo será considerado aceptado únicamente si
+
+* Cumple integridad contable.
+* Soporta multi-ledger.
+* Soporta multimoneda.
+* Soporta subledgers AR/AP.
+* Soporta cierres fiscales.
+* Soporta cierres contables.
+* Mantiene trazabilidad completa.
+* Mantiene atomicidad transaccional.
+* Mantiene experiencia de usuario fluida.
+* Mantiene consistencia de Smart Select dependientes.
+* Impide inconsistencias contables.
+* Impide mezcla de monedas.
+* Impide posteo en periodos inválidos.

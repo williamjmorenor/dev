@@ -1,5 +1,204 @@
 # SESSIONS
 
+## 2026-05-09 (Contabilizar con caja y feedback visible)
+
+### Peticion del usuario
+Validar los datos reales en `cacaoaccounting.db`, corregir que `Libro Contable` y `Moneda` se muestren correctamente, y resolver por qué `Contabilizar` no funcionaba mientras `Rechazar` sí.
+
+### Plan implementado
+1. Inspeccionar el comprobante real en SQLite para distinguir dato persistido vs. contrato visual.
+2. Confirmar la causa del fallo de Contabilizar mediante una prueba directa de submit.
+3. Relajar la validación manual solo para cuentas de caja y banco en `journal_entry`.
+4. Mostrar mensajes flash globales para que los errores de posting sean visibles.
+5. Mejorar el fallback de detalle para que libros y moneda implícitos se presenten de forma legible.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/default_accounts.py`:
+  - `journal_entry` deja de bloquear cuentas `bank` y `cash`.
+- `cacao_accounting/templates/base.html`:
+  - agrega render global de mensajes flash con estilos Bootstrap.
+- `cacao_accounting/contabilidad/__init__.py`:
+  - `ver_comprobante` ahora muestra libros activos de la compañía cuando el comprobante no tiene selección explícita,
+  - la moneda muestra la moneda de la compañía como fallback legible si no hay moneda transaccional.
+- `tests/test_09_journal_entry_form.py`:
+  - nueva regresión: un comprobante manual con cuenta de caja se contabiliza correctamente.
+
+### Validacion ejecutada
+- `c:/code/cacao-accounting/venv/Scripts/python.exe -m pytest tests/test_09_journal_entry_form.py tests/test_e2e_journalentry.py -q` -> 38 passed.
+
+## 2026-05-09 (numeracion diferida en duplicar/revertir)
+
+### Peticion del usuario
+Mantener correcta la referencia al duplicar, pero evitar que `Duplicar` y `Revertir` consuman secuencia o generen `document_no` al crear el borrador. El identificador debe generarse cuando el usuario guarda la edicion con la fecha/serie objetivo.
+
+### Plan implementado
+1. Permitir crear borradores sin asignacion de identificador documental para los flujos de duplicacion/reversion.
+2. Generar identificador solo al primer guardado de edicion si el borrador aun no tiene `document_no`.
+3. Mantener fallback en submit para asignar identificador si llega un borrador sin numeracion.
+4. Ajustar pruebas unitarias/E2E para validar la nueva semantica.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/journal_service.py`:
+  - `create_journal_draft(..., assign_identifier: bool = True)` ahora permite diferir numeracion.
+  - `duplicate_journal_as_draft` y `duplicate_journal_as_reversal_draft` crean borrador sin consumir secuencia y dejan `document_no`/`serie` en `None`.
+  - `update_journal_draft` asigna identificador en el primer guardado de edicion si el borrador no estaba numerado.
+  - `submit_journal` asigna identificador de respaldo si aun no existe antes de contabilizar.
+- `tests/test_09_journal_entry_form.py` y `tests/test_e2e_journalentry.py`:
+  - validan que duplicados/reversiones nacen sin `document_no`,
+  - validan generacion de identificador al guardar edicion (caso junio: contiene `-06-`).
+
+### Verificacion ejecutada
+- `c:/code/cacao-accounting/venv/Scripts/python.exe -m pytest tests/test_09_journal_entry_form.py tests/test_e2e_journalentry.py -q` -> 37 passed.
+
+## 2026-05-09 (ajuste de flujo: Duplicar/Revertir abren edición)
+
+### Peticion del usuario
+Hacer que `Duplicar` lleve al formulario de edición para permitir cambiar serie y fecha de contabilización, y agregar variante `Revertir` que copie el payload en modo edición invirtiendo la afectación contable (debe <-> haber).
+
+### Plan implementado
+1. Ajustar redirección de `Duplicar` para abrir el formulario de edición del nuevo borrador.
+2. Desacoplar serie del documento origen durante duplicación para facilitar nueva selección de serie.
+3. Implementar acción `Revertir` que cree un nuevo borrador con débitos/créditos invertidos y redirección a edición.
+4. Extender pruebas de rutas y E2E para validar ambos flujos.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/journal_service.py`:
+  - `duplicate_journal_as_draft` ahora limpia `naming_series_id`/label para permitir seleccionar nueva serie sin arrastre del origen,
+  - nuevo servicio `duplicate_journal_as_reversal_draft` con inversión línea a línea de `debit` y `credit`.
+- `cacao_accounting/contabilidad/__init__.py`:
+  - `POST /journal/<id>/duplicate` redirige a `/journal/edit/<nuevo_id>` en lugar de vista detalle,
+  - nueva ruta `POST /journal/<id>/revert` que crea borrador de reversión y abre edición.
+- `cacao_accounting/contabilidad/templates/contabilidad/journal.html`:
+  - nueva acción `Revertir` junto a `Duplicar` para estados `draft`, `rejected`, `submitted`.
+- `tests/test_09_journal_entry_form.py` y `tests/test_e2e_journalentry.py`:
+  - cobertura para redirección a edición en duplicación,
+  - cobertura de reversión con inversión de signos en líneas.
+
+### Verificacion ejecutada
+- `c:/code/cacao-accounting/venv/Scripts/python.exe -m pytest tests/test_09_journal_entry_form.py tests/test_e2e_journalentry.py -q` -> 37 passed.
+
+## 2026-05-09 (ajuste UX legible: labels humanas, detalle simplificado y duplicación)
+
+### Peticion del usuario
+Corregir la UX de Journal Entry para evitar códigos crudos: resaltar claramente la fila activa, eliminar `Ver panel`, renombrar `Ver modal` a `Ver detalle`, mostrar libros y moneda con información legible, mostrar cuenta/centro de costos en formato `codigo - descripcion` también en edición, eliminar encabezados `Campo / Valor`, y agregar botón `Duplicar` para crear nuevo borrador desde comprobantes en `draft`, `rejected` o `submitted`.
+
+### Plan implementado
+1. Ajustar vista de detalle (`journal.html`) para interacción clara de línea activa y acciones comprensibles.
+2. Enriquecer backend de vista/serialización para mostrar etiquetas humanas en lugar de códigos sueltos.
+3. Agregar flujo de duplicación de comprobante en servicio y ruta HTTP, con salida siempre en borrador.
+4. Extender pruebas funcionales y E2E para validar UX legible y duplicación por estado permitido.
+5. Registrar decisión de diseño UX como regla permanente del módulo.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/templates/contabilidad/journal.html`:
+  - resaltado visual fuerte de fila activa,
+  - eliminación de botón redundante `Ver panel`,
+  - acción renombrada a `Ver detalle`,
+  - layout de cabecera sin filas `Campo / Valor`,
+  - render de cuenta y centro de costos con etiquetas legibles,
+  - botón `Duplicar` para estados `draft`, `rejected`, `submitted`.
+- `cacao_accounting/contabilidad/__init__.py`:
+  - vista de comprobante con labels legibles para libros, moneda, cuentas y centros de costos,
+  - nueva ruta `POST /accounting/journal/<id>/duplicate`.
+- `cacao_accounting/contabilidad/journal_service.py`:
+  - serialización de líneas con `account_label` y `cost_center_label`,
+  - servicio `duplicate_journal_as_draft` con validación de estados permitidos.
+- `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html`:
+  - edición conserva `initialLabel` legible para centro de costos en Smart Select.
+- `tests/test_09_journal_entry_form.py` y `tests/test_e2e_journalentry.py`:
+  - cobertura nueva para etiquetas legibles,
+  - cobertura de duplicación desde `draft`, `rejected` y `submitted`.
+
+### Verificacion ejecutada
+- `c:/code/cacao-accounting/venv/Scripts/python.exe -m pytest tests/test_09_journal_entry_form.py tests/test_e2e_journalentry.py -q` -> 35 passed.
+
+### Decisión de diseño (regla explícita)
+En Journal Entry, la interfaz debe priorizar información comprensible para usuarios contables: se muestra `codigo - descripcion` para entidades de catálogo (cuentas, centros, libros, moneda) y se evita presentar códigos aislados como valor principal. Los códigos puros quedan reservados al payload técnico interno.
+
+## 2026-05-09 (journal entry: rechazo draft, anulación con reversa y corrección visual Cacao)
+
+### Peticion del usuario
+Implementar rechazo en estado borrador sin tocar el ledger financiero y asegurar que únicamente aprobar/anular comprobantes impacte el ledger. Luego de la primera propuesta visual, corregir el diseño porque no respetaba el estilo Cacao propuesto y reportaba problemas de funcionamiento.
+
+### Plan implementado
+1. Agregar estado `rejected` para borradores en servicio/ruta sin generar `GLEntry`.
+2. Agregar anulación de comprobantes `submitted` con reversa contable append-only (impactando ledger solo en ese flujo).
+3. Corregir edición de borradores para asegurar rehidratación completa de líneas y navegación consistente de Cancelar.
+4. Rehacer `journal.html` usando patrón visual nativo del proyecto (`ca-card`, `ca-table`, toolbar estándar) y mantener doble modo de detalle de líneas (panel + modal) con JS robusto.
+5. Ampliar pruebas E2E para flujo completo y matriz de combinaciones contables.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/journal_service.py`:
+  - nuevos estados `rejected` y `cancelled`,
+  - `reject_journal_draft` (sin impacto en ledger),
+  - `cancel_submitted_journal` (reversa GL usando `cancel_document`).
+- `cacao_accounting/contabilidad/__init__.py`:
+  - nueva ruta `POST /accounting/journal/<id>/cancel`,
+  - ruta `POST /accounting/journal/<id>/reject` conectada a servicio,
+  - `cancel_url` contextual para nuevo/editar,
+  - vista de comprobante ahora recibe nickname de usuario (`User.user`).
+- `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html`:
+  - rehidratación robusta de líneas con `uid` estable para evitar pérdida visual en edición,
+  - botón Cancelar contextual en modo edición.
+- `cacao_accounting/contabilidad/templates/contabilidad/journal.html`:
+  - rediseño completo respetando estilo visual existente del sistema,
+  - una sola aparición de secuencia/documento en título,
+  - panel de detalle de línea + modal de detalle,
+  - acciones de flujo (`Editar`, `Rechazar`, `Contabilizar`, `Anular`) con CSRF.
+- `tests/test_09_journal_entry_form.py`:
+  - regresión de edición (rehidratación + cancelar a comprobante origen),
+  - prueba de rechazo draft sin `GLEntry`.
+- `tests/test_e2e_journalentry.py`:
+  - flujo completo crear/ver/editar/modificar/verificar/contabilizar/verificar,
+  - rechazo draft,
+  - anulación submitted con reversas,
+  - matriz de combinaciones (centro/unidad/proyecto/terceros/referencias/anticipo/cruces).
+
+### Verificacion ejecutada
+- `c:/code/cacao-accounting/venv/Scripts/python.exe -m pytest tests/test_09_journal_entry_form.py tests/test_e2e_journalentry.py -q` -> 30 passed.
+
+### Notas para siguiente iteracion
+1. Ejecutar suite completa oficial (`--slow=True`) para confirmar no regresiones transversales.
+2. Si producto lo requiere, agregar transiciones adicionales de estados (por ejemplo reopen) con reglas explícitas de auditoría.
+
+## 2026-05-09 (implementación de Journal Entry: submit, moneda SmartSelect y prueba E2E)
+
+### Peticion del usuario
+Corregir el guardado por POST de `/accounting/journal/new`, migrar el campo de moneda del comprobante a SmartSelect, eliminar en el modal de línea los campos de moneda y cuenta bancaria, reorganizar el modal según pares definidos y crear una prueba end-to-end basada solo en GET/POST llamada `test_e2e_journalentry.py`.
+
+### Plan implementado
+1. Ajustar frontend del formulario `journal_nuevo.html` para robustecer el submit y adaptar la captura de moneda.
+2. Extender Search Select con doctype de monedas para soportar SmartSelect en cabecera del comprobante.
+3. Endurecer parseo backend del payload para mantener validación server-side confiable.
+4. Agregar prueba E2E con cliente Flask (GET + POST) validando creación de borrador en base de datos.
+5. Actualizar pruebas existentes de Journal Entry para cubrir los cambios de contrato UI/API.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/contabilidad/templates/contabilidad/journal_nuevo.html`:
+  - `prepareSubmit` ahora resuelve compañía de forma robusta antes de validar/enviar payload,
+  - `Moneda del comprobante` migrada a SmartSelect (`doctype: "currency"`),
+  - modal de línea actualizado: se elimina `Moneda` de línea, se elimina `Cuenta bancaria`,
+  - modal reordenado conforme a la matriz solicitada,
+  - etiqueta de `Unidad` actualizada a `Unidad de negocio`.
+- `cacao_accounting/search_select.py`:
+  - nuevo doctype `currency` en `SEARCH_SELECT_REGISTRY` para búsqueda por código/nombre.
+- `cacao_accounting/contabilidad/journal_service.py`:
+  - `parse_journal_form` valida explícitamente que `journal_payload` sea JSON objeto (`dict`) antes de procesar.
+- `tests/test_09_journal_entry_form.py`:
+  - valida presencia de `doctype: "currency"`,
+  - valida ausencia de texto `Buscar cuenta bancaria` en formulario,
+  - valida búsqueda `/api/search-select?doctype=currency`.
+- `tests/test_e2e_journalentry.py` (nuevo):
+  - prueba E2E con cliente Flask: GET de formulario y POST de `journal_payload` balanceado,
+  - asegura creación de `ComprobanteContable` en estado `draft` y ausencia de `GLEntry` al guardar borrador.
+
+### Verificacion ejecutada
+- `c:/code/cacao-accounting/venv/Scripts/python.exe -m pytest tests/test_09_journal_entry_form.py tests/test_e2e_journalentry.py -q` -> 19 passed.
+
+### Notas para siguiente iteracion
+1. Si se desea retirar definitivamente cuenta bancaria del dominio de Journal Entry (no solo de UI), ajustar DTO/servicio y pruebas de posting asociadas.
+2. Ejecutar suite completa `--slow=True` para validar no regresión transversal antes de merge final.
+
 ## 2026-05-09 (validación de comprobantes contables)
 
 ### Peticion del usuario

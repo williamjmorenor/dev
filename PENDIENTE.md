@@ -71,13 +71,18 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Permitir editar borradores del comprobante manual para cambiar libros y líneas antes del submit.
 - [x] Exigir centro de costo en líneas de cuentas de gasto.
 - [x] Forzar moneda única por comprobante y bloquear mezcla de monedas en líneas.
-- [x] Persistir `is_advance` y cuenta bancaria del modal avanzado en `ComprobanteContableDetalle` y `GLEntry`.
+- [x] Migrar moneda de cabecera a SmartSelect (`doctype=currency`) en el formulario de comprobante manual.
+- [x] Simplificar modal de línea: sin moneda de línea y sin cuenta bancaria.
+- [x] Persistir `is_advance` del modal avanzado y mantener compatibilidad backend para `bank_account` vía payload/API legado.
+- [x] Añadir prueba E2E basada en cliente Flask (GET/POST) para verificar creación de borrador (`tests/test_e2e_journalentry.py`).
 - [ ] Soportar tipos: estándar, apertura, nota de crédito, nota de débito, contra asiento, ajuste, reversión.
 - [ ] Completar edición de borradores y lista operacional; `/gl/new` y `/gl/list` quedan como legacy hasta retiro.
 - [x] Añadir cobertura HTTP del selector multi-book y del endpoint de libros activos del comprobante manual.
-- [ ] Resolver formalmente el comportamiento de `document_no` cuando un borrador cambia de serie antes de contabilizar.
+- [~] Resolver formalmente el comportamiento de `document_no` cuando un borrador cambia de serie antes de contabilizar.
+- [x] Diferir numeración en `Duplicar`/`Revertir`: crear borradores sin `document_no` y asignar identificador al primer guardado de edición (con fallback en submit).
+- [x] Permitir contabilización manual con cuentas de caja/banco en `Journal Entry` y mostrar errores de submit mediante flash global.
 - [ ] Implementar selector de documentos abiertos dependiente de compañía / tipo de tercero / tercero / tipo documental.
-- [ ] Completar estados operativos visibles del comprobante (cancelado, reversado, cierre) y sus restricciones.
+- [x] Completar estados operativos visibles del comprobante (cancelado, reversado, cierre) y sus restricciones.
 
 ---
 
@@ -149,7 +154,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Servicio de reversión para documentos operativos contabilizados.
 - [x] Poblar `reversal_of` y `is_reversal` en las entradas GL reversadas.
 - [ ] Trazabilidad bidireccional visible entre asiento original y reverso.
-- [ ] Aplicar el mismo patrón al comprobante contable manual.
+- [x] Aplicar el mismo patrón al comprobante contable manual.
 
 ---
 

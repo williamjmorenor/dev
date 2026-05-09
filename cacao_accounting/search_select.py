@@ -17,6 +17,7 @@ from cacao_accounting.database import (
     Book,
     CompanyParty,
     CostCenter,
+    Currency,
     Entity,
     Item,
     NamingSeries,
@@ -57,6 +58,10 @@ def _account_label(account: Accounts) -> str:
 
 def _company_label(company: Entity) -> str:
     return f"{company.code} - {company.company_name}"
+
+
+def _currency_label(currency: Currency) -> str:
+    return f"{currency.code} - {currency.name}"
 
 
 def _book_label(book: Book) -> str:
@@ -106,6 +111,15 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         label_builder=_company_label,
         allowed_filters={"is_active": "enabled"},
         default_filters={"enabled": True},
+    ),
+    "currency": SearchSelectSpec(
+        doctype="currency",
+        model=Currency,
+        search_fields=("code", "name"),
+        value_field="code",
+        label_builder=_currency_label,
+        allowed_filters={"is_active": "active"},
+        default_filters={},
     ),
     "account": SearchSelectSpec(
         doctype="account",

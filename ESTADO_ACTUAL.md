@@ -85,9 +85,17 @@ Rutas implementadas:
 - **Tipo de cambio:** lista.
 - **Períodos contables:** lista.
 - **Monedas:** lista.
-- **Comprobante Contable (Journal Entry):** nuevo formulario backend-first en `/journal/new`, guarda borrador en `ComprobanteContable` + `ComprobanteContableDetalle`, permite ver `/journal/<id>` y contabilizar con `/journal/<id>/submit`. El formulario permite seleccionar por checkboxes uno o varios libros activos de la compañía; si todos quedan marcados, el posting afecta todos los libros activos.
+- **Comprobante Contable (Journal Entry):** nuevo formulario backend-first en `/journal/new`, guarda borrador en `ComprobanteContable` + `ComprobanteContableDetalle`, permite ver `/journal/<id>` y contabilizar con `/journal/<id>/submit`. El formulario permite seleccionar por checkboxes uno o varios libros activos de la compañía; si todos quedan marcados, el posting afecta todos los libros activos. La moneda del comprobante usa SmartSelect (`doctype=currency`).
 - **Edición de borradores de Comprobante Contable:** `/journal/edit/<id>` rehidrata cabecera, libros y líneas del borrador para modificarlo antes de contabilizar.
-- **Validaciones del comprobante manual:** exige balance, líneas de un solo lado, centro de costo para cuentas de gasto, moneda única por comprobante y persistencia de `is_advance` / cuenta bancaria desde el modal hasta `ComprobanteContableDetalle` y `GLEntry`.
+- **Validaciones del comprobante manual:** exige balance, líneas de un solo lado, centro de costo para cuentas de gasto y moneda única por comprobante. El modal avanzado ya no expone moneda de línea ni cuenta bancaria; mantiene captura de anticipo y dimensiones contables.
+- **Estados operativos del comprobante manual:** soporte de `draft` -> `rejected` sin impacto en ledger y `submitted` -> `cancelled` con reversa contable append-only.
+- **Vista de detalle del comprobante manual:** rediseñada en patrón visual nativo Cacao (`ca-card`/`ca-table`), mostrando alias de usuario (`User.user`) y doble modo de detalle de línea (panel + modal).
+- **Política UX de legibilidad (Journal Entry):** en UI se prioriza formato `codigo - descripcion` para cuenta contable, centro de costos, libros y moneda; los códigos puros se reservan al payload técnico.
+- **Duplicación de comprobantes manuales:** disponible para estados `draft`, `rejected` y `submitted`, creando siempre un nuevo comprobante en estado `draft` mediante acción dedicada en vista de detalle.
+- **Edición post-duplicación/reversión:** `Duplicar` y `Revertir` abren directamente el formulario de edición del nuevo borrador para permitir ajuste de fecha de contabilización y serie en el periodo destino.
+- **Revertir comprobante manual:** variante de duplicación que invierte débitos y créditos de cada línea y genera borrador editable para registrar la reversión contable con nueva fecha/serie.
+- **Numeración diferida en duplicar/revertir:** los borradores creados por estas acciones nacen sin `document_no`; el identificador se asigna al primer guardado de edición (o como fallback al submit) usando la fecha/serie activa del borrador.
+- **Contabilizar con caja/banco en Journal Entry:** el asiento manual ahora puede postear cuentas `cash` y `bank`; los errores de contabilización también se muestran con flash global en la UI.
 - **Series (legacy `Serie`):** lista y crear.
 - **NamingSeries:** lista, nueva, toggle-default, toggle-active.
 - **Contadores externos (`ExternalCounter`):** lista, nuevo, ajuste con auditoría, log de auditoría.
@@ -108,11 +116,11 @@ El posting contable actual:
 Pendiente en contabilidad:
 - No hay reportes financieros construidos sobre `GLEntry`.
 - Dimensiones adicionales y reglas diferenciales entre libros aún no están conectadas al posting.
-- La edición del borrador ya existe, pero aún no recalcula el identificador documental cuando cambia la serie seleccionada antes del submit.
+- La edición del borrador ya existe y asigna identificador al primer guardado cuando el comprobante no estaba numerado; aún falta política formal para renumerar cuando ya existe `document_no` y luego se cambia serie/fecha.
 - Impuestos/cargos ya tienen configuración admin, cálculo de plantilla y posting GL básico en facturas de compra/venta.
 - `CompanyDefaultAccount` cubre efectivo, bancos, AR, AP, ingresos, gastos, inventario, COGS, ajustes de inventario, cuenta puente de compras, anticipos, diferencias bancarias, impuestos, redondeo, diferencias cambiarias, diferidos, descuentos de pago, resultado del período y resultados acumulados.
 
-Modelos en DB disponibles (implementados pero sin UI completa):  
+Modelos en DB disponibles (implementados pero sin UI completa):
 `GLEntry`, `ComprobanteContable`, `ComprobanteContableDetalle`, `GLEntryDimension`, `DimensionType`, `DimensionValue`, `LedgerMappingRule`, `ExchangeRevaluation`, `ExchangeRevaluationItem`, `PeriodCloseRun`, `PeriodCloseCheck`, `ItemAccount`, `PartyAccount`, `CompanyDefaultAccount`, `Tax`, `TaxTemplate`, `TaxTemplateItem`, `AccountBalanceSnapshot`.
 
 ### `compras` — Compras (Source to Pay)
@@ -181,7 +189,7 @@ Rutas implementadas:
 - **Recepción/Entrega directa:** el submit de `PurchaseReceipt` y `DeliveryNote` ahora genera `StockLedgerEntry` y GL de forma directa (cuenta puente / conciliación de compras y COGS respectivamente), y el cancelado guarda reversos append-only en stock y GL.
 - **Servicios de inventario:** conversión UOM por ítem, validación obligatoria de lote/serial, actualización de seriales y reconstrucción de `StockBin` desde `StockLedgerEntry`.
 
-Modelos en DB disponibles pero sin funcionalidad completa:  
+Modelos en DB disponibles pero sin funcionalidad completa:
 `StockBalanceSnapshot`. `Batch` y `SerialNumber` ya tienen validación operativa básica; `StockLedgerEntry`, `StockBin` y `StockValuationLayer` ya están conectados para `StockEntry`, `PurchaseReceipt` y `DeliveryNote`, pero falta gestión visual completa de lotes/seriales y recalculo histórico avanzado.
 
 ### `reportes` — Reportes operativos
@@ -309,6 +317,6 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 - Resultado: **342 pruebas en verde** en el clone local.
 - Ajustes realizados durante la validación:
   - el formulario de Journal Entry ya no permite tratar la moneda como atributo libre por línea; las líneas heredan la moneda del comprobante;
-  - el modal avanzado persiste anticipo y cuenta bancaria tanto en detalle como en `GLEntry`;
+  - el modal avanzado fue simplificado para captura contable (sin moneda de línea ni cuenta bancaria) y mantiene anticipo/dimensiones;
   - el bootstrap de datos demo vuelve a preservar web/correo/teléfonos/fax para las vistas smoke de CI;
   - `smart-select.js` conserva las opciones pre-cargadas al auto-seleccionar una opción default y sus pruebas JS ya funcionan desde rutas reales del repositorio.

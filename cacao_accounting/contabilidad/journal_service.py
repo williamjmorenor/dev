@@ -11,20 +11,25 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from sqlalchemy import select
+
 from cacao_accounting.contabilidad.journal_repository import (
     add_journal,
     get_journal,
     list_journal_lines,
     replace_journal_lines,
 )
-from cacao_accounting.contabilidad.posting import PostingError, post_comprobante_contable
-from cacao_accounting.database import Accounts, ComprobanteContable, ComprobanteContableDetalle, database
+from cacao_accounting.contabilidad.posting import PostingError, cancel_document, post_comprobante_contable
+from cacao_accounting.database import Accounts, ComprobanteContable, ComprobanteContableDetalle, CostCenter, database
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 
 JOURNAL_ENTITY_TYPE = "journal_entry"
 JOURNAL_TRANSACTION_TYPE = "journal_entry"
 JOURNAL_STATUS_DRAFT = "draft"
+JOURNAL_STATUS_REJECTED = "rejected"
 JOURNAL_STATUS_SUBMITTED = "submitted"
+JOURNAL_STATUS_CANCELLED = "cancelled"
+JOURNAL_DUPLICABLE_STATUSES = {JOURNAL_STATUS_DRAFT, JOURNAL_STATUS_REJECTED, JOURNAL_STATUS_SUBMITTED}
 
 
 class JournalValidationError(ValueError):
@@ -71,7 +76,7 @@ class JournalDraftInput:
     lines: list[JournalLineInput]
 
 
-def create_journal_draft(payload: dict[str, Any], user_id: str) -> ComprobanteContable:
+def create_journal_draft(payload: dict[str, Any], user_id: str, assign_identifier: bool = True) -> ComprobanteContable:
     """Crea un comprobante contable manual en borrador."""
     data = _normalize_journal_payload(payload)
     _validate_balanced_lines(data.company, data.lines)
@@ -92,11 +97,11 @@ def create_journal_draft(payload: dict[str, Any], user_id: str) -> ComprobanteCo
         is_closing=data.is_closing,
     )
     lines = [
-        _line_model(data.company, data.posting_date, primary_book, data.transaction_currency, line)
-        for line in data.lines
+        _line_model(data.company, data.posting_date, primary_book, data.transaction_currency, line) for line in data.lines
     ]
     journal = add_journal(journal, lines)
-    _assign_identifier_if_needed(journal, data.naming_series_id)
+    if assign_identifier:
+        _assign_identifier_if_needed(journal, data.naming_series_id)
     database.session.commit()
     return journal
 
@@ -108,6 +113,8 @@ def submit_journal(journal_id: str) -> list[Any]:
         raise JournalValidationError("El comprobante indicado no existe.")
     if journal.status != JOURNAL_STATUS_DRAFT:
         raise JournalValidationError("Solo se puede contabilizar un comprobante en borrador.")
+    if not journal.document_no:
+        _assign_identifier_if_needed(journal, journal.naming_series_id)
     try:
         entries = post_comprobante_contable(journal, ledger_code=_selected_books_for_journal(journal))
     except (PostingError, IdentifierConfigurationError) as exc:
@@ -117,6 +124,84 @@ def submit_journal(journal_id: str) -> list[Any]:
     database.session.add(journal)
     database.session.commit()
     return entries
+
+
+def reject_journal_draft(journal_id: str, user_id: str | None = None) -> ComprobanteContable:
+    """Marca un comprobante manual en borrador como rechazado sin afectar ledger."""
+    journal = get_journal(journal_id)
+    if journal is None:
+        raise JournalValidationError("El comprobante indicado no existe.")
+    if journal.status != JOURNAL_STATUS_DRAFT:
+        raise JournalValidationError("Solo se puede rechazar un comprobante en borrador.")
+    journal.status = JOURNAL_STATUS_REJECTED
+    if user_id:
+        journal.modified_by = user_id
+    database.session.add(journal)
+    database.session.commit()
+    return journal
+
+
+def cancel_submitted_journal(journal_id: str, user_id: str | None = None) -> list[Any]:
+    """Anula un comprobante contabilizado mediante reversa GL append-only."""
+    journal = get_journal(journal_id)
+    if journal is None:
+        raise JournalValidationError("El comprobante indicado no existe.")
+    if journal.status != JOURNAL_STATUS_SUBMITTED:
+        raise JournalValidationError("Solo se puede anular un comprobante contabilizado.")
+    setattr(journal, "docstatus", 1)
+    try:
+        entries = cancel_document(journal)
+    except (PostingError, IdentifierConfigurationError) as exc:
+        database.session.rollback()
+        raise JournalValidationError(str(exc)) from exc
+    journal.status = JOURNAL_STATUS_CANCELLED
+    if user_id:
+        journal.modified_by = user_id
+    database.session.add(journal)
+    database.session.commit()
+    return entries
+
+
+def duplicate_journal_as_draft(journal_id: str, user_id: str) -> ComprobanteContable:
+    """Duplica un comprobante existente creando uno nuevo en borrador."""
+    source = get_journal(journal_id)
+    if source is None:
+        raise JournalValidationError("El comprobante indicado no existe.")
+    if source.status not in JOURNAL_DUPLICABLE_STATUSES:
+        raise JournalValidationError("Solo se puede duplicar un comprobante en borrador, rechazado o contabilizado.")
+
+    payload = serialize_journal_for_form(source)
+    payload["reference"] = source.document_no or source.id
+    payload["memo"] = f"Duplicado de {source.document_no or source.id}"
+    duplicated = create_journal_draft(payload, user_id=user_id, assign_identifier=False)
+    duplicated.status = JOURNAL_STATUS_DRAFT
+    duplicated.document_no = None
+    duplicated.serie = None
+    database.session.add(duplicated)
+    database.session.commit()
+    return duplicated
+
+
+def duplicate_journal_as_reversal_draft(journal_id: str, user_id: str) -> ComprobanteContable:
+    """Genera borrador de reversión invirtiendo debe/haber del comprobante origen."""
+    source = get_journal(journal_id)
+    if source is None:
+        raise JournalValidationError("El comprobante indicado no existe.")
+    if source.status not in JOURNAL_DUPLICABLE_STATUSES:
+        raise JournalValidationError("Solo se puede revertir un comprobante en borrador, rechazado o contabilizado.")
+
+    payload = serialize_journal_for_form(source)
+    payload["reference"] = source.document_no or source.id
+    payload["memo"] = f"Reversión de {source.document_no or source.id}"
+    payload["lines"] = _reversed_payload_lines(payload.get("lines", []))
+
+    reversed_draft = create_journal_draft(payload, user_id=user_id, assign_identifier=False)
+    reversed_draft.status = JOURNAL_STATUS_DRAFT
+    reversed_draft.document_no = None
+    reversed_draft.serie = None
+    database.session.add(reversed_draft)
+    database.session.commit()
+    return reversed_draft
 
 
 def update_journal_draft(journal_id: str, payload: dict[str, Any], user_id: str) -> ComprobanteContable:
@@ -144,10 +229,11 @@ def update_journal_draft(journal_id: str, payload: dict[str, Any], user_id: str)
     journal.user_id = user_id
 
     lines = [
-        _line_model(data.company, data.posting_date, primary_book, data.transaction_currency, line)
-        for line in data.lines
+        _line_model(data.company, data.posting_date, primary_book, data.transaction_currency, line) for line in data.lines
     ]
     journal = replace_journal_lines(journal, lines)
+    if not journal.document_no:
+        _assign_identifier_if_needed(journal, data.naming_series_id)
     database.session.commit()
     return journal
 
@@ -156,6 +242,10 @@ def serialize_journal_for_form(journal: ComprobanteContable) -> dict[str, Any]:
     """Convierte un comprobante manual a un payload compatible con el formulario."""
     lines = list_journal_lines(journal.id)
     selected_books = _selected_books_for_journal(journal)
+    account_codes = {line.account for line in lines if line.account}
+    cost_center_codes = {line.cost_center for line in lines if line.cost_center}
+    account_labels = _account_labels_for_company(journal.entity, account_codes)
+    cost_center_labels = _cost_center_labels_for_company(journal.entity, cost_center_codes)
     return {
         "company": journal.entity,
         "company_label": journal.entity,
@@ -166,9 +256,10 @@ def serialize_journal_for_form(journal: ComprobanteContable) -> dict[str, Any]:
         "reference": journal.reference or "",
         "memo": journal.memo or "",
         "transaction_currency": journal.transaction_currency,
+        "transaction_currency_label": journal.transaction_currency,
         "exchange_rate": str(journal.exchange_rate) if journal.exchange_rate is not None else "",
         "is_closing": bool(getattr(journal, "is_closing", False)),
-        "lines": [_serialize_journal_line(line) for line in lines],
+        "lines": [_serialize_journal_line(line, account_labels, cost_center_labels) for line in lines],
     }
 
 
@@ -177,9 +268,12 @@ def parse_journal_form(form_data: Any) -> dict[str, Any]:
     raw_payload = form_data.get("journal_payload")
     if raw_payload:
         try:
-            return json.loads(raw_payload)
+            parsed_payload = json.loads(raw_payload)
         except json.JSONDecodeError as exc:
             raise JournalValidationError("El detalle del comprobante no tiene un formato valido.") from exc
+        if not isinstance(parsed_payload, dict):
+            raise JournalValidationError("El detalle del comprobante no tiene un formato valido.")
+        return parsed_payload
     return {
         "company": form_data.get("company"),
         "posting_date": form_data.get("posting_date"),
@@ -360,13 +454,20 @@ def _selected_books_for_journal(journal: ComprobanteContable) -> list[str] | Non
     return None
 
 
-def _serialize_journal_line(line: ComprobanteContableDetalle) -> dict[str, Any]:
+def _serialize_journal_line(
+    line: ComprobanteContableDetalle,
+    account_labels: dict[str, str],
+    cost_center_labels: dict[str, str],
+) -> dict[str, Any]:
     value = Decimal(str(line.value or 0))
+    account_code = line.account or ""
+    cost_center_code = line.cost_center or ""
     return {
         "order": line.order or 0,
-        "account": line.account or "",
-        "account_label": line.account or "",
-        "cost_center": line.cost_center or "",
+        "account": account_code,
+        "account_label": account_labels.get(account_code, account_code),
+        "cost_center": cost_center_code,
+        "cost_center_label": cost_center_labels.get(cost_center_code, cost_center_code),
         "party_type": line.third_type or "",
         "party": line.third_code or "",
         "debit": str(value) if value > 0 else "",
@@ -383,6 +484,56 @@ def _serialize_journal_line(line: ComprobanteContableDetalle) -> dict[str, Any]:
         "is_advance": bool(getattr(line, "is_advance", False)),
         "bank_account": getattr(line, "bank_account_id", "") or "",
     }
+
+
+def _account_labels_for_company(company: str, account_codes: set[str]) -> dict[str, str]:
+    if not account_codes:
+        return {}
+    rows = (
+        database.session.execute(select(Accounts).filter(Accounts.entity == company).where(Accounts.code.in_(account_codes)))
+        .scalars()
+        .all()
+    )
+    labels: dict[str, str] = {}
+    for row in rows:
+        if not row.code:
+            continue
+        label = f"{row.code} - {row.name}" if row.name else row.code
+        labels[row.code] = label
+    return labels
+
+
+def _cost_center_labels_for_company(company: str, cost_center_codes: set[str]) -> dict[str, str]:
+    if not cost_center_codes:
+        return {}
+    rows = (
+        database.session.execute(
+            select(CostCenter).filter(CostCenter.entity == company).where(CostCenter.code.in_(cost_center_codes))
+        )
+        .scalars()
+        .all()
+    )
+    labels: dict[str, str] = {}
+    for row in rows:
+        if not row.code:
+            continue
+        label = f"{row.code} - {row.name}" if row.name else row.code
+        labels[row.code] = label
+    return labels
+
+
+def _reversed_payload_lines(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    reversed_lines: list[dict[str, Any]] = []
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        debit_value = line.get("debit") or ""
+        credit_value = line.get("credit") or ""
+        reversed_line = dict(line)
+        reversed_line["debit"] = credit_value
+        reversed_line["credit"] = debit_value
+        reversed_lines.append(reversed_line)
+    return reversed_lines
 
 
 def _normalize_transaction_currency(
@@ -409,9 +560,7 @@ def _account_record(company: str, account_value: str) -> Accounts | None:
     account = database.session.get(Accounts, account_value)
     if account is not None:
         return account if account.entity == company else None
-    return (
-        database.session.execute(database.select(Accounts).filter_by(entity=company, code=account_value)).scalars().first()
-    )
+    return database.session.execute(database.select(Accounts).filter_by(entity=company, code=account_value)).scalars().first()
 
 
 def _account_code(company: str, account_value: str) -> str:
