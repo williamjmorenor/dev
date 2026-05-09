@@ -90,6 +90,34 @@ describe('smart-select', function () {
     await flushPromises();
 
     assert.strictEqual(fetchCalls, 1);
+    assert.strictEqual(component.open, true);
+    assert.strictEqual(component.options.length, 1);
+  });
+
+  it('opens menu on first focus while preload is still loading', async function () {
+    let resolveRequest;
+    const create = loadSmartSelect({
+      fetch: () => new Promise((resolve) => { resolveRequest = resolve; }),
+    });
+
+    const component = create({
+      doctype: 'company',
+      name: 'company',
+      preload: true,
+      preloadOnFocus: true,
+      minChars: 1,
+    });
+
+    component.init();
+    assert.strictEqual(component.loading, true);
+    assert.strictEqual(component.open, false);
+
+    component.onFocus();
+    assert.strictEqual(component.open, true);
+
+    resolveRequest({ ok: true, json: () => Promise.resolve({ results: [{ value: 'cafe' }] }) });
+    await flushPromises();
+    assert.strictEqual(component.loading, false);
     assert.strictEqual(component.options.length, 1);
   });
 
@@ -135,6 +163,135 @@ describe('smart-select', function () {
     assert.strictEqual(fetchCalls, 0);
   });
 
+  it('auto-selects default naming series when company changes and filter is present', async function () {
+    let fetchCalls = 0;
+    const companyElement = {
+      value: 'cafe',
+      listeners: {},
+      addEventListener: function (eventName, callback) {
+        this.listeners[eventName] = callback;
+      },
+    };
+    const create = loadSmartSelect({
+      elements: { '#company': companyElement },
+      fetch: () => {
+        fetchCalls += 1;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [{ value: 'SER-001', display_name: 'Serie 001', is_default: true }] }) });
+      },
+    });
+    const component = create({
+      doctype: 'naming_series',
+      name: 'naming_series_id',
+      filters: { company: { selector: '#company' } },
+      filterSources: ['#company'],
+      preload: false,
+      loadOnFilterChange: true,
+      requiredFilters: ['company'],
+      autoSelectDefault: true,
+      minChars: 1,
+    });
+
+    component.init();
+    companyElement.value = 'choco';
+
+    component.handleFilterChange();
+    await flushPromises();
+
+    assert.strictEqual(fetchCalls, 1);
+    assert.strictEqual(component.selectedValue, 'SER-001');
+    assert.strictEqual(component.selectedLabel, 'Serie 001');
+    assert.strictEqual(component.options.length, 0);
+  });
+
+  it('selectOption updates hidden input and dispatches input/change events', function () {
+    const create = loadSmartSelect();
+    const component = create({
+      doctype: 'company',
+      name: 'company',
+      minChars: 1,
+    });
+
+    const events = [];
+    const hiddenInput = {
+      value: '',
+      dispatchEvent: function (event) {
+        events.push(event.type);
+      },
+    };
+
+    component.$root = {
+      querySelector: function (selector) {
+        if (selector === 'input[type="hidden"][name="company"]') return hiddenInput;
+        return null;
+      },
+    };
+
+    component.selectOption({ value: 'cacao', display_name: 'Cacao SA' });
+
+    assert.strictEqual(hiddenInput.value, 'cacao');
+    assert.ok(events.includes('input'));
+    assert.ok(events.includes('change'));
+  });
+
+  it('company selection stores scalar value in hidden input when option value is object', function () {
+    const create = loadSmartSelect();
+    const component = create({
+      doctype: 'company',
+      name: 'company',
+      minChars: 1,
+    });
+
+    const events = [];
+    const hiddenInput = {
+      value: '',
+      dispatchEvent: function (event) {
+        events.push(event.type);
+      },
+    };
+
+    component.$root = {
+      querySelector: function (selector) {
+        if (selector === 'input[type="hidden"][name="company"]') return hiddenInput;
+        return null;
+      },
+    };
+
+    component.selectOption({ value: { id: 'cacao' }, display_name: 'Cacao SA' });
+
+    assert.strictEqual(component.selectedValue, 'cacao');
+    assert.strictEqual(hiddenInput.value, 'cacao');
+    assert.ok(events.includes('input'));
+    assert.ok(events.includes('change'));
+  });
+
+  it('normalizes object option values on selection', function () {
+    const create = loadSmartSelect();
+    const component = create({
+      doctype: 'company',
+      name: 'company',
+      minChars: 1,
+    });
+
+    component.selectOption({ value: { id: 'cacao' }, display_name: 'Cacao SA' });
+
+    assert.strictEqual(component.selectedValue, 'cacao');
+  });
+
+  it('normalizes object initialValue to scalar', function () {
+    const create = loadSmartSelect();
+    const component = create({
+      doctype: 'company',
+      name: 'company',
+      minChars: 1,
+      initialValue: { value: 'cacao' },
+      initialLabel: 'Cacao SA',
+    });
+
+    component.init();
+
+    assert.strictEqual(component.selectedValue, 'cacao');
+  });
+
   it('normalizes object filters to scalar values for backend queries', async function () {
     let requestUrl = '';
     const create = loadSmartSelect({
@@ -162,6 +319,35 @@ describe('smart-select', function () {
     assert.ok(queryString.includes('company=cafe'));
     assert.ok(queryString.includes('entity_type=journal_entry'));
     assert.strictEqual(queryString.includes('ignored_filter='), false);
+    assert.strictEqual(queryString.includes('[object Object]'), false);
+  });
+
+  it('normalizes selector filter when DOM value is an object', async function () {
+    let requestUrl = '';
+    const create = loadSmartSelect({
+      elements: {
+        '#company': { value: { value: 'cafe' } },
+      },
+      fetch: (url) => {
+        requestUrl = url;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+      },
+    });
+    const component = create({
+      doctype: 'account',
+      name: 'account',
+      minChars: 1,
+      filters: {
+        company: { selector: '#company' },
+      },
+    });
+
+    component.search = '11';
+    component.fetchOptions();
+    await flushPromises();
+
+    const queryString = decodeURIComponent(requestUrl.split('?')[1] || '');
+    assert.ok(queryString.includes('company=cafe'));
     assert.strictEqual(queryString.includes('[object Object]'), false);
   });
 

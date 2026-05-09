@@ -20,7 +20,7 @@
     }
     if (value && typeof value === 'object' && value.selector) {
       var element = document.querySelector(value.selector);
-      return element ? element.value : '';
+      return element ? normalizeValue(element.value) : '';
     }
     if (value && typeof value === 'object') {
       return normalizeObjectValue(value);
@@ -49,7 +49,9 @@
         limit: config.limit || 20,
         filters: config.filters || {},
         filterSources: config.filterSources || [],
+        requiredFilters: config.requiredFilters || [],
         preload: config.preload || false,
+        loadOnFilterChange: config.loadOnFilterChange || false,
         preloadOnFocus: config.preloadOnFocus || false,
         autoSelectDefault: config.autoSelectDefault || false,
         messages: Object.assign({
@@ -62,7 +64,7 @@
           error: ''
         }, config.messages || {}),
         search: config.initialLabel || '',
-        selectedValue: config.initialValue || '',
+        selectedValue: normalizeValue(config.initialValue) || '',
         selectedLabel: config.initialLabel || '',
         options: [],
         open: false,
@@ -77,9 +79,9 @@
           this.bindFilterSources();
           this.invalid = false;
           if (!this.selectedValue && config.initialValue) {
-            this.selectedValue = config.initialValue;
+            this.selectedValue = normalizeValue(config.initialValue);
           }
-          if (this.preload && !this.selectedValue) {
+          if (this.preload && this.requiredFiltersPresent() && !this.selectedValue) {
             this.preloadOptions();
           }
         },
@@ -115,7 +117,7 @@
           if (nextSignature === this.lastFilterSignature) return;
           this.lastFilterSignature = nextSignature;
           this.clearSelection();
-          if (this.preload) {
+          if ((this.preload || this.loadOnFilterChange) && this.requiredFiltersPresent()) {
             this.preloadOptions();
           }
         },
@@ -134,8 +136,13 @@
             if (this.hasPreloadedOptions()) {
               this.open = true;
             } else {
-              this.preloadOptions();
+              this.preloadOptions({ openMenu: true });
             }
+          }
+
+          // If preload started during init and is still loading, show the menu state on first focus.
+          if (this.preload && this.preloadOnFocus && !this.open && this.loading) {
+            this.open = true;
           }
         },
 
@@ -143,7 +150,19 @@
           return this.preload && this.options.length > 0;
         },
 
-        preloadOptions: function () {
+        notifyValueChange: function () {
+          if (!this.$root) return;
+
+          var input = this.$root.querySelector('input[type="hidden"][name="' + this.name + '"]');
+          if (!input) return;
+
+          input.value = this.selectedValue || '';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+
+        preloadOptions: function (settings) {
+          var loadSettings = settings || {};
           var self = this;
           this.error = '';
           var params = new URLSearchParams();
@@ -155,6 +174,9 @@
           });
 
           this.loading = true;
+          if (loadSettings.openMenu) {
+            this.open = true;
+          }
           fetch(this.endpoint + '?' + params.toString(), { credentials: 'same-origin' })
             .then(function (response) {
               if (!response.ok) throw new Error(response.statusText);
@@ -183,6 +205,12 @@
           var query = this.search.trim();
           var self = this;
           this.error = '';
+          if (this.requiredFilters.length && !this.requiredFiltersPresent()) {
+            this.options = [];
+            this.open = false;
+            this.loading = false;
+            return;
+          }
           if (query.length < this.minChars) {
             if (this.hasPreloadedOptions()) {
               this.open = true;
@@ -223,7 +251,8 @@
         },
 
         selectOption: function (option) {
-          this.selectedValue = option.value || option.id;
+          var optionValue = option.value !== undefined ? option.value : option.id;
+          this.selectedValue = normalizeValue(optionValue) || '';
           this.selectedLabel = option.display_name || option.label || '';
           this.search = this.selectedLabel;
           this.options = [];
@@ -237,12 +266,14 @@
               // No-op: do not break select flow
             }
           }
-          if (this.$root) {
-            var input = this.$root.querySelector('input[type="hidden"][name="' + this.name + '"]');
-            if (input) {
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          }
+          this.notifyValueChange();
+        },
+
+        requiredFiltersPresent: function () {
+          var self = this;
+          return !this.requiredFilters.some(function (key) {
+            return !normalizeValue(self.filters[key]);
+          });
         },
 
         clearSelection: function () {
@@ -253,6 +284,7 @@
           this.open = false;
           this.invalid = false;
           this.error = '';
+          this.notifyValueChange();
         },
 
         closeSoon: function () {

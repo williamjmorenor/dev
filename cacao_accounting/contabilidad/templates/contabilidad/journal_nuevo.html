@@ -62,20 +62,55 @@
 
       init: function () {
         if (!this.lines.length) this.addMultipleRows(2);
+        var self = this;
         var companyInput = document.getElementById('company');
         if (companyInput) {
           var loadBooks = this.loadBookOptions.bind(this);
-          companyInput.addEventListener('change', loadBooks);
-          companyInput.addEventListener('input', loadBooks);
+          var syncAndLoadBooks = function () {
+            var selectedCompany = self.syncCompanyFilterValue();
+            loadBooks(selectedCompany);
+          };
+          companyInput.addEventListener('change', syncAndLoadBooks);
+          companyInput.addEventListener('input', syncAndLoadBooks);
           document.addEventListener('company-selected', function (event) {
             var selectedCompany = '';
             if (event && event.detail) {
               selectedCompany = event.detail.value || event.detail.id || '';
             }
+            selectedCompany = self.syncCompanyFilterValue(selectedCompany);
             loadBooks(selectedCompany);
           });
         }
-        if (this.header.company) this.loadBookOptions();
+        this.syncCompanyFilterValue(this.header.company);
+        if (this.header.company) this.loadBookOptions(this.header.company);
+      },
+
+      normalizeCompanyValue: function (value) {
+        if (!value) return '';
+        if (typeof value === 'object') {
+          return value.value || value.id || value.code || '';
+        }
+        if (value === '[object Object]') return '';
+        return value;
+      },
+
+      syncCompanyFilterValue: function (value) {
+        var companyInput = document.getElementById('company');
+        var companyFilterInput = document.getElementById('company_filter_value');
+        var normalized = this.normalizeCompanyValue(value);
+
+        if (!normalized && companyInput) {
+          normalized = this.normalizeCompanyValue(companyInput.value);
+        }
+
+        if (companyInput && normalized && companyInput.value !== normalized) {
+          companyInput.value = normalized;
+        }
+        if (companyFilterInput) {
+          companyFilterInput.value = normalized || '';
+        }
+
+        return normalized || '';
       },
 
       get visibleColumns() {
@@ -360,6 +395,7 @@
           })'
         >
           <input type="hidden" id="company" name="company" x-model="selectedValue" @change="$dispatch('input')">
+          <input type="hidden" id="company_filter_value" value="{{ (journal.company if journal else '')|e }}">
           <div class="ca-smart-select-input-wrap">
             <input class="form-control ca-smart-select-input" type="text" x-model="search" @input="onInput" @focus="onFocus" @blur="closeSoon" :placeholder="messages.placeholder" required>
             <button class="ca-smart-select-clear" type="button" x-show="selectedValue" @click="clearSelection" :title="messages.clear">×</button>
@@ -384,9 +420,11 @@
             doctype: "naming_series",
             name: "naming_series_id",
             minChars: 1,
-            preload: true,
+            preload: false,
+            loadOnFilterChange: true,
+            requiredFilters: ["company"],
             autoSelectDefault: true,
-            filters: { company: { selector: "#company" }, entity_type: "journal_entry" },
+            filters: { company: { selector: "#company_filter_value" }, entity_type: "journal_entry" },
             filterSources: ["#company"],
             initialValue: header.naming_series_id,
             initialLabel: header.naming_series_label,
@@ -499,7 +537,7 @@
                       doctype: "account",
                       name: "account",
                       minChars: 1,
-                      filters: { company: { selector: "#company" } },
+                      filters: { company: { selector: "#company_filter_value" } },
                       filterSources: ["#company"],
                       initialValue: line.account,
                       initialLabel: line.account_label,
@@ -535,7 +573,7 @@
                       doctype: "cost_center",
                       name: "cost_center",
                       minChars: 1,
-                      filters: { company: { selector: "#company" } },
+                      filters: { company: { selector: "#company_filter_value" } },
                       filterSources: ["#company"],
                       initialValue: line.cost_center,
                       initialLabel: line.cost_center,
@@ -579,7 +617,12 @@
                       doctype: "party",
                       name: "party",
                       minChars: 1,
-                      filters: { company: { selector: "#company" } },
+                      filters: {
+                        company: { selector: "#company_filter_value" },
+                        party_type: function () {
+                          return line.party_type || "";
+                        }
+                      },
                       filterSources: ["#company"],
                       initialValue: line.party,
                       initialLabel: line.party,
@@ -663,7 +706,7 @@
                   doctype: "account",
                   name: "modal_account",
                   minChars: 1,
-                  filters: { company: { selector: "#company" } },
+                  filters: { company: { selector: "#company_filter_value" } },
                   filterSources: ["#company"],
                   initialValue: modalLine.account,
                   initialLabel: modalLine.account_label,
@@ -700,7 +743,7 @@
                   doctype: "cost_center",
                   name: "modal_cost_center",
                   minChars: 1,
-                  filters: { company: { selector: "#company" } },
+                  filters: { company: { selector: "#company_filter_value" } },
                   filterSources: ["#company"],
                   initialValue: modalLine.cost_center,
                   initialLabel: modalLine.cost_center,
@@ -737,7 +780,7 @@
                   doctype: "unit",
                   name: "modal_unit",
                   minChars: 1,
-                  filters: { company: { selector: "#company" } },
+                  filters: { company: { selector: "#company_filter_value" } },
                   filterSources: ["#company"],
                   initialValue: modalLine.unit,
                   initialLabel: modalLine.unit,
@@ -774,7 +817,7 @@
                   doctype: "project",
                   name: "modal_project",
                   minChars: 1,
-                  filters: { company: { selector: "#company" } },
+                  filters: { company: { selector: "#company_filter_value" } },
                   filterSources: ["#company"],
                   initialValue: modalLine.project,
                   initialLabel: modalLine.project,
@@ -820,7 +863,12 @@
                   doctype: "party",
                   name: "modal_party",
                   minChars: 1,
-                  filters: { company: { selector: "#company" } },
+                  filters: {
+                    company: { selector: "#company_filter_value" },
+                    party_type: function () {
+                      return modalLine.party_type || "";
+                    }
+                  },
                   filterSources: ["#company"],
                   initialValue: modalLine.party,
                   initialLabel: modalLine.party,
