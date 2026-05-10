@@ -9,6 +9,7 @@ import csv
 from dataclasses import replace
 from datetime import date
 from decimal import Decimal
+from decimal import DecimalException
 from io import BytesIO, StringIO
 
 from flask import Blueprint, render_template, request, send_file
@@ -106,10 +107,14 @@ _MONEY_COLUMNS = {
     "net_profit",
 }
 _RIGHT_ALIGN_COLUMNS = _MONEY_COLUMNS | {"level"}
+_ALWAYS_VISIBLE_COLUMNS = {"debit", "credit", "difference", "account_code", "account_name", "section", "amount"}
 
 
 def _format_number(value: object) -> str:
-    amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    try:
+        amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    except DecimalException:
+        return "—"
     formatted = f"{abs(amount):,.2f}"
     return f"({formatted})" if amount < 0 else formatted
 
@@ -158,6 +163,17 @@ def _build_context_summary(report, report_filters: FinancialReportFilters) -> di
         "status": status_label,
         "records": str(report.total_rows),
     }
+
+
+def _is_report_balanced(display_totals: dict[str, str]) -> bool:
+    difference = display_totals.get("difference")
+    if difference is None:
+        return False
+    normalized_difference = difference.replace(",", "").replace("(", "-").replace(")", "")
+    try:
+        return Decimal(normalized_difference) == Decimal("0")
+    except DecimalException:
+        return False
 
 
 def _date_arg(name: str) -> date | None:
@@ -255,8 +271,7 @@ def _render_financial_report(report_code: str, report_title: str, report, report
     display_columns = [
         column
         for column in columns
-        if any((row.values.get(column) not in (None, "", "—") for row in report.rows))
-        or column in {"debit", "credit", "difference", "account_code", "account_name", "section", "amount"}
+        if any((row.values.get(column) not in (None, "", "—") for row in report.rows)) or column in _ALWAYS_VISIBLE_COLUMNS
     ]
     if not display_columns:
         display_columns = columns
@@ -282,6 +297,7 @@ def _render_financial_report(report_code: str, report_title: str, report, report
         ledger_currency=report.ledger_currency,
         context_summary=_build_context_summary(report, report_filters),
         right_align_columns=_RIGHT_ALIGN_COLUMNS,
+        is_balanced=_is_report_balanced(display_totals),
     )
 
 

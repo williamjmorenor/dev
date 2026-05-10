@@ -30,6 +30,9 @@ from cacao_accounting.database import (
     database,
 )
 
+_DEDUP_QUERY_LIMIT_MULTIPLIER = 5
+_DEDUP_QUERY_LIMIT_MIN = 25
+
 
 class SearchSelectError(ValueError):
     """Error validado para busquedas de campos seleccionables."""
@@ -109,7 +112,7 @@ def _naming_series_label(naming_series: NamingSeries) -> str:
     return f"{naming_series.name} ({naming_series.entity_type})"
 
 
-def _raw_value_label(value: Any) -> str:
+def _passthrough_label(value: Any) -> str:
     return str(value)
 
 
@@ -263,7 +266,7 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=Party,
         search_fields=("party_type",),
         value_field="party_type",
-        label_builder=_raw_value_label,
+        label_builder=_passthrough_label,
         allowed_filters={"is_active": "is_active"},
         default_filters={"is_active": True},
         deduplicate_by_value=True,
@@ -273,7 +276,7 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=GLEntry,
         search_fields=("voucher_type",),
         value_field="voucher_type",
-        label_builder=_raw_value_label,
+        label_builder=_passthrough_label,
         allowed_filters={"company": "company", "ledger": "ledger_id"},
         default_filters={},
         deduplicate_by_value=True,
@@ -283,7 +286,7 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=GLEntry,
         search_fields=("document_no", "voucher_id"),
         value_field="document_no",
-        label_builder=_raw_value_label,
+        label_builder=_passthrough_label,
         allowed_filters={"company": "company", "ledger": "ledger_id"},
         default_filters={},
         deduplicate_by_value=True,
@@ -324,7 +327,7 @@ def search_select(doctype: str, query: str, filters: dict[str, list[str]], limit
     statement = _apply_search(statement, spec, normalized_query)
     query_limit = max_results + 1
     if spec.deduplicate_by_value:
-        query_limit = max(query_limit * 5, 25)
+        query_limit = max(query_limit * _DEDUP_QUERY_LIMIT_MULTIPLIER, _DEDUP_QUERY_LIMIT_MIN)
     statement = statement.limit(query_limit)
 
     rows = database.session.execute(statement).scalars().all()

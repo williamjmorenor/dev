@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% macro smart_select_field(label, name, doctype, value='', field_id='', min_chars=1, filters='{}', filter_sources='[]', required_filters='[]') -%}
+{% macro smart_select_field(label, name, doctype, value='', field_id='', min_chars=1, filters=None, filter_sources=None, required_filters=None) -%}
 <label class="form-label mb-0">
   {{ _(label) }}
   <div class="ca-smart-select" x-data='smartSelect({
@@ -11,9 +11,9 @@
       loadOnFilterChange: true,
       initialValue: {{ value|tojson }},
       initialLabel: {{ value|tojson }},
-      filters: {{ filters|safe }},
-      filterSources: {{ filter_sources|safe }},
-      requiredFilters: {{ required_filters|safe }},
+      filters: {{ (filters or {})|tojson }},
+      filterSources: {{ (filter_sources or [])|tojson }},
+      requiredFilters: {{ (required_filters or [])|tojson }},
       messages: {
         placeholder: {{ _("Buscar...")|tojson }},
         loading: {{ _("Buscando...")|tojson }},
@@ -65,23 +65,23 @@
     <div class="p-3" x-show="!collapsed">
       <form method="get" class="d-grid gap-2">
         {{ smart_select_field("Compañía", "company", "company", request.args.get('company', 'cacao'), "report-company") }}
-        {{ smart_select_field("Libro contable", "ledger", "book", request.args.get('ledger', ''), "report-ledger", 1, '{"company": {"selector": "#report-company"}}', '["#report-company"]', '["company"]') }}
-        {{ smart_select_field("Periodo contable", "accounting_period", "accounting_period", request.args.get('accounting_period', ''), "report-accounting-period", 1, '{"company": {"selector": "#report-company"}}', '["#report-company"]', '["company"]') }}
-        {{ smart_select_field("ID visible del comprobante", "voucher_number", "document_no", request.args.get('voucher_number', ''), "report-voucher-number", 1, '{"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}', '["#report-company", "#report-ledger"]', '["company"]') }}
-        {{ smart_select_field("Cuenta contable", "account_code", "account_code", request.args.get('account_code', ''), "report-account-code", 1, '{"company": {"selector": "#report-company"}}', '["#report-company"]', '["company"]') }}
+        {{ smart_select_field("Libro contable", "ledger", "book", request.args.get('ledger', ''), "report-ledger", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+        {{ smart_select_field("Periodo contable", "accounting_period", "accounting_period", request.args.get('accounting_period', ''), "report-accounting-period", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+        {{ smart_select_field("ID visible del comprobante", "voucher_number", "document_no", request.args.get('voucher_number', ''), "report-voucher-number", 1, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
+        {{ smart_select_field("Cuenta contable", "account_code", "account_code", request.args.get('account_code', ''), "report-account-code", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
         <button class="btn btn-link text-start p-0 mt-1" type="button" @click="advanced = !advanced">
           <span x-show="!advanced">{{ _("Mostrar filtros avanzados") }}</span>
           <span x-show="advanced">{{ _("Ocultar filtros avanzados") }}</span>
         </button>
         <div class="d-grid gap-2" x-show="advanced">
-          {{ smart_select_field("Rango cuenta desde", "account_from", "account_code", request.args.get('account_from', ''), "report-account-from", 1, '{"company": {"selector": "#report-company"}}', '["#report-company"]', '["company"]') }}
-          {{ smart_select_field("Rango cuenta hasta", "account_to", "account_code", request.args.get('account_to', ''), "report-account-to", 1, '{"company": {"selector": "#report-company"}}', '["#report-company"]', '["company"]') }}
-          {{ smart_select_field("Centro de costos", "cost_center_code", "cost_center", request.args.get('cost_center_code', ''), "report-cost-center", 1, '{"company": {"selector": "#report-company"}}', '["#report-company"]', '["company"]') }}
-          {{ smart_select_field("Unidad de negocio", "unit_code", "unit", request.args.get('unit_code', ''), "report-unit", 1, '{"company": {"selector": "#report-company"}}', '["#report-company"]', '["company"]') }}
-          {{ smart_select_field("Proyecto", "project_code", "project", request.args.get('project_code', ''), "report-project", 1, '{"company": {"selector": "#report-company"}}', '["#report-company"]', '["company"]') }}
+          {{ smart_select_field("Rango cuenta desde", "account_from", "account_code", request.args.get('account_from', ''), "report-account-from", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Rango cuenta hasta", "account_to", "account_code", request.args.get('account_to', ''), "report-account-to", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Centro de costos", "cost_center_code", "cost_center", request.args.get('cost_center_code', ''), "report-cost-center", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Unidad de negocio", "unit_code", "unit", request.args.get('unit_code', ''), "report-unit", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Proyecto", "project_code", "project", request.args.get('project_code', ''), "report-project", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
           {{ smart_select_field("Tipo de tercero", "party_type", "party_type", request.args.get('party_type', ''), "report-party-type") }}
-          {{ smart_select_field("Tercero", "party_id", "party", request.args.get('party_id', ''), "report-party-id", 1, '{"company": {"selector": "#report-company"}, "party_type": {"selector": "#report-party-type"}}', '["#report-company", "#report-party-type"]', '["company"]') }}
-          {{ smart_select_field("Tipo de comprobante", "voucher_type", "voucher_type", request.args.get('voucher_type', ''), "report-voucher-type", 1, '{"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}', '["#report-company", "#report-ledger"]', '["company"]') }}
+          {{ smart_select_field("Tercero", "party_id", "party", request.args.get('party_id', ''), "report-party-id", 1, {"company": {"selector": "#report-company"}, "party_type": {"selector": "#report-party-type"}}, ["#report-company", "#report-party-type"], ["company"]) }}
+          {{ smart_select_field("Tipo de comprobante", "voucher_type", "voucher_type", request.args.get('voucher_type', ''), "report-voucher-type", 1, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
           <label class="form-label mb-0">
             {{ _("Estado") }}
             <select name="status" class="form-select">
@@ -145,7 +145,7 @@
         <strong class="ca-total-value">{{ value }}</strong>
       </div>
       {% endfor %}
-      {% if totals.get('difference') in ('0.00', '0', '0.0000') %}
+      {% if is_balanced %}
       <div class="ca-total-item ca-total-ok">✅ {{ _("Cuadrado") }}</div>
       {% endif %}
     </div>
