@@ -1680,3 +1680,43 @@ Corregir `cacao_accounting/static/js/smart-select.js` para que los campos depend
 - `bash run_test.sh` (baseline) → falla por dependencias faltantes del entorno: `black`, `flake8`, `ruff`, `bandit`, `pytest`.
 - `npm --prefix cacao_accounting/static ci` → instalación de dependencias JS para pruebas.
 - `npx --prefix cacao_accounting/static mocha cacao_accounting/static/test/smart-select.test.js` → **5 passing**.
+
+## 2026-05-10 (reportes financieros: smart-select en filtros)
+
+### Petición del usuario
+Asegurar que los 4 reportes financieros (`/reports/account-movement`, `/reports/trial-balance`, `/reports/income-statement`, `/reports/balance-sheet`) utilicen Smart Select en los campos de búsqueda y filtrado del panel lateral.
+
+### Plan implementado
+1. Extender el registry de `search_select` para soportar filtros requeridos por reportes financieros.
+2. Migrar los filtros del template `financial_report.html` a componentes `smartSelect` con dependencias por compañía/libro.
+3. Mejorar presentación financiera (encabezados amigables, formato monetario, resumen superior y barra sticky de totales) sin tocar lógica GL.
+4. Añadir pruebas puntuales para validar nuevos doctypes Smart Select y presencia de Smart Select en la vista de reportes.
+5. Ejecutar validación completa de lint, tipos y pruebas.
+
+### Resumen técnico de cambios
+- `cacao_accounting/reportes/templates/reportes/financial_report.html`
+  - Filtros principales y avanzados migrados a `smartSelect`.
+  - Dependencias de filtros: compañía → libro/periodo/cuentas/dimensiones; tipo tercero → tercero; compañía+libro → tipo/ID comprobante.
+  - Panel superior de contexto (compañía, libro, periodo, estado, registros).
+  - Tabla con encabezados amigables y barra sticky de totales.
+- `cacao_accounting/search_select.py`
+  - Nuevos doctypes: `accounting_period`, `account_code`, `party_type`, `voucher_type`, `document_no`.
+  - Soporte de deduplicación por valor para catálogos derivados de GL.
+- `cacao_accounting/reportes/__init__.py`
+  - Etiquetas amigables de columnas.
+  - Formato financiero de importes (`1,000.00`, negativos en paréntesis).
+  - Ocultado de columnas vacías en la renderización.
+  - Envío de contexto de reporte y columnas renderizadas al template.
+- Tests:
+  - `tests/test_09_journal_entry_form.py`: validación de `doctype=accounting_period`.
+  - `tests/test_08_reconciliation_reports.py`: validación de presencia de Smart Select en HTML de reportes.
+
+### Verificación ejecutada
+- `python -m flake8 cacao_accounting/`
+- `python -m ruff check cacao_accounting/`
+- `python -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True`
+- Targeted:
+  - `tests/test_08_reconciliation_reports.py::test_financial_reports_framework_uses_gl_and_supports_export`
+  - `tests/test_09_journal_entry_form.py::test_search_select_supports_journal_doctypes_and_filters`
+  - `tests/test_10_smart_select_js.py`

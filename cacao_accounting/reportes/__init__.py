@@ -8,6 +8,7 @@ from __future__ import annotations
 import csv
 from dataclasses import replace
 from datetime import date
+from decimal import Decimal
 from io import BytesIO, StringIO
 
 from flask import Blueprint, render_template, request, send_file
@@ -58,6 +59,105 @@ else:
 
 
 reportes = Blueprint("reportes", __name__, template_folder="templates")
+
+_COLUMN_LABELS = {
+    "posting_date": "Fecha",
+    "accounting_period": "Periodo",
+    "document_no": "Comprobante",
+    "voucher_type": "Tipo",
+    "account_code": "Cuenta",
+    "account_name": "Nombre de cuenta",
+    "debit": "Debe",
+    "credit": "Haber",
+    "running_balance": "Saldo final",
+    "currency": "Moneda",
+    "ledger": "Libro",
+    "company": "Compañía",
+    "opening_balance": "Saldo inicial",
+    "ending_balance": "Saldo final",
+    "cost_center": "Centro de costo",
+    "unit": "Unidad",
+    "project": "Proyecto",
+    "party_type": "Tipo de tercero",
+    "party_id": "Tercero",
+    "created_by": "Usuario",
+    "created_at": "Fecha creación",
+    "line_comment": "Referencia",
+    "voucher_status": "Estado",
+    "section": "Sección",
+    "amount": "Monto",
+}
+_MONEY_COLUMNS = {
+    "debit",
+    "credit",
+    "difference",
+    "opening_balance",
+    "ending_balance",
+    "running_balance",
+    "amount",
+    "assets",
+    "liabilities",
+    "equity",
+    "period_profit",
+    "income",
+    "cost",
+    "expense",
+    "gross_profit",
+    "net_profit",
+}
+_RIGHT_ALIGN_COLUMNS = _MONEY_COLUMNS | {"level"}
+
+
+def _format_number(value: object) -> str:
+    amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    formatted = f"{abs(amount):,.2f}"
+    return f"({formatted})" if amount < 0 else formatted
+
+
+def _column_label(column: str, ledger_currency: str | None) -> str:
+    label = _(_COLUMN_LABELS.get(column, column.replace("_", " ").title()))
+    if column in _MONEY_COLUMNS and ledger_currency:
+        return f"{label} ({ledger_currency})"
+    return label
+
+
+def _format_cell(column: str, value: object, ledger_currency: str | None) -> str:
+    if value is None or value == "":
+        return "—"
+    if column in _MONEY_COLUMNS:
+        return _format_number(value)
+    if column == "posting_date" and isinstance(value, date):
+        return value.isoformat()
+    if column == "voucher_status":
+        return _("Cancelado") if str(value).lower() == "cancelled" else _("Contabilizado")
+    if column == "section":
+        section_labels = {
+            "assets": _("ACTIVOS"),
+            "liabilities": _("PASIVOS"),
+            "equity": _("PATRIMONIO"),
+            "income": _("INGRESOS"),
+            "cost": _("COSTOS"),
+            "expense": _("GASTOS"),
+            "gross_profit": _("UTILIDAD BRUTA"),
+            "net_profit": _("UTILIDAD NETA"),
+        }
+        return section_labels.get(str(value), str(value))
+    return str(value)
+
+
+def _build_context_summary(report, report_filters: FinancialReportFilters) -> dict[str, str]:
+    ledger_label = report_filters.ledger or "—"
+    if report_filters.ledger and report.ledger_currency:
+        ledger_label = f"{report_filters.ledger} ({report.ledger_currency})"
+    status_value = report_filters.status or "submitted"
+    status_label = _("Cancelado") if status_value == "cancelled" else _("Contabilizado")
+    return {
+        "company": report_filters.company,
+        "ledger": ledger_label,
+        "period": report_filters.accounting_period or "—",
+        "status": status_label,
+        "records": str(report.total_rows),
+    }
 
 
 def _date_arg(name: str) -> date | None:
@@ -147,22 +247,41 @@ def _export_financial_report(report, report_code: str, title: str):
     )
 
 
-def _render_financial_report(report_code: str, report_title: str, report):
+def _render_financial_report(report_code: str, report_title: str, report, report_filters: FinancialReportFilters):
     export_response = _export_financial_report(report, report_code, report_title)
     if export_response is not None:
         return export_response
+    columns = report.columns or []
+    display_columns = [
+        column
+        for column in columns
+        if any((row.values.get(column) not in (None, "", "—") for row in report.rows))
+        or column in {"debit", "credit", "difference", "account_code", "account_name", "section", "amount"}
+    ]
+    if not display_columns:
+        display_columns = columns
+    display_headers = {column: _column_label(column, report.ledger_currency) for column in display_columns}
+    display_rows = [
+        {column: _format_cell(column, row.values.get(column), report.ledger_currency) for column in display_columns}
+        for row in report.rows
+    ]
+    display_totals = {key: _format_cell(key, value, report.ledger_currency) for key, value in report.totals.items()}
     return render_template(
         "reportes/financial_report.html",
         titulo=f"{report_title} - {APPNAME}",
         report_code=report_code,
         report_title=report_title,
         rows=report.rows,
-        columns=report.columns or [],
-        totals=report.totals,
+        columns=display_columns,
+        display_headers=display_headers,
+        display_rows=display_rows,
+        totals=display_totals,
         total_rows=report.total_rows,
         page=report.page,
         page_size=report.page_size,
         ledger_currency=report.ledger_currency,
+        context_summary=_build_context_summary(report, report_filters),
+        right_align_columns=_RIGHT_ALIGN_COLUMNS,
     )
 
 
@@ -175,8 +294,8 @@ def account_movement():
     report = get_account_movement_detail(filters)
     if request.args.get("export") in {"csv", "xlsx"}:
         export_report = get_account_movement_detail(replace(filters, export_all=True, page=1))
-        return _render_financial_report("account-movement", _("Detalle de Movimiento Contable"), export_report)
-    return _render_financial_report("account-movement", _("Detalle de Movimiento Contable"), report)
+        return _render_financial_report("account-movement", _("Detalle de Movimiento Contable"), export_report, filters)
+    return _render_financial_report("account-movement", _("Detalle de Movimiento Contable"), report, filters)
 
 
 @reportes.route("/reports/trial-balance")
@@ -186,7 +305,7 @@ def trial_balance():
     """Reporte de balanza de comprobación."""
     filters = _financial_filters()
     report = get_trial_balance_report(filters)
-    return _render_financial_report("trial-balance", _("Balanza de Comprobación"), report)
+    return _render_financial_report("trial-balance", _("Balanza de Comprobación"), report, filters)
 
 
 @reportes.route("/reports/income-statement")
@@ -196,7 +315,7 @@ def income_statement():
     """Reporte de estado de resultado."""
     filters = _financial_filters()
     report = get_income_statement_report(filters)
-    return _render_financial_report("income-statement", _("Estado de Resultado"), report)
+    return _render_financial_report("income-statement", _("Estado de Resultado"), report, filters)
 
 
 @reportes.route("/reports/balance-sheet")
@@ -206,7 +325,7 @@ def balance_sheet():
     """Reporte de balance general."""
     filters = _financial_filters()
     report = get_balance_sheet_report(filters)
-    return _render_financial_report("balance-sheet", _("Balance General"), report)
+    return _render_financial_report("balance-sheet", _("Balance General"), report, filters)
 
 
 @reportes.route("/reports/subledger")

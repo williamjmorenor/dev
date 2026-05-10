@@ -12,6 +12,7 @@ from sqlalchemy import Select, case, cast, func, or_, select, true
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from cacao_accounting.database import (
+    AccountingPeriod,
     Accounts,
     BankAccount,
     Book,
@@ -25,6 +26,7 @@ from cacao_accounting.database import (
     Project,
     Unit,
     Warehouse,
+    GLEntry,
     database,
 )
 
@@ -50,6 +52,7 @@ class SearchSelectSpec:
     allowed_filters: dict[str, str]
     default_filters: dict[str, str | bool]
     limit: int = 20
+    deduplicate_by_value: bool = False
 
 
 def _account_label(account: Accounts) -> str:
@@ -66,6 +69,10 @@ def _currency_label(currency: Currency) -> str:
 
 def _book_label(book: Book) -> str:
     return f"{book.code} - {book.name}"
+
+
+def _accounting_period_label(period: AccountingPeriod) -> str:
+    return period.name
 
 
 def _cost_center_label(cost_center: CostCenter) -> str:
@@ -102,6 +109,10 @@ def _naming_series_label(naming_series: NamingSeries) -> str:
     return f"{naming_series.name} ({naming_series.entity_type})"
 
 
+def _raw_value_label(value: Any) -> str:
+    return str(value)
+
+
 SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
     "company": SearchSelectSpec(
         doctype="company",
@@ -130,6 +141,15 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         allowed_filters={"company": "entity", "account_type": "account_type", "is_active": "active"},
         default_filters={"group": False, "active": True, "enabled": True},
     ),
+    "account_code": SearchSelectSpec(
+        doctype="account_code",
+        model=Accounts,
+        search_fields=("code", "name"),
+        value_field="code",
+        label_builder=_account_label,
+        allowed_filters={"company": "entity", "account_type": "account_type", "is_active": "active"},
+        default_filters={"active": True, "enabled": True},
+    ),
     "book": SearchSelectSpec(
         doctype="book",
         model=Book,
@@ -138,6 +158,15 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         label_builder=_book_label,
         allowed_filters={"company": "entity", "is_primary": "is_primary"},
         default_filters={},
+    ),
+    "accounting_period": SearchSelectSpec(
+        doctype="accounting_period",
+        model=AccountingPeriod,
+        search_fields=("name",),
+        value_field="name",
+        label_builder=_accounting_period_label,
+        allowed_filters={"company": "entity", "is_closed": "is_closed", "is_active": "enabled"},
+        default_filters={"enabled": True},
     ),
     "cost_center": SearchSelectSpec(
         doctype="cost_center",
@@ -229,6 +258,46 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         allowed_filters={"company": "company", "entity_type": "entity_type", "is_active": "is_active"},
         default_filters={"is_active": True},
     ),
+    "party_type": SearchSelectSpec(
+        doctype="party_type",
+        model=Party,
+        search_fields=("party_type",),
+        value_field="party_type",
+        label_builder=_raw_value_label,
+        allowed_filters={"is_active": "is_active"},
+        default_filters={"is_active": True},
+        deduplicate_by_value=True,
+    ),
+    "voucher_type": SearchSelectSpec(
+        doctype="voucher_type",
+        model=GLEntry,
+        search_fields=("voucher_type",),
+        value_field="voucher_type",
+        label_builder=_raw_value_label,
+        allowed_filters={"company": "company", "ledger": "ledger_id"},
+        default_filters={},
+        deduplicate_by_value=True,
+    ),
+    "document_no": SearchSelectSpec(
+        doctype="document_no",
+        model=GLEntry,
+        search_fields=("document_no", "voucher_id"),
+        value_field="document_no",
+        label_builder=_raw_value_label,
+        allowed_filters={"company": "company", "ledger": "ledger_id"},
+        default_filters={},
+        deduplicate_by_value=True,
+    ),
+    "voucher_status": SearchSelectSpec(
+        doctype="voucher_status",
+        model=GLEntry,
+        search_fields=("is_cancelled",),
+        value_field="is_cancelled",
+        label_builder=lambda row: "cancelled" if getattr(row, "is_cancelled", False) else "submitted",
+        allowed_filters={"company": "company"},
+        default_filters={},
+        deduplicate_by_value=True,
+    ),
 }
 
 
@@ -253,16 +322,36 @@ def search_select(doctype: str, query: str, filters: dict[str, list[str]], limit
     statement = _apply_default_filters(statement, spec)
     statement = _apply_request_filters(statement, spec, filters)
     statement = _apply_search(statement, spec, normalized_query)
-    statement = statement.limit(max_results + 1)
+    query_limit = max_results + 1
+    if spec.deduplicate_by_value:
+        query_limit = max(query_limit * 5, 25)
+    statement = statement.limit(query_limit)
 
     rows = database.session.execute(statement).scalars().all()
-    visible_rows = rows[:max_results]
+    serialized_results = _serialize_results(spec, rows)
+    visible_rows = serialized_results[:max_results]
     return {
         "doctype": doctype,
         "query": normalized_query,
-        "results": [_serialize_result(spec, row) for row in visible_rows],
-        "has_more": len(rows) > max_results,
+        "results": visible_rows,
+        "has_more": len(serialized_results) > max_results,
     }
+
+
+def _serialize_results(spec: SearchSelectSpec, rows: Sequence[Any]) -> list[dict[str, Any]]:
+    if not spec.deduplicate_by_value:
+        return [_serialize_result(spec, row) for row in rows]
+
+    values: list[dict[str, Any]] = []
+    seen_values: set[str] = set()
+    for row in rows:
+        payload = _serialize_result(spec, row)
+        value = str(payload.get("value", ""))
+        if not value or value in seen_values:
+            continue
+        seen_values.add(value)
+        values.append(payload)
+    return values
 
 
 def _normalize_limit(limit: int | None, default_limit: int) -> int:
