@@ -1,5 +1,11 @@
 # ESTADO ACTUAL DEL PROYECTO
 
+## Actualización incremental — 2026-05-10 (presentación jerárquica financiera)
+
+- Se mejoró la presentación visual de los reportes financieros principales (`Balanza de Comprobación`, `Balance General`, `Estado de Resultado`) con un renderer jerárquico por cuentas, nodos expandibles/colapsables y subtotales por agrupador.
+- La `Balanza de Comprobación` deja de mostrar la columna técnica `Level` en la UI.
+- Se mantuvo el backend común de cálculo financiero; los cambios se concentraron en capa de renderización.
+
 ## Actualización incremental — 2026-05-10
 
 - Se corrigió la normalización de `Accounts.classification` en reportes financieros GL (`Estado de Resultado` y `Balance General`) para soportar alias en plural (`ingresos`, `gastos`, etc.) sin perder movimientos en resultados.

@@ -564,6 +564,107 @@ def test_financial_report_view_persistence_and_column_selection(app_ctx):
     assert "vista-mensual" in html
 
 
+def test_trial_balance_uses_tree_presentation_without_level_column(app_ctx):
+    from cacao_accounting.database import (
+        Accounts,
+        AccountingPeriod,
+        Book,
+        FiscalYear,
+        GLEntry,
+        Modules,
+        User,
+        database,
+    )
+
+    accounting_module = Modules(module="accounting", default=True, enabled=True)
+    report_user = User(user="trial-tree-user", name="Trial Tree User", password=b"x", classification="admin", active=True)
+    fiscal_year = FiscalYear(
+        entity="cacao",
+        name="FY-2026",
+        year_start_date=date(2026, 1, 1),
+        year_end_date=date(2026, 12, 31),
+    )
+    book = Book(entity="cacao", code="FISC", name="Fiscal", currency="NIO", is_primary=True, default=True)
+    period = AccountingPeriod(
+        entity="cacao",
+        fiscal_year_id=fiscal_year.id,
+        name="2026-05",
+        start=date(2026, 5, 1),
+        end=date(2026, 5, 31),
+        enabled=True,
+        is_closed=False,
+    )
+    database.session.add_all([accounting_module, report_user, fiscal_year, book])
+    database.session.flush()
+    period.fiscal_year_id = fiscal_year.id
+    database.session.add(period)
+    account_parent = Accounts(
+        entity="cacao",
+        code="1.01",
+        name="Activo Corriente",
+        active=True,
+        enabled=True,
+        account_type="asset",
+        classification="activo",
+    )
+    account_leaf = Accounts(
+        entity="cacao",
+        code="1.01.001",
+        name="Caja",
+        active=True,
+        enabled=True,
+        account_type="cash",
+        classification="activo",
+    )
+    database.session.add_all([account_parent, account_leaf])
+    database.session.flush()
+    database.session.add_all(
+        [
+            GLEntry(
+                posting_date=date(2026, 5, 1),
+                company="cacao",
+                ledger_id=book.id,
+                accounting_period_id=period.id,
+                account_id=account_leaf.id,
+                account_code=account_leaf.code,
+                debit=Decimal("120.00"),
+                credit=Decimal("0"),
+                voucher_type="journal_entry",
+                voucher_id="TREE-1",
+                document_no="TREE-1",
+            ),
+            GLEntry(
+                posting_date=date(2026, 5, 1),
+                company="cacao",
+                ledger_id=book.id,
+                accounting_period_id=period.id,
+                account_id=account_leaf.id,
+                account_code=account_leaf.code,
+                debit=Decimal("0"),
+                credit=Decimal("120.00"),
+                voucher_type="journal_entry",
+                voucher_id="TREE-1",
+                document_no="TREE-1",
+            ),
+        ]
+    )
+    database.session.commit()
+
+    app_ctx.config["SECRET_KEY"] = "testing"
+    client = app_ctx.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = report_user.id
+        session["_fresh"] = True
+
+    response = client.get("/reports/trial-balance?company=cacao&ledger=FISC&accounting_period=2026-05")
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Activo Corriente" in html
+    assert "Caja" in html
+    assert "Level" not in html
+    assert "ca-tree-toggle" in html
+
+
 def test_tax_template_posts_sales_tax_and_price_suggestion(app_ctx):
     from cacao_accounting.contabilidad.posting import post_document_to_gl
     from cacao_accounting.database import (
