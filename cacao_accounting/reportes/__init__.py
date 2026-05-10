@@ -19,7 +19,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
-from cacao_accounting.database import Entity, UserFormPreference, database
+from cacao_accounting.database import Accounts, Entity, UserFormPreference, database
 from cacao_accounting.decorators import modulo_activo, verifica_acceso
 from cacao_accounting.form_preferences import get_form_preference, reset_form_preference, save_form_preference
 from cacao_accounting.reportes.services import (
@@ -135,6 +135,13 @@ _FINANCIAL_FILTER_FIELDS = (
     "sort_dir",
     "group_by",
 )
+
+
+def _to_decimal_or_zero(value: object) -> Decimal:
+    try:
+        return value if isinstance(value, Decimal) else Decimal(str(value))
+    except DecimalException:
+        return Decimal("0")
 
 
 def _format_number(value: object) -> str:
@@ -368,6 +375,113 @@ def _build_voucher_url(values: dict[str, object]) -> str | None:
     return None
 
 
+def _build_hierarchical_financial_rows(
+    report_code: str, source_rows: list[dict[str, object]], company: str
+) -> list[dict[str, object]]:
+    if report_code not in {"trial-balance", "income-statement", "balance-sheet"}:
+        return source_rows
+    sections_order: list[str] = []
+    section_nodes: dict[str, dict[str, dict[str, object]]] = {}
+    section_non_account_rows: dict[str, list[dict[str, object]]] = {}
+    for row in source_rows:
+        section = str(row.get("section") or "__all__")
+        if section not in sections_order:
+            sections_order.append(section)
+        account_code = str(row.get("account_code") or "").strip()
+        if not account_code:
+            section_non_account_rows.setdefault(section, []).append(dict(row))
+            continue
+        nodes = section_nodes.setdefault(section, {})
+        existing_node = nodes.get(account_code, {})
+        node = {**existing_node, **dict(row)}
+        node["account_code"] = account_code
+        nodes[account_code] = node
+        code_parts = account_code.split(".")
+        for index in range(1, len(code_parts)):
+            parent_code = ".".join(code_parts[:index])
+            parent_node = nodes.setdefault(
+                parent_code,
+                {
+                    "section": row.get("section"),
+                    "account_code": parent_code,
+                    "account_name": None,
+                },
+            )
+            if row.get("section") and not parent_node.get("section"):
+                parent_node["section"] = row.get("section")
+
+    for section, nodes in section_nodes.items():
+        if not nodes:
+            continue
+        account_codes = list(nodes)
+        account_names = {
+            account.code: account.name
+            for account in database.session.execute(
+                database.select(Accounts).where(Accounts.entity == company, Accounts.code.in_(account_codes))
+            ).scalars()
+        }
+        numeric_fields = {
+            field
+            for row in nodes.values()
+            for field, value in row.items()
+            if field in _MONEY_COLUMNS and isinstance(value, (int, float, Decimal, str))
+        }
+        children_map: dict[str, list[str]] = {}
+        for code in nodes:
+            parent = ".".join(code.split(".")[:-1])
+            if parent:
+                children_map.setdefault(parent, []).append(code)
+        for code in sorted(nodes.keys(), key=lambda value: value.count("."), reverse=True):
+            parent = ".".join(code.split(".")[:-1])
+            if not parent or parent not in nodes:
+                continue
+            for field in numeric_fields:
+                parent_amount = _to_decimal_or_zero(nodes[parent].get(field))
+                child_amount = _to_decimal_or_zero(nodes[code].get(field))
+                nodes[parent][field] = parent_amount + child_amount
+        for node_code, node in nodes.items():
+            node["account_name"] = node.get("account_name") or account_names.get(node_code) or node_code
+            node["level"] = node_code.count(".") + 1
+            node["is_group"] = bool(children_map.get(node_code))
+
+    flattened_rows: list[dict[str, object]] = []
+    for section in sections_order:
+        flattened_rows.extend(section_non_account_rows.get(section, []))
+        nodes = section_nodes.get(section, {})
+        if not nodes:
+            continue
+        ordered_children_map: dict[str, list[str]] = {}
+        for code in nodes:
+            parent = ".".join(code.split(".")[:-1])
+            if parent:
+                ordered_children_map.setdefault(parent, []).append(code)
+        root_codes = sorted(
+            [code for code in nodes if ".".join(code.split(".")[:-1]) not in nodes],
+            key=str,
+        )
+
+        def append_node(code: str) -> None:
+            flattened_rows.append(dict(nodes[code]))
+            for child_code in sorted(ordered_children_map.get(code, []), key=str):
+                append_node(child_code)
+
+        for root_code in root_codes:
+            append_node(root_code)
+    return flattened_rows
+
+
+def _resolve_row_level(row: dict[str, object], account_code: str) -> int:
+    level_value = row.get("level")
+    if isinstance(level_value, int):
+        return level_value
+    try:
+        if level_value is not None:
+            return int(str(level_value))
+    except (TypeError, ValueError):
+        pass
+    return account_code.count(".") + 1 if account_code else 0
+
+
 def _date_arg(name: str) -> date | None:
     value = request.args.get(name)
     return date.fromisoformat(value) if value else None
@@ -501,6 +615,8 @@ def _render_financial_report(
     columns = report.columns or []
     if selected_columns:
         columns = [column for column in columns if column in selected_columns]
+    if report_code == "trial-balance":
+        columns = [column for column in columns if column != "level"]
     display_columns = [
         column
         for column in columns
@@ -509,32 +625,35 @@ def _render_financial_report(
     if not display_columns:
         display_columns = columns
     display_headers = {column: _column_label(column, report.ledger_currency) for column in display_columns}
+    source_rows = [dict(row.values) for row in report.rows]
+    source_rows = _build_hierarchical_financial_rows(report_code, source_rows, report_filters.company)
     row_metadata = []
     child_counts: dict[str, int] = {}
-    for row in report.rows:
-        account_code = str(row.values.get("account_code") or "")
+    for row in source_rows:
+        account_code = str(row.get("account_code") or "")
         if not account_code:
             continue
         parent_code = ".".join(account_code.split(".")[:-1])
         if parent_code:
             child_counts[parent_code] = child_counts.get(parent_code, 0) + 1
-    for row in report.rows:
-        account_code = str(row.values.get("account_code") or "")
+    for row in source_rows:
+        account_code = str(row.get("account_code") or "")
         parent_code = ".".join(account_code.split(".")[:-1]) if account_code else ""
         row_metadata.append(
             {
                 "code": account_code,
                 "parent": parent_code,
                 "has_children": bool(child_counts.get(account_code)),
-                "level": int(row.values.get("level") or account_code.count(".") + 1 if account_code else 0),
-                "drilldown_url": _build_drill_down_url(row.values, report_filters.company, report_filters.ledger),
-                "voucher_url": _build_voucher_url(row.values),
+                "level": _resolve_row_level(row, account_code),
+                "drilldown_url": _build_drill_down_url(row, report_filters.company, report_filters.ledger),
+                "voucher_url": _build_voucher_url(row),
+                "is_group": bool(row.get("is_group")),
             }
         )
     display_rows: list[dict[str, object]] = []
-    for index, row in enumerate(report.rows):
+    for index, row in enumerate(source_rows):
         formatted_row: dict[str, object] = {
-            column: _format_cell(column, row.values.get(column), report.ledger_currency) for column in display_columns
+            column: _format_cell(column, row.get(column), report.ledger_currency) for column in display_columns
         }
         formatted_row["__meta"] = row_metadata[index]
         display_rows.append(formatted_row)

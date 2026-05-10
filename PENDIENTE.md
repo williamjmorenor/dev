@@ -377,7 +377,7 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [ ] Saldos por dimensión (cost_center, unit, project).
 - [ ] Revalorización cambiaria histórica.
 - [ ] Anticipos de clientes/proveedores (aplicado, pendiente, remanente).
-- [ ] Drill-down universal (balance -> cuenta -> detalle -> comprobante) y jerarquías expandibles completas.
+- [~] Jerarquías expandibles y subtotales visuales implementadas para Balanza de Comprobación, Balance General y Estado de Resultado; pendiente completar drill-down universal en todos los reportes y casos de navegación.
 - [ ] Exportación avanzada consistente (agrupaciones, formato monetario y totales configurables en todos los reportes).
 
 ### Compras

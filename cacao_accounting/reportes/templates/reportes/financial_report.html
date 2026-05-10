@@ -159,12 +159,18 @@
             <td colspan="{{ columns|length if columns else 1 }}" class="fw-semibold">{{ row.get('__group_title') }}</td>
           </tr>
           {% else %}
-          <tr>
             {% set meta = row.get('__meta') %}
+          <tr class="{% if meta and meta.is_group %}ca-group-row{% endif %}">
             {% for column in columns %}
             <td class="{% if column in right_align_columns %}text-end{% endif %}" {% if meta and meta.code %}data-code="{{ meta.code }}" data-parent="{{ meta.parent }}" data-level="{{ meta.level }}"{% endif %}>
-              {% if column == 'account_code' and meta and meta.drilldown_url and row.get(column) not in (None, '—', '') %}
-              <a href="{{ meta.drilldown_url }}">{{ row.get(column, "—") }}</a>
+              {% if column == 'account_code' and row.get(column) not in (None, '—', '') %}
+              <span class="ca-tree-label" style="padding-left: {{ ((meta.level if meta else 1) - 1) * 1.1 }}rem;">
+                {% if meta and meta.drilldown_url %}
+                <a href="{{ meta.drilldown_url }}">{{ row.get(column, "—") }}</a>
+                {% else %}
+                {{ row.get(column, "—") }}
+                {% endif %}
+              </span>
               {% elif column == 'document_no' and meta and meta.voucher_url and row.get(column) not in (None, '—', '') %}
               <a href="{{ meta.voucher_url }}">{{ row.get(column, "—") }}</a>
               {% else %}
@@ -188,7 +194,7 @@
       </div>
       {% endfor %}
       {% if is_balanced %}
-      <div class="ca-total-item ca-total-ok">✅ {{ _("Cuadrado") }}</div>
+      <div class="ca-total-item ca-total-ok">{{ _("Cuadrado") }}</div>
       {% endif %}
     </div>
   </section>
@@ -210,6 +216,8 @@
   .ca-total-value{text-align:right}
   .ca-total-ok{justify-content:center;font-weight:600;color:#198754}
   .ca-tree-toggle{cursor:pointer;font-weight:600}
+  .ca-group-row{background:rgba(13,110,253,.04)!important;font-weight:600}
+  .ca-tree-label{display:inline-flex;align-items:center;gap:.35rem}
   @media (max-width: 1100px){.ca-report-layout{flex-direction:column}.ca-report-filters{position:static;width:100%;max-height:none}}
 </style>
 

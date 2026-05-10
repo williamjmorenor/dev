@@ -1,5 +1,37 @@
 # SESSIONS
 
+## 2026-05-10 (mejora visual jerárquica en reportes financieros)
+
+### Peticion del usuario
+Priorizar la corrección de presentación visual para Balanza de Comprobación, Balance General y Estado de Resultado, manteniendo el backend común y tomando como referencia el árbol desplegable estilo ERPNext.
+
+### Plan implementado
+1. Mantener el motor de cálculo actual y ajustar solo el renderer/presentación.
+2. Construir jerarquía visual por cuenta contable con nodos expandibles/colapsables y subtotales por agrupador.
+3. Aplicar la jerarquía a Balanza, Balance y Estado de Resultado.
+4. Eliminar columna técnica `Level` de la vista tabular de Balanza.
+5. Validar con pruebas focalizadas y checks del workflow.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/reportes/__init__.py`:
+  - nuevo helper `_build_hierarchical_financial_rows` para derivar nodos padre por prefijos de cuenta y acumular subtotales.
+  - se integra el renderer jerárquico para `trial-balance`, `balance-sheet` e `income-statement`.
+  - se oculta columna `level` en `trial-balance` en la salida visual.
+  - metadatos de fila enriquecidos (`is_group`) para estilizar agrupadores.
+- `cacao_accounting/reportes/templates/reportes/financial_report.html`:
+  - indentación visual por nivel y resaltado de filas agrupadoras.
+  - se conserva comportamiento expandir/colapsar y se ajusta presentación de estado cuadrado (sin emoji).
+- `tests/test_08_reconciliation_reports.py`:
+  - nueva prueba `test_trial_balance_uses_tree_presentation_without_level_column`.
+
+### Verificacion ejecutada
+- `python -m build`
+- `python -m flake8 cacao_accounting/`
+- `python -m ruff check cacao_accounting/`
+- `python -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s tests/test_08_reconciliation_reports.py -k \"financial_reports_framework_uses_gl_and_supports_export or financial_report_view_persistence_and_column_selection or trial_balance_uses_tree_presentation_without_level_column\"`
+
 ## 2026-05-10 (normalización de clasificaciones plurales en reportes financieros)
 
 ### Peticion del usuario
