@@ -1,5 +1,10 @@
 # ESTADO ACTUAL DEL PROYECTO
 
+## Actualización incremental — 2026-05-10
+
+- Se corrigió la normalización de `Accounts.classification` en reportes financieros GL (`Estado de Resultado` y `Balance General`) para soportar alias en plural (`ingresos`, `gastos`, etc.) sin perder movimientos en resultados.
+- La cobertura de pruebas del framework financiero ahora valida explícitamente clasificaciones plurales creadas desde formularios contables.
+
 **Fecha de análisis:** 2026-05-07
 **Rama analizada:** `copilot/analyze-modules-and-create-docs`
 

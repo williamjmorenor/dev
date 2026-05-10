@@ -360,8 +360,8 @@ def test_financial_reports_framework_uses_gl_and_supports_export(app_ctx):
     accounts = [
         Accounts(entity="cacao", code="1.01.01", name="Caja", active=True, enabled=True, classification="Activo"),
         Accounts(entity="cacao", code="3.01.01", name="Capital", active=True, enabled=True, classification="Patrimonio"),
-        Accounts(entity="cacao", code="4.01.01", name="Ventas", active=True, enabled=True, classification="Ingreso"),
-        Accounts(entity="cacao", code="5.01.01", name="Gastos", active=True, enabled=True, classification="Gasto"),
+        Accounts(entity="cacao", code="4.01.01", name="Ventas", active=True, enabled=True, classification="Ingresos"),
+        Accounts(entity="cacao", code="5.01.01", name="Gastos", active=True, enabled=True, classification="Gastos"),
     ]
     database.session.add_all([period_apr, period_may, book, *accounts])
     database.session.flush()

@@ -1,5 +1,10 @@
 # PENDIENTE — Cacao Accounting
 
+## Actualización incremental — 2026-05-10
+
+- Sin nuevos pendientes derivados de esta iteración.
+- Se resolvió la compatibilidad de reportes financieros con clasificaciones de cuentas en plural (`Ingresos`/`Gastos`) en el cálculo de resultados.
+
 **Fecha de análisis:** 2026-05-06
 **Base:** definición de módulos en `modulos/` y estado actual del código.
 

@@ -1,5 +1,29 @@
 # SESSIONS
 
+## 2026-05-10 (normalización de clasificaciones plurales en reportes financieros)
+
+### Peticion del usuario
+Corregir error en reportes financieros para que cuentas creadas con clasificaciones en plural (por ejemplo `Ingresos` y `Gastos`) no queden excluidas del Estado de Resultado y del cálculo de utilidad del Balance General.
+
+### Plan implementado
+1. Normalizar alias de clasificación de cuentas en `reportes/services.py`.
+2. Reutilizar la normalización en Estado de Resultado y Balance General.
+3. Ajustar prueba del framework financiero para cubrir clasificaciones plurales.
+4. Ejecutar validación completa (flake8, ruff, mypy y pytest).
+
+### Resumen tecnico de cambios
+- `cacao_accounting/reportes/services.py`:
+  - nuevo helper `_normalize_account_classification` con soporte de alias plural ES/EN.
+  - uso del helper en `get_income_statement_report` y `get_balance_sheet_report`.
+- `tests/test_08_reconciliation_reports.py`:
+  - `test_financial_reports_framework_uses_gl_and_supports_export` ahora usa `Ingresos` y `Gastos` para validar compatibilidad.
+
+### Verificacion ejecutada
+- `python -m flake8 cacao_accounting/`
+- `python -m ruff check cacao_accounting/`
+- `python -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True`
+
 ## 2026-05-09 (framework base de reportes financieros)
 
 ### Peticion del usuario

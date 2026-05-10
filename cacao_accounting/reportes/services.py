@@ -141,6 +141,25 @@ def _decimal_value(value: Any) -> Decimal:
     return Decimal(str(value))
 
 
+def _normalize_account_classification(account: Accounts | None) -> str:
+    """Normaliza aliases de clasificaciones de cuentas para reportes financieros."""
+    raw_classification = (account.classification or "").strip().lower() if account else ""
+    aliases = {
+        "activos": "activo",
+        "pasivos": "pasivo",
+        "ingresos": "ingreso",
+        "costos": "costo",
+        "gastos": "gasto",
+        "assets": "asset",
+        "liabilities": "liability",
+        "equities": "equity",
+        "incomes": "income",
+        "costs": "cost",
+        "expenses": "expense",
+    }
+    return aliases.get(raw_classification, raw_classification)
+
+
 def _payment_allocations(reference_type: str, reference_id: str, as_of_date: date | None) -> Decimal:
     query = select(PaymentReference).filter_by(reference_type=reference_type, reference_id=reference_id)
     if as_of_date is not None:
@@ -603,7 +622,7 @@ def get_income_statement_report(filters: FinancialReportFilters) -> PaginatedRep
         "expense": Decimal("0"),
     }
     for entry, account in database.session.execute(base_query).all():
-        classification = (account.classification or "").lower() if account else ""
+        classification = _normalize_account_classification(account)
         debit = _decimal_value(entry.debit)
         credit = _decimal_value(entry.credit)
         if classification in {"ingreso", "income"}:
@@ -659,7 +678,7 @@ def get_balance_sheet_report(filters: FinancialReportFilters) -> PaginatedReport
     for entry, account in database.session.execute(base_query).all():
         if account is None:
             continue
-        classification = (account.classification or "").lower()
+        classification = _normalize_account_classification(account)
         debit = _decimal_value(entry.debit)
         credit = _decimal_value(entry.credit)
         if classification in {"activo", "asset"}:
