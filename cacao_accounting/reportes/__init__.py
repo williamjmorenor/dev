@@ -238,6 +238,10 @@ def _restore_filters_from_view(filters: FinancialReportFilters, report_code: str
     payload = preference.get("filters", {})
     if not isinstance(payload, dict):
         return filters
+    try:
+        page_size = max(int(payload.get("page_size") or filters.page_size), 1)
+    except (TypeError, ValueError):
+        page_size = max(filters.page_size, 1)
     return replace(
         filters,
         company=str(payload.get("company") or filters.company),
@@ -255,7 +259,7 @@ def _restore_filters_from_view(filters: FinancialReportFilters, report_code: str
         voucher_type=str(payload.get("voucher_type") or "") or None,
         status=str(payload.get("status") or filters.status or "submitted"),
         include_running_balance=str(payload.get("include_running_balance") or "").lower() in {"1", "true", "yes", "on"},
-        page_size=max(int(payload.get("page_size") or filters.page_size), 1),
+        page_size=page_size,
         sort_by=str(payload.get("sort_by") or filters.sort_by),
         sort_dir=str(payload.get("sort_dir") or filters.sort_dir),
         page=1,
@@ -343,7 +347,7 @@ def _resolve_company(company_code: str) -> str:
     return default_company or "cacao"
 
 
-def _build_drilldown_url(values: dict[str, object], company: str, ledger: str | None) -> str | None:
+def _build_drill_down_url(values: dict[str, object], company: str, ledger: str | None) -> str | None:
     account_code = values.get("account_code")
     if account_code in (None, "", _EMPTY_CELL_VALUE):
         return None
@@ -523,7 +527,7 @@ def _render_financial_report(
                 "parent": parent_code,
                 "has_children": bool(child_counts.get(account_code)),
                 "level": int(row.values.get("level") or account_code.count(".") + 1 if account_code else 0),
-                "drilldown_url": _build_drilldown_url(row.values, report_filters.company, report_filters.ledger),
+                "drilldown_url": _build_drill_down_url(row.values, report_filters.company, report_filters.ledger),
                 "voucher_url": _build_voucher_url(row.values),
             }
         )

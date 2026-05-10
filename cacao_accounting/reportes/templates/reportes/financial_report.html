@@ -247,8 +247,12 @@
       });
       if (!hasChildren) return;
       const text = cell.textContent || '';
-      cell.innerHTML = '<span class="ca-tree-toggle">▾</span> ' + text;
-      const toggle = cell.querySelector('.ca-tree-toggle');
+      cell.textContent = '';
+      const toggle = document.createElement('span');
+      toggle.className = 'ca-tree-toggle';
+      toggle.textContent = '▾';
+      cell.appendChild(toggle);
+      cell.appendChild(document.createTextNode(' ' + text));
       let collapsed = false;
       toggle.addEventListener('click', function (event) {
         event.preventDefault();

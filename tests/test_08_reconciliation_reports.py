@@ -526,6 +526,7 @@ def test_financial_reports_framework_uses_gl_and_supports_export(app_ctx):
     filters_sheet = workbook["Filtros"]
     filter_rows = [row for row in filters_sheet.iter_rows(min_row=2, max_col=2, values_only=True) if row[0]]
     assert any("Company" in str(row[0]) for row in filter_rows)
+    assert any(str(row[1]) == "cacao" for row in filter_rows)
 
 
 def test_financial_report_view_persistence_and_column_selection(app_ctx):
