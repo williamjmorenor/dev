@@ -1,5 +1,10 @@
 # ESTADO ACTUAL DEL PROYECTO
 
+## Actualización incremental — 2026-05-10
+
+- Se corrigió la normalización de `Accounts.classification` en reportes financieros GL (`Estado de Resultado` y `Balance General`) para soportar alias en plural (`ingresos`, `gastos`, etc.) sin perder movimientos en resultados.
+- La cobertura de pruebas del framework financiero ahora valida explícitamente clasificaciones plurales creadas desde formularios contables.
+
 **Fecha de análisis:** 2026-05-07
 **Rama analizada:** `copilot/analyze-modules-and-create-docs`
 
@@ -44,7 +49,7 @@ El sistema está diseñado con soporte nativo para:
 | Posting contable | `cacao_accounting/contabilidad/posting.py` | Servicio de contabilización GL, AR/AP, bancos e inventario |
 | Conciliación de Compras | `cacao_accounting/compras/purchase_reconciliation_service.py` | Motor de matching 2-way/3-way, eventos económicos, tolerancias configurables por compañía y panel operativo |
 | Conciliación bancaria | `cacao_accounting/bancos/reconciliation_service.py` | Servicio de matching parcial contra pagos y GL |
-| Reportes operativos | `cacao_accounting/reportes/` | Subledger, aging, Kardex y reconciliaciones |
+| Reportes contables y operativos | `cacao_accounting/reportes/` | Framework financiero base (Detalle Movimiento, Balanza, Estado de Resultado, Balance General) + reportes operativos |
 | Datos demo | `cacao_accounting/datos/` | Datos de carga inicial y desarrollo |
 | Pruebas | `tests/` | Suite de pruebas con pytest |
 
@@ -192,8 +197,12 @@ Rutas implementadas:
 Modelos en DB disponibles pero sin funcionalidad completa:
 `StockBalanceSnapshot`. `Batch` y `SerialNumber` ya tienen validación operativa básica; `StockLedgerEntry`, `StockBin` y `StockValuationLayer` ya están conectados para `StockEntry`, `PurchaseReceipt` y `DeliveryNote`, pero falta gestión visual completa de lotes/seriales y recalculo histórico avanzado.
 
-### `reportes` — Reportes operativos
+### `reportes` — Reportes contables y operativos
 - Blueprint global con rutas HTML:
+  - `/reports/account-movement`
+  - `/reports/trial-balance`
+  - `/reports/income-statement`
+  - `/reports/balance-sheet`
   - `/reports/subledger`
   - `/reports/aging`
   - `/reports/kardex`
@@ -208,7 +217,11 @@ Modelos en DB disponibles pero sin funcionalidad completa:
   - `/reports/batches`
   - `/reports/serials`
 - Servicios derivados desde GL/documentos, `PaymentReference`, `StockLedgerEntry` y reconciliaciones.
-- Estado actual: reportes operativos MVP con filtros básicos y totales; pendiente pulir UX, exportación y reportes financieros formales.
+- Estado actual:
+  - Reportes financieros base derivados del GL con filtros por compañía/libro/período, paginación server-side y exportación CSV/XLSX para Detalle de Movimiento.
+  - Layout ERP de reportes (panel lateral de filtros + panel derecho de resultados con sticky headers y scroll independiente).
+  - Reportes operativos MVP existentes se mantienen activos.
+  - Pendiente: profundizar jerarquías/drill-down universal, exportación avanzada para todos los reportes y endurecimiento de seguridad por compañía/libro a nivel de permisos.
 
 ### `document_flow` — Flujo Documental
 - Registro de relaciones entre documentos (`DocumentRelation`).
