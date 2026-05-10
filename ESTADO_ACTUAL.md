@@ -349,3 +349,20 @@ Modelos en DB disponibles pero sin funcionalidad completa:
   - panel superior de contexto
   - barra sticky de totales al pie
 - Validación ejecutada en verde: flake8, ruff, mypy, pytest completo.
+
+## Actualización 2026-05-10 — Backlog avanzado de reportes financieros
+
+- Vistas guardadas implementadas por usuario para los 4 reportes GL (save/apply/reset).
+- Selector de columnas funcional integrado en el panel de filtros y aplicado en render.
+- Agrupación dinámica (`group_by`) añadida en Detalle de Movimiento.
+- Jerarquías expandibles en tabla financiera habilitadas con árbol por `account_code`.
+- Drill-down implementado:
+  - cuenta → `account-movement`
+  - comprobante (cuando es journal/comprobante contable) → detalle de comprobante.
+- Exportación Excel avanzada implementada con:
+  - metadata (título, fecha, usuario),
+  - encabezados congelados,
+  - formato financiero de celdas exportadas,
+  - autoancho,
+  - hoja adicional `Filtros`.
+- Seguridad reforzada en rutas financieras GL con `@verifica_acceso("accounting")` y normalización de compañía válida.

@@ -65,6 +65,16 @@
     </div>
     <div class="p-3" x-show="!collapsed">
       <form method="get" class="d-grid gap-2">
+        <label class="form-label mb-0">
+          {{ _("Vista guardada") }}
+          <div class="d-flex gap-2">
+            <input name="saved_view" class="form-control" value="{{ saved_view }}">
+            <button class="btn btn-outline-secondary" type="submit" name="view_action" value="apply">{{ _("Cargar") }}</button>
+          </div>
+          {% if saved_views %}
+          <small class="text-muted">{{ _("Disponibles") }}: {{ saved_views|join(", ") }}</small>
+          {% endif %}
+        </label>
         {{ smart_select_field("Compañía", "company", "company", request.args.get('company', 'cacao'), "report-company") }}
         {{ smart_select_field("Libro contable", "ledger", "book", request.args.get('ledger', ''), "report-ledger", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
         {{ smart_select_field("Periodo contable", "accounting_period", "accounting_period", request.args.get('accounting_period', ''), "report-accounting-period", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
@@ -84,12 +94,34 @@
           {{ smart_select_field("Tercero", "party_id", "party", request.args.get('party_id', ''), "report-party-id", 1, {"company": {"selector": "#report-company"}, "party_type": {"selector": "#report-party-type"}}, ["#report-company", "#report-party-type"], ["company"]) }}
           {{ smart_select_field("Tipo de comprobante", "voucher_type", "voucher_type", request.args.get('voucher_type', ''), "report-voucher-type", 1, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
           {{ smart_select_field("Estado", "status", "report_status", request.args.get('status', 'submitted'), "report-status") }}
+          <label class="form-label mb-0">
+            {{ _("Agrupar por") }}
+            <select class="form-select" name="group_by">
+              <option value="">{{ _("Sin agrupación") }}</option>
+              <option value="account_code" {% if group_by == 'account_code' %}selected{% endif %}>{{ _("Cuenta") }}</option>
+              <option value="voucher_type" {% if group_by == 'voucher_type' %}selected{% endif %}>{{ _("Tipo de comprobante") }}</option>
+              <option value="document_no" {% if group_by == 'document_no' %}selected{% endif %}>{{ _("Comprobante") }}</option>
+              <option value="cost_center" {% if group_by == 'cost_center' %}selected{% endif %}>{{ _("Centro de costo") }}</option>
+              <option value="party_id" {% if group_by == 'party_id' %}selected{% endif %}>{{ _("Tercero") }}</option>
+              <option value="posting_date" {% if group_by == 'posting_date' %}selected{% endif %}>{{ _("Fecha") }}</option>
+              <option value="accounting_period" {% if group_by == 'accounting_period' %}selected{% endif %}>{{ _("Periodo") }}</option>
+            </select>
+          </label>
+          <div class="border rounded p-2">
+            <div class="fw-semibold mb-2">{{ _("Columnas visibles") }}</div>
+            {% for available in all_columns %}
+            <label class="form-check">
+              <input class="form-check-input" type="checkbox" name="visible_columns" value="{{ available }}" {% if available in selected_columns %}checked{% endif %}>
+              <span class="form-check-label">{{ display_headers.get(available, available) }}</span>
+            </label>
+            {% endfor %}
+          </div>
         </div>
         <div class="d-flex flex-wrap gap-2 mt-2">
           <button class="btn btn-primary" type="submit">{{ _("Aplicar filtros") }}</button>
           <a class="btn btn-outline-secondary" href="{{ request.path }}">{{ _("Limpiar filtros") }}</a>
-          <button class="btn btn-outline-secondary" type="button" disabled title="{{ _('Próximamente') }}">{{ _("Guardar vista") }}</button>
-          <button class="btn btn-outline-secondary" type="button" disabled title="{{ _('Próximamente') }}">{{ _("Columnas") }}</button>
+          <button class="btn btn-outline-secondary" type="submit" name="view_action" value="save">{{ _("Guardar vista") }}</button>
+          <button class="btn btn-outline-danger" type="submit" name="view_action" value="reset">{{ _("Eliminar vista") }}</button>
         </div>
       </form>
     </div>
@@ -122,11 +154,26 @@
         </thead>
         <tbody>
           {% for row in display_rows %}
+          {% if row.get('__row_type') == 'group' %}
+          <tr class="table-light">
+            <td colspan="{{ columns|length if columns else 1 }}" class="fw-semibold">{{ row.get('__group_title') }}</td>
+          </tr>
+          {% else %}
           <tr>
+            {% set meta = row.get('__meta') %}
             {% for column in columns %}
-            <td class="{% if column in right_align_columns %}text-end{% endif %}">{{ row.get(column, "—") }}</td>
+            <td class="{% if column in right_align_columns %}text-end{% endif %}" {% if meta and meta.code %}data-code="{{ meta.code }}" data-parent="{{ meta.parent }}" data-level="{{ meta.level }}"{% endif %}>
+              {% if column == 'account_code' and meta and meta.drilldown_url and row.get(column) not in (None, '—', '') %}
+              <a href="{{ meta.drilldown_url }}">{{ row.get(column, "—") }}</a>
+              {% elif column == 'document_no' and meta and meta.voucher_url and row.get(column) not in (None, '—', '') %}
+              <a href="{{ meta.voucher_url }}">{{ row.get(column, "—") }}</a>
+              {% else %}
+              {{ row.get(column, "—") }}
+              {% endif %}
+            </td>
             {% endfor %}
           </tr>
+          {% endif %}
           {% else %}
           <tr><td colspan="{{ columns|length if columns else 1 }}">{{ _("No hay registros para los filtros seleccionados.") }}</td></tr>
           {% endfor %}
@@ -162,7 +209,55 @@
   .ca-total-label{font-size:.75rem;color:var(--bs-secondary-color,#6c757d)}
   .ca-total-value{text-align:right}
   .ca-total-ok{justify-content:center;font-weight:600;color:#198754}
+  .ca-tree-toggle{cursor:pointer;font-weight:600}
   @media (max-width: 1100px){.ca-report-layout{flex-direction:column}.ca-report-filters{position:static;width:100%;max-height:none}}
 </style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const rows = Array.from(document.querySelectorAll('.ca-report-table tbody tr'));
+    const byCode = new Map();
+    rows.forEach(function (row) {
+      const cell = row.querySelector('td[data-code]');
+      if (!cell) return;
+      const code = cell.dataset.code || '';
+      const parent = cell.dataset.parent || '';
+      if (code) byCode.set(code, row);
+      if (parent) row.dataset.parentCode = parent;
+    });
+
+    function toggleChildren(code, hide) {
+      rows.forEach(function (row) {
+        if ((row.dataset.parentCode || '') !== code) return;
+        row.style.display = hide ? 'none' : '';
+        const childCell = row.querySelector('td[data-code]');
+        if (!childCell) return;
+        const childCode = childCell.dataset.code || '';
+        if (hide) toggleChildren(childCode, true);
+      });
+    }
+
+    rows.forEach(function (row) {
+      const cell = row.querySelector('td[data-code]');
+      if (!cell) return;
+      const code = cell.dataset.code || '';
+      if (!code) return;
+      const hasChildren = rows.some(function (candidate) {
+        return (candidate.dataset.parentCode || '') === code;
+      });
+      if (!hasChildren) return;
+      const text = cell.textContent || '';
+      cell.innerHTML = '<span class="ca-tree-toggle">▾</span> ' + text;
+      const toggle = cell.querySelector('.ca-tree-toggle');
+      let collapsed = false;
+      toggle.addEventListener('click', function (event) {
+        event.preventDefault();
+        collapsed = !collapsed;
+        toggle.textContent = collapsed ? '▸' : '▾';
+        toggleChildren(code, collapsed);
+      });
+    });
+  });
+</script>
 
 {% endblock %}

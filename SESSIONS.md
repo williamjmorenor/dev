@@ -1720,3 +1720,42 @@ Asegurar que los 4 reportes financieros (`/reports/account-movement`, `/reports/
   - `tests/test_08_reconciliation_reports.py::test_financial_reports_framework_uses_gl_and_supports_export`
   - `tests/test_09_journal_entry_form.py::test_search_select_supports_journal_doctypes_and_filters`
   - `tests/test_10_smart_select_js.py`
+
+## 2026-05-10 (completar backlog de reportes financieros solicitado en PR)
+
+### Petición del usuario
+Completar capacidades pendientes del framework de reportes: vistas guardadas, selector de columnas funcional, agrupación/jerarquías, drill-down universal, exportación Excel avanzada y refuerzo de seguridad por compañía/libro.
+
+### Plan implementado
+1. Implementar persistencia de vistas por usuario reutilizando `UserFormPreference`.
+2. Activar selector de columnas en formulario de filtros y aplicar columnas visibles en render.
+3. Añadir agrupación dinámica (`group_by`) en detalle de movimiento y jerarquía expandible en tabla de reportes financieros.
+4. Agregar drill-down a cuenta (hacia account movement) y a comprobante (cuando aplica).
+5. Mejorar exportación XLSX con metadata + hoja “Filtros” + ancho automático + headers congelados.
+6. Reforzar control de acceso con `@verifica_acceso("accounting")` en rutas financieras y normalización de compañía.
+
+### Resumen técnico de cambios
+- `cacao_accounting/reportes/__init__.py`
+  - Vistas guardadas: `saved_view`, `view_action` (save/apply/reset), carga/listado de vistas por usuario.
+  - Selector funcional de columnas (`visible_columns`) aplicado al render.
+  - Agrupación dinámica en account movement (`group_by`).
+  - Drill-down URLs por cuenta/comprobante en filas renderizadas.
+  - Exportación XLSX avanzada con título, fecha, usuario, formato financiero, auto-width, freeze panes y hoja `Filtros`.
+  - Seguridad: rutas financieras GL con `@verifica_acceso("accounting")` y validación de compañía existente.
+- `cacao_accounting/reportes/services.py`
+  - `income_statement` ahora devuelve desglose por cuenta y nivel para permitir jerarquías expandibles reales.
+- `cacao_accounting/reportes/templates/reportes/financial_report.html`
+  - UI de vistas guardadas.
+  - Selector funcional de columnas.
+  - Selector de agrupación.
+  - Enlaces de drill-down y comportamiento expand/collapse en jerarquías.
+- `tests/test_08_reconciliation_reports.py`
+  - Validación de exportación XLSX avanzada (hoja Filtros + freeze panes).
+  - Validación de persistencia de vistas en reportes financieros.
+
+### Verificación ejecutada
+- `python -m build`
+- `python -m flake8 cacao_accounting/`
+- `python -m ruff check cacao_accounting/`
+- `python -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True`
