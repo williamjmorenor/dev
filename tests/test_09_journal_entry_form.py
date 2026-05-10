@@ -697,6 +697,7 @@ def test_search_select_supports_journal_doctypes_and_filters(app_ctx):
         client.get("/api/search-select?doctype=accounting_period&q=2026&company=cacao").json["results"][0]["value"]
         == "2026-05"
     )
+    assert client.get("/api/search-select?doctype=report_status&q=conta").json["results"][0]["value"] == "submitted"
     assert client.get("/api/search-select?doctype=book&q=Fiscal&bad_filter=x").status_code == 400
 
 

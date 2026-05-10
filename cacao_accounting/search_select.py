@@ -32,6 +32,9 @@ from cacao_accounting.database import (
 
 _DEDUP_QUERY_LIMIT_MULTIPLIER = 5
 _DEDUP_QUERY_LIMIT_MIN = 25
+_STATIC_SEARCH_SELECT_OPTIONS: dict[str, tuple[tuple[str, str], ...]] = {
+    "report_status": (("submitted", "Contabilizado"), ("cancelled", "Cancelado")),
+}
 
 
 class SearchSelectError(ValueError):
@@ -296,6 +299,11 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
 
 def search_select(doctype: str, query: str, filters: dict[str, list[str]], limit: int | None = None) -> dict[str, Any]:
     """Busca opciones para un doctype registrado y devuelve un payload uniforme."""
+    if doctype in _STATIC_SEARCH_SELECT_OPTIONS:
+        if filters:
+            raise SearchSelectError("Filtros no permitidos para este tipo de seleccion.")
+        return _search_static_options(doctype=doctype, query=query, limit=limit)
+
     spec = SEARCH_SELECT_REGISTRY.get(doctype)
     if spec is None:
         raise SearchSelectError("Tipo de seleccion no registrado.", 404)
@@ -328,6 +336,29 @@ def search_select(doctype: str, query: str, filters: dict[str, list[str]], limit
         "query": normalized_query,
         "results": visible_rows,
         "has_more": len(serialized_results) > max_results,
+    }
+
+
+def _search_static_options(doctype: str, query: str, limit: int | None) -> dict[str, Any]:
+    normalized_query = query.strip().lower()
+    max_results = _normalize_limit(limit, default_limit=20)
+    options = _STATIC_SEARCH_SELECT_OPTIONS.get(doctype, ())
+    filtered = [
+        {
+            "id": value,
+            "value": value,
+            "label": label,
+            "display_name": label,
+        }
+        for value, label in options
+        if not normalized_query or normalized_query in value.lower() or normalized_query in label.lower()
+    ]
+    visible_rows = filtered[:max_results]
+    return {
+        "doctype": doctype,
+        "query": query.strip(),
+        "results": visible_rows,
+        "has_more": len(filtered) > max_results,
     }
 
 

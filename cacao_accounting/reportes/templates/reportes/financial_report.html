@@ -83,13 +83,7 @@
           {{ smart_select_field("Tipo de tercero", "party_type", "party_type", request.args.get('party_type', ''), "report-party-type") }}
           {{ smart_select_field("Tercero", "party_id", "party", request.args.get('party_id', ''), "report-party-id", 1, {"company": {"selector": "#report-company"}, "party_type": {"selector": "#report-party-type"}}, ["#report-company", "#report-party-type"], ["company"]) }}
           {{ smart_select_field("Tipo de comprobante", "voucher_type", "voucher_type", request.args.get('voucher_type', ''), "report-voucher-type", 1, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
-          <label class="form-label mb-0">
-            {{ _("Estado") }}
-            <select name="status" class="form-select">
-              <option value="submitted" {% if request.args.get('status', 'submitted') == 'submitted' %}selected{% endif %}>{{ _("Contabilizado") }}</option>
-              <option value="cancelled" {% if request.args.get('status') == 'cancelled' %}selected{% endif %}>{{ _("Cancelado") }}</option>
-            </select>
-          </label>
+          {{ smart_select_field("Estado", "status", "report_status", request.args.get('status', 'submitted'), "report-status") }}
         </div>
         <div class="d-flex flex-wrap gap-2 mt-2">
           <button class="btn btn-primary" type="submit">{{ _("Aplicar filtros") }}</button>
