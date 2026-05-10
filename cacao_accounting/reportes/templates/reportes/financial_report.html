@@ -216,13 +216,11 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const rows = Array.from(document.querySelectorAll('.ca-report-table tbody tr'));
-    const byCode = new Map();
     rows.forEach(function (row) {
       const cell = row.querySelector('td[data-code]');
       if (!cell) return;
       const code = cell.dataset.code || '';
       const parent = cell.dataset.parent || '';
-      if (code) byCode.set(code, row);
       if (parent) row.dataset.parentCode = parent;
     });
 

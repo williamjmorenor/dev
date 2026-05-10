@@ -623,11 +623,11 @@ def get_income_statement_report(filters: FinancialReportFilters) -> PaginatedRep
     }
     account_summary: dict[str, dict[str, Any]] = {}
     for entry, account in database.session.execute(base_query).all():
+        if account is None:
+            continue
         classification = _normalize_account_classification(account)
         debit = _decimal_value(entry.debit)
         credit = _decimal_value(entry.credit)
-        if account is None:
-            continue
         account_code = account.code or (entry.account_code or "")
         account_name = account.name
         account_bucket = account_summary.setdefault(
