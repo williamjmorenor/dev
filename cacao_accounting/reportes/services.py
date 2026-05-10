@@ -621,25 +621,75 @@ def get_income_statement_report(filters: FinancialReportFilters) -> PaginatedRep
         "cost": Decimal("0"),
         "expense": Decimal("0"),
     }
+    account_summary: dict[str, dict[str, Any]] = {}
     for entry, account in database.session.execute(base_query).all():
+        if account is None:
+            continue
         classification = _normalize_account_classification(account)
         debit = _decimal_value(entry.debit)
         credit = _decimal_value(entry.credit)
+        account_code = account.code or (entry.account_code or "")
+        account_name = account.name
+        account_bucket = account_summary.setdefault(
+            account_code,
+            {
+                "account_code": account_code,
+                "account_name": account_name,
+                "section": None,
+                "amount": Decimal("0"),
+                "level": account_code.count(".") + 1 if account_code else 1,
+            },
+        )
         if classification in {"ingreso", "income"}:
-            summary["income"] += credit - debit
+            amount = credit - debit
+            summary["income"] += amount
+            account_bucket["section"] = "income"
+            account_bucket["amount"] += amount
         elif classification in {"costo", "cost"}:
-            summary["cost"] += debit - credit
+            amount = debit - credit
+            summary["cost"] += amount
+            account_bucket["section"] = "cost"
+            account_bucket["amount"] += amount
         elif classification in {"gasto", "expense"}:
-            summary["expense"] += debit - credit
+            amount = debit - credit
+            summary["expense"] += amount
+            account_bucket["section"] = "expense"
+            account_bucket["amount"] += amount
     gross_profit = summary["income"] - summary["cost"]
     operating_profit = gross_profit - summary["expense"]
-    rows = [
-        ReportRow({"section": "income", "amount": summary["income"]}),
-        ReportRow({"section": "cost", "amount": -summary["cost"]}),
-        ReportRow({"section": "gross_profit", "amount": gross_profit}),
-        ReportRow({"section": "expense", "amount": -summary["expense"]}),
-        ReportRow({"section": "net_profit", "amount": operating_profit}),
-    ]
+    rows: list[ReportRow] = []
+    for section in ("income", "cost", "expense"):
+        section_amount = summary[section]
+        rows.append(
+            ReportRow({"section": section, "account_code": None, "account_name": None, "amount": section_amount, "level": 0})
+        )
+        section_rows = [
+            row
+            for row in account_summary.values()
+            if row.get("section") == section and _decimal_value(row.get("amount")) != Decimal("0")
+        ]
+        for values in sorted(section_rows, key=lambda item: str(item["account_code"])):
+            rows.append(
+                ReportRow(
+                    {
+                        "section": section,
+                        "account_code": values["account_code"],
+                        "account_name": values["account_name"],
+                        "amount": values["amount"],
+                        "level": values["level"],
+                    }
+                )
+            )
+    rows.extend(
+        [
+            ReportRow(
+                {"section": "gross_profit", "account_code": None, "account_name": None, "amount": gross_profit, "level": 0}
+            ),
+            ReportRow(
+                {"section": "net_profit", "account_code": None, "account_name": None, "amount": operating_profit, "level": 0}
+            ),
+        ]
+    )
     return PaginatedReport(
         rows=rows,
         totals={
@@ -649,7 +699,7 @@ def get_income_statement_report(filters: FinancialReportFilters) -> PaginatedRep
             "gross_profit": gross_profit,
             "net_profit": operating_profit,
         },
-        columns=["section", "amount"],
+        columns=["section", "account_code", "account_name", "amount", "level"],
         total_rows=len(rows),
         page=1,
         page_size=len(rows),

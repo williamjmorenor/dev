@@ -1,4 +1,50 @@
 {% extends "base.html" %}
+{# smart_select_field: label, name, doctype, value, field_id, min_chars, filters(dict), filter_sources(list), required_filters(list) #}
+{% macro smart_select_field(label, name, doctype, value='', field_id='', min_chars=1, filters=None, filter_sources=None, required_filters=None) -%}
+<label class="form-label mb-0">
+  {{ _(label) }}
+  <div class="ca-smart-select" x-data='smartSelect({
+      doctype: {{ doctype|tojson }},
+      name: {{ name|tojson }},
+      minChars: {{ min_chars }},
+      preload: true,
+      preloadOnFocus: true,
+      loadOnFilterChange: true,
+      initialValue: {{ value|tojson }},
+      initialLabel: {{ value|tojson }},
+      filters: {{ (filters or {})|tojson }},
+      filterSources: {{ (filter_sources or [])|tojson }},
+      requiredFilters: {{ (required_filters or [])|tojson }},
+      messages: {
+        placeholder: {{ _("Buscar...")|tojson }},
+        loading: {{ _("Buscando...")|tojson }},
+        noResults: {{ _("Sin resultados")|tojson }},
+        minChars: {{ _("Escriba para buscar")|tojson }},
+        clear: {{ _("Limpiar")|tojson }},
+        invalid: {{ _("Seleccione una opción válida")|tojson }},
+        error: {{ _("No se pudo buscar")|tojson }}
+      }
+    })'>
+    <input type="hidden" id="{{ field_id or name }}" name="{{ name }}" x-model="selectedValue">
+    <div class="ca-smart-select-input-wrap">
+      <input class="form-control ca-smart-select-input" type="text" x-model="search" @input="onInput" @focus="onFocus"
+        @blur="closeSoon" :placeholder="messages.placeholder">
+      <button class="ca-smart-select-clear" type="button" x-show="selectedValue" @click="clearSelection"
+        :title="messages.clear">×</button>
+    </div>
+    <div class="ca-smart-select-menu" x-show="open" x-cloak>
+      <div class="ca-smart-select-state" x-show="loading" x-text="messages.loading"></div>
+      <template x-for="option in options" :key="option.value">
+        <button class="ca-smart-select-option" type="button" @mousedown.prevent="selectOption(option)">
+          <span x-text="option.display_name"></span>
+        </button>
+      </template>
+      <div class="ca-smart-select-state" x-show="!loading && !options.length" x-text="messages.noResults"></div>
+      <div class="ca-smart-select-state text-danger" x-show="error" x-text="error"></div>
+    </div>
+  </div>
+</label>
+{%- endmacro %}
 {% block contenido %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb lh-sm">
@@ -8,7 +54,7 @@
   </ol>
 </nav>
 
-<div x-data="{ collapsed: false }" class="ca-report-layout">
+<div x-data="{ collapsed: false, advanced: false }" class="ca-report-layout">
   <aside class="ca-report-filters ca-card" :class="{ 'ca-report-filters-collapsed': collapsed }">
     <div class="ca-card-header d-flex justify-content-between align-items-center">
       <h5 class="ca-card-title mb-0">{{ _("Filtros") }}</h5>
@@ -20,83 +66,63 @@
     <div class="p-3" x-show="!collapsed">
       <form method="get" class="d-grid gap-2">
         <label class="form-label mb-0">
-          {{ _("Compañía") }}
-          <input name="company" class="form-control" value="{{ request.args.get('company', 'cacao') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Libro contable") }}
-          <input name="ledger" class="form-control" value="{{ request.args.get('ledger', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Periodo contable") }}
-          <input name="accounting_period" class="form-control" placeholder="2026-05" value="{{ request.args.get('accounting_period', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("ID visible del comprobante") }}
-          <input name="voucher_number" class="form-control" value="{{ request.args.get('voucher_number', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Cuenta contable") }}
-          <input name="account_code" class="form-control" value="{{ request.args.get('account_code', '') }}">
-        </label>
-        <div class="row g-2">
-          <div class="col-6">
-            <label class="form-label mb-0">
-              {{ _("Rango cuenta desde") }}
-              <input name="account_from" class="form-control" value="{{ request.args.get('account_from', '') }}">
-            </label>
+          {{ _("Vista guardada") }}
+          <div class="d-flex gap-2">
+            <input name="saved_view" class="form-control" value="{{ saved_view }}">
+            <button class="btn btn-outline-secondary" type="submit" name="view_action" value="apply">{{ _("Cargar") }}</button>
           </div>
-          <div class="col-6">
-            <label class="form-label mb-0">
-              {{ _("Rango cuenta hasta") }}
-              <input name="account_to" class="form-control" value="{{ request.args.get('account_to', '') }}">
+          {% if saved_views %}
+          <small class="text-muted">{{ _("Disponibles") }}: {{ saved_views|join(", ") }}</small>
+          {% endif %}
+        </label>
+        {{ smart_select_field("Compañía", "company", "company", request.args.get('company', 'cacao'), "report-company") }}
+        {{ smart_select_field("Libro contable", "ledger", "book", request.args.get('ledger', ''), "report-ledger", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+        {{ smart_select_field("Periodo contable", "accounting_period", "accounting_period", request.args.get('accounting_period', ''), "report-accounting-period", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+        {{ smart_select_field("ID visible del comprobante", "voucher_number", "document_no", request.args.get('voucher_number', ''), "report-voucher-number", 1, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
+        {{ smart_select_field("Cuenta contable", "account_code", "account_code", request.args.get('account_code', ''), "report-account-code", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+        <button class="btn btn-link text-start p-0 mt-1" type="button" @click="advanced = !advanced">
+          <span x-show="!advanced">{{ _("Mostrar filtros avanzados") }}</span>
+          <span x-show="advanced">{{ _("Ocultar filtros avanzados") }}</span>
+        </button>
+        <div class="d-grid gap-2" x-show="advanced">
+          {{ smart_select_field("Rango cuenta desde", "account_from", "account_code", request.args.get('account_from', ''), "report-account-from", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Rango cuenta hasta", "account_to", "account_code", request.args.get('account_to', ''), "report-account-to", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Centro de costos", "cost_center_code", "cost_center", request.args.get('cost_center_code', ''), "report-cost-center", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Unidad de negocio", "unit_code", "unit", request.args.get('unit_code', ''), "report-unit", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Proyecto", "project_code", "project", request.args.get('project_code', ''), "report-project", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Tipo de tercero", "party_type", "party_type", request.args.get('party_type', ''), "report-party-type") }}
+          {{ smart_select_field("Tercero", "party_id", "party", request.args.get('party_id', ''), "report-party-id", 1, {"company": {"selector": "#report-company"}, "party_type": {"selector": "#report-party-type"}}, ["#report-company", "#report-party-type"], ["company"]) }}
+          {{ smart_select_field("Tipo de comprobante", "voucher_type", "voucher_type", request.args.get('voucher_type', ''), "report-voucher-type", 1, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
+          {{ smart_select_field("Estado", "status", "report_status", request.args.get('status', 'submitted'), "report-status") }}
+          <label class="form-label mb-0">
+            {{ _("Agrupar por") }}
+            <select class="form-select" name="group_by">
+              <option value="">{{ _("Sin agrupación") }}</option>
+              <option value="account_code" {% if group_by == 'account_code' %}selected{% endif %}>{{ _("Cuenta") }}</option>
+              <option value="voucher_type" {% if group_by == 'voucher_type' %}selected{% endif %}>{{ _("Tipo de comprobante") }}</option>
+              <option value="document_no" {% if group_by == 'document_no' %}selected{% endif %}>{{ _("Comprobante") }}</option>
+              <option value="cost_center" {% if group_by == 'cost_center' %}selected{% endif %}>{{ _("Centro de costo") }}</option>
+              <option value="party_id" {% if group_by == 'party_id' %}selected{% endif %}>{{ _("Tercero") }}</option>
+              <option value="posting_date" {% if group_by == 'posting_date' %}selected{% endif %}>{{ _("Fecha") }}</option>
+              <option value="accounting_period" {% if group_by == 'accounting_period' %}selected{% endif %}>{{ _("Periodo") }}</option>
+            </select>
+          </label>
+          <div class="border rounded p-2">
+            <div class="fw-semibold mb-2">{{ _("Columnas visibles") }}</div>
+            {% for available in all_columns %}
+            <label class="form-check">
+              <input class="form-check-input" type="checkbox" name="visible_columns" value="{{ available }}" {% if available in selected_columns %}checked{% endif %}>
+              <span class="form-check-label">{{ display_headers.get(available, available) }}</span>
             </label>
+            {% endfor %}
           </div>
         </div>
-        <label class="form-label mb-0">
-          {{ _("Centro de costos") }}
-          <input name="cost_center_code" class="form-control" value="{{ request.args.get('cost_center_code', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Unidad de negocio") }}
-          <input name="unit_code" class="form-control" value="{{ request.args.get('unit_code', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Proyecto") }}
-          <input name="project_code" class="form-control" value="{{ request.args.get('project_code', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Tipo de tercero") }}
-          <input name="party_type" class="form-control" value="{{ request.args.get('party_type', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Tercero") }}
-          <input name="party_id" class="form-control" value="{{ request.args.get('party_id', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Tipo de comprobante") }}
-          <input name="voucher_type" class="form-control" value="{{ request.args.get('voucher_type', '') }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Estado") }}
-          <select name="status" class="form-select">
-            <option value="submitted" {% if request.args.get('status', 'submitted') == 'submitted' %}selected{% endif %}>{{ _("Contabilizado") }}</option>
-            <option value="cancelled" {% if request.args.get('status') == 'cancelled' %}selected{% endif %}>{{ _("Cancelado") }}</option>
-          </select>
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Página") }}
-          <input type="number" min="1" name="page" class="form-control" value="{{ request.args.get('page', page) }}">
-        </label>
-        <label class="form-label mb-0">
-          {{ _("Tamaño de página") }}
-          <input type="number" min="1" name="page_size" class="form-control" value="{{ request.args.get('page_size', page_size or 100) }}">
-        </label>
-        <label class="form-check mt-2">
-          <input class="form-check-input" type="checkbox" name="include_running_balance" value="1" {% if request.args.get('include_running_balance') in ('1', 'true', 'yes', 'on') %}checked{% endif %}>
-          <span class="form-check-label">{{ _("Mostrar balance acumulado") }}</span>
-        </label>
-        <button class="btn btn-primary mt-2" type="submit">{{ _("Aplicar filtros") }}</button>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <button class="btn btn-primary" type="submit">{{ _("Aplicar filtros") }}</button>
+          <a class="btn btn-outline-secondary" href="{{ request.path }}">{{ _("Limpiar filtros") }}</a>
+          <button class="btn btn-outline-secondary" type="submit" name="view_action" value="save">{{ _("Guardar vista") }}</button>
+          <button class="btn btn-outline-danger" type="submit" name="view_action" value="reset">{{ _("Eliminar vista") }}</button>
+        </div>
       </form>
     </div>
   </aside>
@@ -109,8 +135,12 @@
         <a class="btn btn-sm btn-outline-secondary" href="{{ request.path }}?{{ request.query_string.decode() }}{% if request.query_string %}&{% endif %}export=csv">{{ _("Exportar CSV") }}</a>
       </div>
     </div>
-    <div class="p-3 small text-muted">
-      {{ _("Registros totales") }}: {{ total_rows }}{% if ledger_currency %} · {{ _("Moneda") }}: {{ ledger_currency }}{% endif %}
+    <div class="ca-report-context">
+      <div><strong>{{ _("Compañía") }}:</strong> {{ context_summary.company }}</div>
+      <div><strong>{{ _("Libro") }}:</strong> {{ context_summary.ledger }}</div>
+      <div><strong>{{ _("Periodo") }}:</strong> {{ context_summary.period }}</div>
+      <div><strong>{{ _("Estado") }}:</strong> {{ context_summary.status }}</div>
+      <div><strong>{{ _("Registros") }}:</strong> {{ context_summary.records }}</div>
     </div>
     <div class="ca-report-table-wrapper">
       <table class="ca-table ca-report-table">
@@ -118,40 +148,118 @@
         <thead>
           <tr>
             {% for column in columns %}
-            <th scope="col">{{ column }}</th>
+            <th scope="col" class="{% if column in right_align_columns %}text-end{% endif %}">{{ display_headers.get(column, column) }}</th>
             {% endfor %}
           </tr>
         </thead>
         <tbody>
-          {% for row in rows %}
+          {% for row in display_rows %}
+          {% if row.get('__row_type') == 'group' %}
+          <tr class="table-light">
+            <td colspan="{{ columns|length if columns else 1 }}" class="fw-semibold">{{ row.get('__group_title') }}</td>
+          </tr>
+          {% else %}
           <tr>
+            {% set meta = row.get('__meta') %}
             {% for column in columns %}
-            <td>{{ row.values.get(column, '—') }}</td>
+            <td class="{% if column in right_align_columns %}text-end{% endif %}" {% if meta and meta.code %}data-code="{{ meta.code }}" data-parent="{{ meta.parent }}" data-level="{{ meta.level }}"{% endif %}>
+              {% if column == 'account_code' and meta and meta.drilldown_url and row.get(column) not in (None, '—', '') %}
+              <a href="{{ meta.drilldown_url }}">{{ row.get(column, "—") }}</a>
+              {% elif column == 'document_no' and meta and meta.voucher_url and row.get(column) not in (None, '—', '') %}
+              <a href="{{ meta.voucher_url }}">{{ row.get(column, "—") }}</a>
+              {% else %}
+              {{ row.get(column, "—") }}
+              {% endif %}
+            </td>
             {% endfor %}
           </tr>
+          {% endif %}
           {% else %}
           <tr><td colspan="{{ columns|length if columns else 1 }}">{{ _("No hay registros para los filtros seleccionados.") }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <div class="p-3 border-top d-flex flex-wrap gap-2">
+    <div class="ca-report-totals-sticky">
       {% for key, value in totals.items() %}
-      <span class="badge bg-secondary">{{ key }}: {{ value }}</span>
+      <div class="ca-total-item">
+        <span class="ca-total-label">{{ _(key.replace("_", " ").title()) }}</span>
+        <strong class="ca-total-value">{{ value }}</strong>
+      </div>
       {% endfor %}
+      {% if is_balanced %}
+      <div class="ca-total-item ca-total-ok">✅ {{ _("Cuadrado") }}</div>
+      {% endif %}
     </div>
   </section>
 </div>
 
 <style>
   .ca-report-layout{display:flex;gap:1rem;min-height:70vh}
-  .ca-report-filters{width:320px;position:sticky;top:88px;align-self:flex-start;max-height:calc(100vh - 110px);overflow-y:auto;flex-shrink:0}
+  .ca-report-filters{width:340px;position:sticky;top:88px;align-self:flex-start;max-height:calc(100vh - 110px);overflow-y:auto;flex-shrink:0}
   .ca-report-filters-collapsed{width:auto}
   .ca-report-results{flex:1;min-width:0;display:flex;flex-direction:column}
-  .ca-report-table-wrapper{overflow:auto;max-height:calc(100vh - 260px)}
+  .ca-report-context{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.5rem;padding:.75rem 1rem;background:var(--ca-bg-soft,#f8f9fa);border-bottom:1px solid var(--ca-border,#dee2e6)}
+  .ca-report-table-wrapper{overflow:auto;max-height:calc(100vh - 330px)}
   .ca-report-table thead th{position:sticky;top:0;z-index:2;white-space:nowrap}
   .ca-report-table td,.ca-report-table th{white-space:nowrap}
+  .ca-report-table tbody tr:nth-child(even){background-color:rgba(0,0,0,.02)}
+  .ca-report-totals-sticky{position:sticky;bottom:0;display:flex;gap:.5rem;flex-wrap:wrap;padding:.75rem 1rem;border-top:1px solid var(--ca-border,#dee2e6);background:var(--ca-bg,#fff)}
+  .ca-total-item{display:flex;flex-direction:column;min-width:180px}
+  .ca-total-label{font-size:.75rem;color:var(--bs-secondary-color,#6c757d)}
+  .ca-total-value{text-align:right}
+  .ca-total-ok{justify-content:center;font-weight:600;color:#198754}
+  .ca-tree-toggle{cursor:pointer;font-weight:600}
   @media (max-width: 1100px){.ca-report-layout{flex-direction:column}.ca-report-filters{position:static;width:100%;max-height:none}}
 </style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const rows = Array.from(document.querySelectorAll('.ca-report-table tbody tr'));
+    rows.forEach(function (row) {
+      const cell = row.querySelector('td[data-code]');
+      if (!cell) return;
+      const code = cell.dataset.code || '';
+      const parent = cell.dataset.parent || '';
+      if (parent) row.dataset.parentCode = parent;
+    });
+
+    function toggleChildren(code, hide) {
+      rows.forEach(function (row) {
+        if ((row.dataset.parentCode || '') !== code) return;
+        row.style.display = hide ? 'none' : '';
+        const childCell = row.querySelector('td[data-code]');
+        if (!childCell) return;
+        const childCode = childCell.dataset.code || '';
+        if (hide) toggleChildren(childCode, true);
+      });
+    }
+
+    rows.forEach(function (row) {
+      const cell = row.querySelector('td[data-code]');
+      if (!cell) return;
+      const code = cell.dataset.code || '';
+      if (!code) return;
+      const hasChildren = rows.some(function (candidate) {
+        return (candidate.dataset.parentCode || '') === code;
+      });
+      if (!hasChildren) return;
+      const text = cell.textContent || '';
+      cell.textContent = '';
+      const toggle = document.createElement('span');
+      toggle.className = 'ca-tree-toggle';
+      toggle.textContent = '▾';
+      cell.appendChild(toggle);
+      cell.appendChild(document.createTextNode(' ' + text));
+      let collapsed = false;
+      toggle.addEventListener('click', function (event) {
+        event.preventDefault();
+        collapsed = !collapsed;
+        toggle.textContent = collapsed ? '▸' : '▾';
+        toggleChildren(code, collapsed);
+      });
+    });
+  });
+</script>
 
 {% endblock %}

@@ -541,3 +541,19 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [x] Agregar y ejecutar pruebas unitarias JS de `smart-select` para cubrir regressions del issue.
 - [x] Hacer que `preloadOptions()` / `fetchOptions()` retornen promesas para poder validarlas de forma determinista en pruebas.
 - [x] Mantener disponibles las opciones pre-cargadas después del auto-select de una opción default.
+
+## Pendiente (iteración 2026-05-10 — reportes financieros)
+
+- [ ] Implementar persistencia real de vistas guardadas (filtros/columnas/orden/agrupaciones por usuario).
+- [ ] Implementar selector funcional de columnas (actualmente botón placeholder en UI).
+- [ ] Implementar agrupación dinámica y jerarquías expandibles reales para Balanza, Estado de Resultado y Balance General.
+- [ ] Completar drill-down universal (cuenta → movimiento → comprobante) con validación de permisos.
+- [ ] Mejorar exportación avanzada de Excel (hoja de filtros, formato monetario por columna, auto ancho, metadata de usuario/fecha).
+- [ ] Reforzar seguridad de reportes por compañía/libro en filtros, exportación y drill-down.
+
+## Pendiente tras iteración 2026-05-10 (reportes financieros)
+
+- [ ] Endurecer autorización por compañía/libro con matriz explícita usuario↔compañía/libro (modelo dedicado; hoy se reforzó acceso de módulo y validación de compañía/ledger).
+- [ ] Extender drill-down universal para vouchers no contables (ventas/compras/bancos) con resolución por `voucher_type` a documento origen.
+- [ ] Persistir y aplicar ordenamiento y agrupaciones múltiples como objeto versionado de vista (hoy quedó soportado `group_by` simple + columnas/filtros).
+- [ ] Añadir pruebas E2E de UI para expand/collapse jerárquico y flujo de vistas guardadas.

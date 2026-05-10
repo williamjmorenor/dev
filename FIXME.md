@@ -19,23 +19,71 @@ Al finalizar cada iteración actualiza:
 
 Issues actuales que deben corregirse:
 
-- URL: /accounting/accounts y /accounting/costs_center
-  La opción de expandir o colapsar solo se esta aplicando a cuentas y centros de costos de primer nivel. La logica debe ser para expandir o colapsar si la cuenta o centro de costos es tipo parent y tiene hijos asociados. Si cumple esa caracteristica debe de poder expandirse y colapsarse.
+## Todos los reportes no debería mostrar información al cargar, unicamente mostrar información al Aplicar Fistros
 
-  Pendiente opción de expandir / colapsar todos.
-  
-- URL: /accounting/book/list
-  Al crear una compañia el libro contable por defecto llamarlo Local y no Fiscal
-  
-- URL: /accounting/journal/new
-  En el selector de compañia dado que el principal campo actualizar cacao_accounting/static/js/smart-select.js para aceptar x-data-preload para cargar la lista de entidades antes que el usuario comienze a escribir, es decir cuando el usuario se ubica en el campo ya estan precargadas las compañias y puede comenzar a escribir o seleccionar una compañia de la lista.
+# /reports/account-movement
 
-  En el selector de secuencia dado que la secuencia tiene un valor predeterminado actualizar cacao_accounting/static/js/smart-select.js para que si existe un campo predeterminado llenar el campo con el valor predeterminado, otros casos de uso a crear un Nuevo Cliente llenar la cuenta por cobrar por defecto o crear un nuevo proveedor llenar la cuenta por cobrar por defecto.
-  
-- He intentado llenar un comprobante de prueba pero no me permite grabar porque hay campos requeridos sin llenar pero no me indica cuales
-  <img width="1702" height="787" alt="image" src="https://github.com/user-attachments/assets/d9aedacc-d6e4-4b68-afef-f03858c09dfe" />
+## La función de guardar vista esta genial pero puede mejorarse:
 
-- En el modal para ingresar información adicional en una linea de un comprobante ningun campo funciona y en cuenta esta mostrando el id interno de el registro
-  <img width="1902" height="913" alt="image" src="https://github.com/user-attachments/assets/811c378a-fb10-49c8-908a-f7c99c0e49be" />
+1. Guardar Vista -> Permitir asignar nombre lo que haría es un pequeño modal que permita al establecer un nombre y guardarlo.
+2. Completar el ciclo de vida de una vista guardada: Guardar, Actualizar, Eliminar
+3. El campo de vista guardada debe usar smart-select respentando el usuario actual
 
-  Este modal requiere una revisión completa.
+
+## Al seleccionar buscar por ID Visible del comprobante no se muestran los valores esperados, actualmente muestra lo que parece ser un Objeto: <GLEntry kgpkcafa3l>
+
+## Remover esto de la columna de totales: ✅ Cuadrado
+
+## Los botones de Aplicar Filtros y Limpiar Filtros deben estar disponibles en la parte superior e inferior de la barra de filtros
+
+## Renombrar ID visible del comprobante simplemente a Comprobante
+
+## El Togle Mostrar / Ocultar Filtros avanzados no funciona
+
+## La implementación de Columnas visibles no esta correcta: No nuestra todos los nombre de campos y seleccionar o deseleccionar columnas no afecta la tabla.
+
+Columnas visibles
+Posting Date
+Period
+Voucher
+Type
+Account
+Account Name
+Debit (NIO)
+Credit (NIO)
+Currency
+Ledger
+Company
+cost_center
+unit
+project
+party_type
+party_id
+line_comment
+created_by
+Creation Date
+Status
+
+## Las opciones de agrupar estan bien pero se necesita mostrar el sub total por agrupador
+
+## El filtro Tipo de comprobante muestra sin resultados al comenzar a escribir
+
+## El filtro Tipo de tercero nuestra lo que parece ser un objeto <Party 01KR76GMJ99EP3KAR5NFPQY9HY>
+
+## Columnas visibles debería ser un modal
+
+## Columnas visibles debe de poder incluir mas campos como referencia, es anulación, esta anulado.
+
+## Agregar como Filtro de Primer Nivel: Mostrar anulaciones, por defecto Falso pero al cambiar a verdadero mostrar registros que se han cancelado con su respectivo comprobante de cancelación.
+
+Esta funcionalidad es peligrosa si el comprobante existe en un mes y se cancela en otro. A nivel de flujo de no se tiene que permitir revertir o anular comprobantes de periodos cerrados.
+
+Se espera que comprobante y su anulación esten en el mismo mes.
+
+# /reports/trial-balance
+
+## Eliminar Level, no tiene sentido tener esa columna
+
+## Entiendo que se ha creado un framework centralizado para la gestión de reportes financieros
+
+Pero lamentablemente los contadores tradicionales en reportes como Balanza de Comprobación, Estado de Resultados y Balance General esperan ver el tree view con nodos colapsables y poder navegar el arbol de cuentas en el archivo requerimiento.md he agregado contexto adicional del cambio requerido

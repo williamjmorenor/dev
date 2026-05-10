@@ -333,3 +333,36 @@ Modelos en DB disponibles pero sin funcionalidad completa:
   - el modal avanzado fue simplificado para captura contable (sin moneda de línea ni cuenta bancaria) y mantiene anticipo/dimensiones;
   - el bootstrap de datos demo vuelve a preservar web/correo/teléfonos/fax para las vistas smoke de CI;
   - `smart-select.js` conserva las opciones pre-cargadas al auto-seleccionar una opción default y sus pruebas JS ya funcionan desde rutas reales del repositorio.
+
+## Actualización 2026-05-10 — Framework de reportes financieros (Smart Select)
+
+- Los 4 reportes financieros principales ahora comparten filtros con Smart Select en `reportes/financial_report.html`.
+- Se agregaron filtros dependientes por contexto:
+  - compañía → libro, período, cuentas, dimensiones
+  - tipo de tercero → tercero
+  - compañía + libro → tipo/ID de comprobante
+- `search_select` quedó extendido para reportes con nuevos doctypes:
+  - `accounting_period`, `account_code`, `party_type`, `voucher_type`, `document_no`
+- Se elevó la presentación financiera:
+  - encabezados amigables de columnas
+  - formato monetario en importes
+  - panel superior de contexto
+  - barra sticky de totales al pie
+- Validación ejecutada en verde: flake8, ruff, mypy, pytest completo.
+
+## Actualización 2026-05-10 — Backlog avanzado de reportes financieros
+
+- Vistas guardadas implementadas por usuario para los 4 reportes GL (save/apply/reset).
+- Selector de columnas funcional integrado en el panel de filtros y aplicado en render.
+- Agrupación dinámica (`group_by`) añadida en Detalle de Movimiento.
+- Jerarquías expandibles en tabla financiera habilitadas con árbol por `account_code`.
+- Drill-down implementado:
+  - cuenta → `account-movement`
+  - comprobante (cuando es journal/comprobante contable) → detalle de comprobante.
+- Exportación Excel avanzada implementada con:
+  - metadata (título, fecha, usuario),
+  - encabezados congelados,
+  - formato financiero de celdas exportadas,
+  - autoancho,
+  - hoja adicional `Filtros`.
+- Seguridad reforzada en rutas financieras GL con `@verifica_acceso("accounting")` y normalización de compañía válida.

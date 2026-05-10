@@ -5,8 +5,10 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from io import BytesIO
 
 import pytest
+from openpyxl import load_workbook
 
 from cacao_accounting import create_app
 from cacao_accounting.config import configuracion
@@ -508,9 +510,58 @@ def test_financial_reports_framework_uses_gl_and_supports_export(app_ctx):
     response = client.get("/reports/account-movement?company=cacao&ledger=FISC&accounting_period=2026-05&export=csv")
     assert response.status_code == 200
     assert response.mimetype == "text/csv"
+    html_response = client.get("/reports/account-movement?company=cacao&ledger=FISC&accounting_period=2026-05")
+    html = html_response.get_data(as_text=True)
+    assert html_response.status_code == 200
+    assert 'doctype: "company"' in html
+    assert 'doctype: "book"' in html
+    assert 'doctype: "accounting_period"' in html
+    assert 'doctype: "document_no"' in html
     response_xlsx = client.get("/reports/account-movement?company=cacao&ledger=FISC&accounting_period=2026-05&export=xlsx")
     assert response_xlsx.status_code == 200
     assert response_xlsx.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    workbook = load_workbook(BytesIO(response_xlsx.data))
+    assert "Filtros" in workbook.sheetnames
+    assert workbook.active.freeze_panes == "A5"
+    filters_sheet = workbook["Filtros"]
+    filter_rows = [row for row in filters_sheet.iter_rows(min_row=2, max_col=2, values_only=True) if row[0]]
+    assert any("Company" in str(row[0]) for row in filter_rows)
+    assert any(str(row[1]) == "cacao" for row in filter_rows)
+
+
+def test_financial_report_view_persistence_and_column_selection(app_ctx):
+    from cacao_accounting.database import Modules, User, UserFormPreference, database
+
+    accounting_module = Modules(module="accounting", default=True, enabled=True)
+    report_user = User(user="report-view-user", name="Report View User", password=b"x", classification="admin", active=True)
+    database.session.add_all([accounting_module, report_user])
+    database.session.commit()
+
+    app_ctx.config["SECRET_KEY"] = "testing"
+    client = app_ctx.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = report_user.id
+        session["_fresh"] = True
+
+    response_save = client.get(
+        "/reports/account-movement?company=cacao&ledger=FISC&saved_view=vista-mensual&view_action=save&visible_columns=posting_date&visible_columns=account_code"
+    )
+    assert response_save.status_code == 200
+    preference = database.session.execute(
+        database.select(UserFormPreference).filter_by(
+            user_id=report_user.id,
+            form_key="reports.financial.account-movement",
+            view_key="vista-mensual",
+        )
+    ).scalar_one()
+    assert "posting_date" in preference.config_json
+
+    response_apply = client.get(
+        "/reports/account-movement?company=cacao&ledger=FISC&saved_view=vista-mensual&view_action=apply"
+    )
+    assert response_apply.status_code == 200
+    html = response_apply.get_data(as_text=True)
+    assert "vista-mensual" in html
 
 
 def test_tax_template_posts_sales_tax_and_price_suggestion(app_ctx):

@@ -1680,3 +1680,82 @@ Corregir `cacao_accounting/static/js/smart-select.js` para que los campos depend
 - `bash run_test.sh` (baseline) → falla por dependencias faltantes del entorno: `black`, `flake8`, `ruff`, `bandit`, `pytest`.
 - `npm --prefix cacao_accounting/static ci` → instalación de dependencias JS para pruebas.
 - `npx --prefix cacao_accounting/static mocha cacao_accounting/static/test/smart-select.test.js` → **5 passing**.
+
+## 2026-05-10 (reportes financieros: smart-select en filtros)
+
+### Petición del usuario
+Asegurar que los 4 reportes financieros (`/reports/account-movement`, `/reports/trial-balance`, `/reports/income-statement`, `/reports/balance-sheet`) utilicen Smart Select en los campos de búsqueda y filtrado del panel lateral.
+
+### Plan implementado
+1. Extender el registry de `search_select` para soportar filtros requeridos por reportes financieros.
+2. Migrar los filtros del template `financial_report.html` a componentes `smartSelect` con dependencias por compañía/libro.
+3. Mejorar presentación financiera (encabezados amigables, formato monetario, resumen superior y barra sticky de totales) sin tocar lógica GL.
+4. Añadir pruebas puntuales para validar nuevos doctypes Smart Select y presencia de Smart Select en la vista de reportes.
+5. Ejecutar validación completa de lint, tipos y pruebas.
+
+### Resumen técnico de cambios
+- `cacao_accounting/reportes/templates/reportes/financial_report.html`
+  - Filtros principales y avanzados migrados a `smartSelect`.
+  - Dependencias de filtros: compañía → libro/periodo/cuentas/dimensiones; tipo tercero → tercero; compañía+libro → tipo/ID comprobante.
+  - Panel superior de contexto (compañía, libro, periodo, estado, registros).
+  - Tabla con encabezados amigables y barra sticky de totales.
+- `cacao_accounting/search_select.py`
+  - Nuevos doctypes: `accounting_period`, `account_code`, `party_type`, `voucher_type`, `document_no`.
+  - Soporte de deduplicación por valor para catálogos derivados de GL.
+- `cacao_accounting/reportes/__init__.py`
+  - Etiquetas amigables de columnas.
+  - Formato financiero de importes (`1,000.00`, negativos en paréntesis).
+  - Ocultado de columnas vacías en la renderización.
+  - Envío de contexto de reporte y columnas renderizadas al template.
+- Tests:
+  - `tests/test_09_journal_entry_form.py`: validación de `doctype=accounting_period`.
+  - `tests/test_08_reconciliation_reports.py`: validación de presencia de Smart Select en HTML de reportes.
+
+### Verificación ejecutada
+- `python -m flake8 cacao_accounting/`
+- `python -m ruff check cacao_accounting/`
+- `python -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True`
+- Targeted:
+  - `tests/test_08_reconciliation_reports.py::test_financial_reports_framework_uses_gl_and_supports_export`
+  - `tests/test_09_journal_entry_form.py::test_search_select_supports_journal_doctypes_and_filters`
+  - `tests/test_10_smart_select_js.py`
+
+## 2026-05-10 (completar backlog de reportes financieros solicitado en PR)
+
+### Petición del usuario
+Completar capacidades pendientes del framework de reportes: vistas guardadas, selector de columnas funcional, agrupación/jerarquías, drill-down universal, exportación Excel avanzada y refuerzo de seguridad por compañía/libro.
+
+### Plan implementado
+1. Implementar persistencia de vistas por usuario reutilizando `UserFormPreference`.
+2. Activar selector de columnas en formulario de filtros y aplicar columnas visibles en render.
+3. Añadir agrupación dinámica (`group_by`) en detalle de movimiento y jerarquía expandible en tabla de reportes financieros.
+4. Agregar drill-down a cuenta (hacia account movement) y a comprobante (cuando aplica).
+5. Mejorar exportación XLSX con metadata + hoja “Filtros” + ancho automático + headers congelados.
+6. Reforzar control de acceso con `@verifica_acceso("accounting")` en rutas financieras y normalización de compañía.
+
+### Resumen técnico de cambios
+- `cacao_accounting/reportes/__init__.py`
+  - Vistas guardadas: `saved_view`, `view_action` (save/apply/reset), carga/listado de vistas por usuario.
+  - Selector funcional de columnas (`visible_columns`) aplicado al render.
+  - Agrupación dinámica en account movement (`group_by`).
+  - Drill-down URLs por cuenta/comprobante en filas renderizadas.
+  - Exportación XLSX avanzada con título, fecha, usuario, formato financiero, auto-width, freeze panes y hoja `Filtros`.
+  - Seguridad: rutas financieras GL con `@verifica_acceso("accounting")` y validación de compañía existente.
+- `cacao_accounting/reportes/services.py`
+  - `income_statement` ahora devuelve desglose por cuenta y nivel para permitir jerarquías expandibles reales.
+- `cacao_accounting/reportes/templates/reportes/financial_report.html`
+  - UI de vistas guardadas.
+  - Selector funcional de columnas.
+  - Selector de agrupación.
+  - Enlaces de drill-down y comportamiento expand/collapse en jerarquías.
+- `tests/test_08_reconciliation_reports.py`
+  - Validación de exportación XLSX avanzada (hoja Filtros + freeze panes).
+  - Validación de persistencia de vistas en reportes financieros.
+
+### Verificación ejecutada
+- `python -m build`
+- `python -m flake8 cacao_accounting/`
+- `python -m ruff check cacao_accounting/`
+- `python -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True`

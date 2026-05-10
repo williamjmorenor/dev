@@ -660,7 +660,7 @@ def test_entity_creation_uses_setup_defaults_and_creates_required_book_cost_cent
 
 
 def test_search_select_supports_journal_doctypes_and_filters(app_ctx):
-    from cacao_accounting.database import Book, CostCenter, Project, Unit, User, database
+    from cacao_accounting.database import AccountingPeriod, Book, CostCenter, Project, Unit, User, database
 
     from cacao_accounting.database import Currency
 
@@ -668,6 +668,14 @@ def test_search_select_supports_journal_doctypes_and_filters(app_ctx):
         [
             Currency(code="NIO", name="Córdoba", decimals=2, active=True, default=True),
             Book(code="FISC", name="Fiscal", entity="cacao", is_primary=True),
+            AccountingPeriod(
+                entity="cacao",
+                name="2026-05",
+                enabled=True,
+                is_closed=False,
+                start=date(2026, 5, 1),
+                end=date(2026, 5, 31),
+            ),
             CostCenter(code="MAIN", name="Principal", entity="cacao", active=True, enabled=True, group=False),
             Unit(code="HQ", name="Central", entity="cacao"),
             Project(code="PRJ", name="Proyecto", entity="cacao", enabled=True, start=date(2026, 1, 1)),
@@ -685,6 +693,11 @@ def test_search_select_supports_journal_doctypes_and_filters(app_ctx):
     assert client.get("/api/search-select?doctype=cost_center&q=Principal&company=cacao").json["results"][0]["value"] == "MAIN"
     assert client.get("/api/search-select?doctype=unit&q=Central&company=cacao").json["results"][0]["value"] == "HQ"
     assert client.get("/api/search-select?doctype=project&q=Proyecto&company=cacao").json["results"][0]["value"] == "PRJ"
+    assert (
+        client.get("/api/search-select?doctype=accounting_period&q=2026&company=cacao").json["results"][0]["value"]
+        == "2026-05"
+    )
+    assert client.get("/api/search-select?doctype=report_status&q=conta").json["results"][0]["value"] == "submitted"
     assert client.get("/api/search-select?doctype=book&q=Fiscal&bad_filter=x").status_code == 400
 
 

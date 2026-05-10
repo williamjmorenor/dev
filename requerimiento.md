@@ -1,687 +1,466 @@
-# Criterios de aceptación — Implementación de Comprobante Contable
+Sí. Aquí el requerimiento claro para mejorar los 3 reportes sin romper el backend común.
 
-## Objetivo
+# Requerimiento técnico — Reportes financieros jerárquicos y navegables
 
-Definir los criterios funcionales, contables, técnicos y de experiencia de usuario que debe cumplir la implementación del módulo de Comprobante Contable del sistema Cacao Accounting.
+## 1. Objetivo
 
----
+Mejorar los reportes financieros principales de **Cacao Accounting**:
 
-# 1. Arquitectura General del Comprobante
+* Balanza de Comprobación
+* Balance General
+* Estado de Resultado
 
-## CA-001 — Estructura maestro/detalle
+manteniendo un **framework centralizado de reportes financieros**, pero permitiendo que cada reporte tenga una **presentación especializada**, más cercana a la expectativa de contadores tradicionales.
 
-### Criterio de aceptación
+El objetivo no es convertir cada reporte en un módulo independiente, sino separar correctamente:
 
-El comprobante contable debe estar compuesto por:
-
-1. Un registro maestro (header).
-2. Uno o múltiples registros de líneas contables (detail).
-
-### Validaciones
-
-* El registro maestro debe almacenar:
-
-  * ID único interno.
-  * Referencia visible para usuario.
-  * Compañía.
-  * Fecha de contabilización.
-  * Serie/secuencia.
-  * Moneda del comprobante.
-  * Concepto global.
-  * Indicador `is_closing`.
-  * Estado del comprobante.
-
-* Las líneas deben almacenar:
-
-  * Cuenta contable.
-  * Débito.
-  * Crédito.
-  * Centro de costo.
-  * Unidad de negocio.
-  * Proyecto.
-  * Tipo de tercero.
-  * Tercero.
-  * Documento referenciado.
-  * Comentario de línea.
-  * Indicador de anticipo.
+* **Backend común de cálculo**
+* **Modelo común de datos financieros**
+* **Renderer especializado por tipo de reporte**
+* **Navegación contable unificada**
 
 ---
 
-# 2. Año Fiscal y Periodos Contables
+# 2. Principio arquitectónico
 
-## CA-002 — Inferencia automática de periodo contable
+La implementación actual usa el mismo backend para los cuatro reportes.
+Esto debe mantenerse.
 
-### Criterio de aceptación
+El backend común garantiza que:
 
-El sistema debe inferir automáticamente el periodo contable y año fiscal utilizando únicamente la fecha de contabilización.
+* Los saldos sean consistentes.
+* La Balanza, Balance General, Estado de Resultado y Detalle de Movimiento usen la misma fuente contable.
+* No existan diferencias numéricas entre reportes.
+* La lógica de filtros, período, compañía, libro contable, estado y moneda sea compartida.
 
-### Validaciones
+Sin embargo, los reportes financieros no deben verse todos como tablas planas.
 
-* El usuario NO debe seleccionar manualmente:
+Debe existir una capa adicional:
 
-  * Periodo contable.
-  * Año fiscal.
-
-* La fecha contable debe determinar automáticamente:
-
-  * Año fiscal.
-  * Periodo contable.
-
----
-
-## CA-003 — Bloqueo por año fiscal cerrado
-
-### Criterio de aceptación
-
-El sistema debe impedir registrar comprobantes en años fiscales cerrados.
-
-### Validaciones
-
-* Si el año fiscal está cerrado:
-
-  * Debe bloquearse cualquier posteo.
-  * Debe mostrarse mensaje de error funcional.
-
-* La bandera `is_closing` NO debe ignorar el cierre fiscal.
+```text
+Financial Report Engine
+        ↓
+Financial Report Dataset común
+        ↓
+Renderer especializado
+        ↓
+Vista del reporte
+```
 
 ---
 
-## CA-004 — Restricción por periodo contable cerrado
+# 3. Problema actual
 
-### Criterio de aceptación
+Actualmente los reportes:
 
-Los periodos contables cerrados deben bloquear transacciones normales.
-
-### Validaciones
-
-* Si el periodo está cerrado:
-
-  * Solo se permiten comprobantes con `is_closing = true`.
-
-* Si `is_closing = false`:
-
-  * El sistema debe impedir guardar y contabilizar.
+* Se ven demasiado técnicos.
+* Presentan datos como tablas planas.
+* No muestran claramente el árbol de cuentas.
+* No permiten navegar naturalmente desde un saldo hasta sus movimientos.
+* No reflejan el formato tradicional esperado por contadores.
+* Balance General y Estado de Resultado no tienen formato financiero suficientemente legible.
 
 ---
 
-# 3. Smart Select y Experiencia de Usuario
+# 4. Requerimiento principal
 
-## CA-005 — Precarga inteligente de compañía
+Los reportes de:
 
-### Criterio de aceptación
+* Balanza de Comprobación
+* Balance General
+* Estado de Resultado
 
-El selector de compañía debe precargar registros automáticamente al abrir el formulario.
+deben renderizarse como **estructuras jerárquicas basadas en el árbol de cuentas contables**, con nodos expandibles y colapsables.
 
-### Validaciones
+Ejemplo:
 
-* Debe existir búsqueda incremental.
-* Debe existir filtrado por escritura.
-* El usuario debe poder:
+```text
+▾ 1 Activos
+  ▾ 1.1 Activo corriente
+    ▾ 1.1.01 Efectivo y equivalentes
+        1.1.01.001 Caja
+```
 
-  * Seleccionar desde lista.
-  * Escribir para buscar.
-
----
-
-## CA-006 — Campo oculto de compañía
-
-### Criterio de aceptación
-
-Al seleccionar una compañía, el sistema debe actualizar automáticamente un campo oculto interno.
-
-### Validaciones
-
-* El campo oculto debe ser la fuente oficial de verdad para:
-
-  * Filtrado de secuencias.
-  * Filtrado de terceros.
-  * Filtrado de documentos.
-  * Filtrado de libros.
-  * Filtrado de proyectos.
-  * Filtrado de centros de costo.
-
-* Los filtros NO deben depender del texto visible del selector.
+No deben mostrarse únicamente como una tabla plana.
 
 ---
 
-## CA-007 — Smart Select dependiente
+# 5. Navegación contable obligatoria
 
-### Criterio de aceptación
+Debe implementarse navegación real desde los reportes hacia el detalle que integra cada saldo.
 
-Todos los Smart Select dependientes deben reaccionar automáticamente a los cambios de contexto.
+## 5.1 Balance General
 
-### Validaciones
+Flujo esperado:
 
-* Cambio de compañía:
+```text
+Balance General
+→ clic en cuenta o rubro
+→ abre Detalle de Movimiento Contable filtrado por cuenta
+→ clic en comprobante
+→ abre comprobante contable
+```
 
-  * Actualiza secuencias.
-  * Actualiza libros.
-  * Actualiza terceros.
-  * Actualiza documentos.
+## 5.2 Estado de Resultado
 
-* Cambio de tipo de tercero:
+Flujo esperado:
 
-  * Actualiza selector de terceros.
+```text
+Estado de Resultado
+→ clic en sección o rubro
+→ expande cuentas relacionadas
+→ clic en cuenta
+→ abre Detalle de Movimiento Contable filtrado por cuenta
+→ clic en comprobante
+→ abre documento/comprobante contable
+```
 
-* Cambio de tercero:
+## 5.3 Balanza de Comprobación
 
-  * Actualiza documentos disponibles.
+Flujo esperado:
 
----
-
-# 4. Series y Secuencias
-
-## CA-008 — Secuencia predeterminada
-
-### Criterio de aceptación
-
-Al seleccionar una compañía, el sistema debe cargar automáticamente la secuencia predeterminada.
-
-### Validaciones
-
-* La secuencia debe obtenerse desde PADM.
-
-* Debe existir una secuencia predeterminada por:
-
-  * Compañía.
-  * Tipo de documento.
-
-* El usuario debe poder cambiar manualmente la secuencia.
+```text
+Balanza de Comprobación
+→ clic en cuenta
+→ abre Detalle de Movimiento Contable filtrado por cuenta
+→ clic en comprobante
+→ abre comprobante contable
+```
 
 ---
 
-## CA-009 — Búsqueda de secuencias
+# 6. Formato financiero esperado
 
-### Criterio de aceptación
+## 6.1 Balance General
 
-El selector de secuencia debe soportar búsqueda incremental.
+Debe mostrarse en formato financiero, no como tabla técnica.
 
-### Validaciones
+Ejemplo:
 
-* Debe permitir escribir para filtrar.
-* Debe permitir seleccionar secuencias activas.
-* Debe impedir seleccionar secuencias inactivas.
+```text
+ACTIVOS
 
----
+Activo corriente
+  Efectivo y equivalentes                     1,000.00
+  Cuentas por cobrar                            500.00
+TOTAL ACTIVO CORRIENTE                        1,500.00
 
-# 5. Libros Contables y Multi-Ledger
+TOTAL ACTIVOS                                 1,500.00
 
-## CA-010 — Carga automática de libros activos
 
-### Criterio de aceptación
+PASIVOS
 
-Al seleccionar compañía, deben cargarse automáticamente los libros contables activos.
+Pasivo corriente
+  Cuentas por pagar                              300.00
+TOTAL PASIVO CORRIENTE                          300.00
 
-### Validaciones
+TOTAL PASIVOS                                   300.00
 
-* Los libros deben mostrarse preseleccionados.
-* El usuario puede desmarcar libros específicos.
-* Si todos permanecen seleccionados:
 
-  * El comprobante afecta todos los libros.
+PATRIMONIO
 
----
+Capital en acciones comunes                   1,200.00
+TOTAL PATRIMONIO                              1,200.00
 
-## CA-011 — Generación automática de líneas por ledger
-
-### Criterio de aceptación
-
-El sistema debe generar automáticamente líneas contables independientes por cada libro seleccionado.
-
-### Validaciones
-
-* El usuario NO debe crear líneas separadas manualmente.
-* El motor contable debe:
-
-  * Crear una línea por ledger.
-  * Realizar conversiones monetarias automáticamente.
-
-### Ejemplo esperado
-
-Si existen:
-
-* Ledger local en Córdoba.
-* Ledger financiero en USD.
-
-Entonces:
-
-* Debe generarse una línea en moneda local.
-* Debe generarse otra línea convertida en USD.
+TOTAL PASIVO + PATRIMONIO                     1,500.00
+```
 
 ---
 
-# 6. Moneda del Comprobante
+## 6.2 Estado de Resultado
 
-## CA-012 — Moneda única por comprobante
+Debe mostrarse en formato financiero:
 
-### Criterio de aceptación
+```text
+INGRESOS
 
-El comprobante debe manejar una única moneda transaccional.
+Ingresos por ventas                           5,000.00
+TOTAL INGRESOS                                5,000.00
 
-### Validaciones
 
-* Todas las líneas deben heredar la moneda del comprobante.
-* Las líneas NO pueden definir moneda propia.
-* Debe bloquearse mezcla de monedas.
+COSTOS
 
----
+Costo de ventas                               2,000.00
+TOTAL COSTOS                                  2,000.00
 
-## CA-013 — Conversión automática de monedas
+UTILIDAD BRUTA                                3,000.00
 
-### Criterio de aceptación
 
-El sistema debe convertir automáticamente montos para ledgers con moneda distinta.
+GASTOS
 
-### Validaciones
+Gastos administrativos                          800.00
+Gastos de ventas                                500.00
+TOTAL GASTOS                                  1,300.00
 
-* La conversión debe ejecutarse automáticamente.
-* Debe utilizar configuración monetaria definida en PADM.
-* Debe registrar equivalentes correctamente por ledger.
-
----
-
-# 7. Validaciones Contables
-
-## CA-014 — Balance contable obligatorio
-
-### Criterio de aceptación
-
-El comprobante solo puede contabilizarse si está balanceado.
-
-### Validaciones
-
-* Total débitos = Total créditos.
-* Si existe diferencia:
-
-  * Debe bloquear contabilización.
-  * Debe resaltarse visualmente la diferencia.
+UTILIDAD NETA                                 1,700.00
+```
 
 ---
 
-## CA-015 — Validación de cuentas de gasto
+## 6.3 Balanza de Comprobación
 
-### Criterio de aceptación
+Debe conservar su naturaleza tabular, pero con jerarquía contable:
 
-Las cuentas de gasto deben requerir centro de costo.
+```text
+▾ 1 Activos
+  ▾ 1.1 Activo corriente
+      1.1.01.001 Caja        0.00    1,000.00    0.00    1,000.00
 
-### Validaciones
+▾ 3 Patrimonio
+      3.1 Capital            0.00        0.00  1,000.00  (1,000.00)
+```
 
-* Si cuenta es tipo gasto:
+Columnas mínimas:
 
-  * Centro de costo obligatorio.
-
-* Si no se define:
-
-  * Debe bloquear guardado.
-
----
-
-## CA-016 — Validación de débitos/créditos
-
-### Criterio de aceptación
-
-Cada línea debe contener únicamente débito o crédito.
-
-### Validaciones
-
-* No puede existir:
-
-  * Débito y crédito simultáneamente.
-  * Débito y crédito vacíos.
+* Cuenta
+* Nombre de cuenta
+* Saldo inicial
+* Débito
+* Crédito
+* Saldo final
+* Nivel
 
 ---
 
-# 8. Terceros y Subledgers
+# 7. Comportamiento de jerarquías
 
-## CA-017 — Soporte de terceros
+Cada nodo del árbol debe soportar:
 
-### Criterio de aceptación
+* Expandir
+* Colapsar
+* Mostrar subtotal acumulado
+* Mostrar saldo propio si aplica
+* Mostrar saldo consolidado de hijos
+* Diferenciar visualmente secciones, grupos y cuentas finales
 
-El comprobante debe soportar afectación de terceros.
+Los nodos padres deben calcularse a partir de sus hijos.
 
-### Validaciones
-
-* Tipos soportados:
-
-  * Cliente.
-  * Proveedor.
-  * Empleado.
-
-* El selector de tercero debe depender del tipo seleccionado.
+Las cuentas hoja deben permitir navegación hacia movimientos.
 
 ---
 
-## CA-018 — Integración con AR/AP Ledger
+# 8. Reglas de interacción
 
-### Criterio de aceptación
+## 8.1 Clic en cuenta contable
 
-Las líneas contables deben poder afectar subledgers de cuentas por cobrar y cuentas por pagar.
+Al hacer clic en una cuenta contable, el sistema debe abrir:
 
-### Validaciones
+```text
+/reports/account-movement
+```
 
-* Los movimientos deben reflejarse en:
+con filtros preaplicados:
 
-  * Estado de cuenta de clientes.
-  * Estado de cuenta de proveedores.
+* Compañía
+* Libro contable
+* Período
+* Cuenta contable
+* Estado
+* Moneda, si aplica
+* Dimensiones activas, si aplica
 
-* El saldo debe calcularse por:
+## 8.2 Clic en comprobante desde Detalle de Movimiento
 
-  * Transacciones abiertas.
-  * Independientemente del origen.
+Al hacer clic en el comprobante:
 
----
+```text
+cacao-JOU-2026-05-00002
+```
 
-## CA-019 — Restricción sobre inventarios
-
-### Criterio de aceptación
-
-El comprobante contable NO debe afectar inventario.
-
-### Validaciones
-
-* Debe bloquear:
-
-  * Movimientos de stock.
-  * Ajustes de existencias.
-  * Afectación de Kardex.
-
-* Inventario solo puede modificarse desde módulos logísticos.
+el sistema debe abrir el comprobante contable correspondiente.
 
 ---
 
-# 9. Documentos Referenciados
+# 9. Requerimiento de backend
 
-## CA-020 — Selección de documentos abiertos
+El backend debe seguir siendo común.
 
-### Criterio de aceptación
+Debe producir un dataset estructurado que permita dos modos de consumo:
 
-El comprobante debe permitir seleccionar documentos abiertos de terceros.
+## 9.1 Modo plano
 
-### Validaciones
+Para:
 
-* El selector debe depender de:
+* Exportar CSV
+* Exportar Excel
+* Detalle de Movimiento Contable
+* Validaciones internas
 
-  * Compañía.
-  * Tipo de tercero.
-  * Tercero.
-  * Tipo de documento.
+## 9.2 Modo jerárquico
 
-* Solo deben mostrarse documentos:
+Para:
 
-  * Activos.
-  * Con saldo pendiente.
+* Balanza de Comprobación
+* Balance General
+* Estado de Resultado
 
-### Documentos soportados
+El dataset jerárquico debe incluir como mínimo:
 
-* Facturas.
-* Notas de débito.
-* Notas de crédito.
-* Devoluciones.
-* Otros documentos configurados.
-
----
-
-## CA-021 — Soporte de cancelaciones contables
-
-### Criterio de aceptación
-
-El comprobante debe permitir cancelar parcial o totalmente saldos de AR/AP.
-
-### Validaciones
-
-* Debe permitir:
-
-  * Castigos.
-  * Ajustes.
-  * Reclasificaciones.
-  * Cancelaciones contables.
-
-* Los saldos abiertos deben actualizarse automáticamente.
+```json
+{
+  "account": "1.1.01.001",
+  "account_name": "Caja",
+  "parent_account": "1.1.01",
+  "level": 4,
+  "is_group": false,
+  "section": "ACTIVOS",
+  "opening_balance": 0,
+  "debit": 1000,
+  "credit": 0,
+  "final_balance": 1000,
+  "has_children": false,
+  "movement_url": "/reports/account-movement?...",
+  "children": []
+}
+```
 
 ---
 
-# 10. Modal Expandido de Línea
+# 10. Requerimiento de UI
 
-## CA-022 — Modal de detalle de línea
+La interfaz debe conservar:
 
-### Criterio de aceptación
+* Sidebar izquierdo del sistema
+* Columna izquierda de filtros
+* Área principal del reporte
+* Botones de exportación
 
-Cada línea debe poder expandirse a un modal avanzado.
+Pero el área principal del reporte debe mejorar visualmente.
 
-### Validaciones
+Debe incluir:
 
-* El modal debe permitir editar:
-
-  * Proyecto.
-  * Unidad.
-  * Referencias.
-  * Tipo de documento.
-  * Documento relacionado.
-  * Comentario.
-  * Cuenta bancaria.
-  * Anticipo.
-
----
-
-## CA-023 — Persistencia completa de dimensiones
-
-### Criterio de aceptación
-
-Las dimensiones configuradas desde el modal deben persistirse correctamente.
-
-### Validaciones
-
-* Al cerrar y reabrir:
-
-  * Deben mantenerse los datos.
-
-* Al guardar:
-
-  * Deben persistirse todas las dimensiones.
+* Encabezado financiero claro
+* Secciones contables destacadas
+* Subtotales visibles
+* Totales finales destacados
+* Nodos expandibles
+* Cuentas clicables
+* Indicador de reporte cuadrado cuando aplique
+* Mejor alineación numérica
+* Mejor separación visual entre secciones
 
 ---
 
-# 11. Comentarios y Referencias
+# 11. Exportación
 
-## CA-024 — Comentario global y comentario por línea
+Los reportes deben permitir exportar:
 
-### Criterio de aceptación
+* Excel
+* CSV
 
-El comprobante debe soportar comentarios globales y específicos por línea.
+La exportación debe soportar:
 
-### Validaciones
+* Versión plana
+* Versión jerárquica indentada
 
-* Debe existir:
+En Excel, debe respetarse la indentación de niveles.
 
-  * Concepto general.
-  * Comentario individual por línea.
+Ejemplo:
 
-* Ambos deben persistirse independientemente.
-
----
-
-# 12. Anticipos
-
-## CA-025 — Marcado de anticipos
-
-### Criterio de aceptación
-
-Las líneas deben poder marcarse como anticipo.
-
-### Validaciones
-
-* Debe existir indicador `is_advance`.
-* Debe persistirse en ledger.
-* Debe ser visible posteriormente en conciliaciones.
+```text
+ACTIVOS
+  Activo corriente
+    Efectivo y equivalentes
+      Caja
+TOTAL ACTIVOS
+```
 
 ---
 
-# 13. Experiencia de Usuario
+# 12. Criterios de aceptación
 
-## CA-026 — Vista simplificada y avanzada
+## CA-001 — Backend común preservado
 
-### Criterio de aceptación
+Los cuatro reportes deben seguir usando el mismo backend financiero base.
 
-La tabla principal debe mostrar únicamente dimensiones frecuentes.
-
-### Validaciones
-
-* Vista principal:
-
-  * Cuenta.
-  * Centro de costo.
-  * Tipo tercero.
-  * Tercero.
-  * Débito.
-  * Crédito.
-
-* Vista avanzada:
-
-  * Modal expandido.
+No debe duplicarse lógica de cálculo por reporte.
 
 ---
 
-## CA-027 — Indicadores visuales
+## CA-002 — Jerarquía visible
 
-### Criterio de aceptación
-
-El sistema debe mostrar indicadores visuales de balance.
-
-### Validaciones
-
-* Debe mostrar:
-
-  * Total débitos.
-  * Total créditos.
-  * Diferencia.
-
-* Diferencias deben resaltarse visualmente.
+Balanza de Comprobación, Balance General y Estado de Resultado deben mostrar el árbol contable con niveles expandibles.
 
 ---
 
-# 14. Persistencia y Auditoría
+## CA-003 — Navegación desde saldo
 
-## CA-028 — Trazabilidad completa
-
-### Criterio de aceptación
-
-Toda transacción debe ser completamente auditable.
-
-### Validaciones
-
-* Registrar:
-
-  * Usuario creador.
-  * Fecha creación.
-  * Usuario modificación.
-  * Fecha modificación.
-  * Ledger afectado.
-  * Moneda.
-  * Tasa de cambio.
+Al hacer clic en una cuenta con saldo, el sistema debe abrir Detalle de Movimiento Contable filtrado por esa cuenta y contexto.
 
 ---
 
-## CA-029 — Integridad transaccional
+## CA-004 — Navegación hasta comprobante
 
-### Criterio de aceptación
-
-La contabilización debe ejecutarse de manera atómica.
-
-### Validaciones
-
-* Si falla una línea:
-
-  * Debe revertirse toda la transacción.
-
-* No pueden existir:
-
-  * Ledgers parciales.
-  * Posteos incompletos.
+Desde Detalle de Movimiento Contable, el usuario debe poder abrir el comprobante contable que originó el movimiento.
 
 ---
 
-# 15. Estados del Comprobante
+## CA-005 — Balance General con formato financiero
 
-## CA-030 — Estados operativos
+Balance General debe mostrarse por secciones:
 
-### Criterio de aceptación
-
-El comprobante debe soportar estados operativos visibles.
-
-### Estados mínimos
-
-* Borrador.
-* Contabilizado.
-* Cancelado.
-* Reversado.
-* Cierre.
-
-### Validaciones
-
-* Los estados deben mostrarse visualmente mediante badges.
-* Deben existir restricciones según estado.
+* Activos
+* Pasivos
+* Patrimonio
+* Total Pasivo + Patrimonio
 
 ---
 
-# 16. Restricciones Funcionales
+## CA-006 — Estado de Resultado con formato financiero
 
-## CA-031 — Restricción de edición
+Estado de Resultado debe mostrarse por secciones:
 
-### Criterio de aceptación
-
-Los comprobantes contabilizados no deben editarse libremente.
-
-### Validaciones
-
-* Debe bloquearse edición directa.
-* La corrección debe realizarse mediante:
-
-  * Reversión.
-  * Ajuste.
-  * Cancelación.
+* Ingresos
+* Costos
+* Utilidad bruta
+* Gastos
+* Utilidad neta
 
 ---
 
-# 17. Rendimiento
+## CA-007 — Balanza con árbol contable
 
-## CA-032 — Rendimiento aceptable
-
-### Criterio de aceptación
-
-El formulario debe responder fluidamente.
-
-### Validaciones
-
-* Smart Select:
-
-  * Debe responder en tiempo razonable.
-
-* Apertura de modal:
-
-  * No debe congelar interfaz.
-
-* Cambios de compañía:
-
-  * Deben refrescar dependencias automáticamente.
+La Balanza de Comprobación debe mantener columnas contables, pero agrupadas jerárquicamente por el árbol de cuentas.
 
 ---
 
-# 18. Criterio Final de Aprobación
+## CA-008 — Totales consistentes
 
-## CA-033 — Validación integral
+Los totales mostrados en:
 
-### El módulo será considerado aceptado únicamente si
+* Balanza de Comprobación
+* Balance General
+* Estado de Resultado
+* Detalle de Movimiento Contable
 
-* Cumple integridad contable.
-* Soporta multi-ledger.
-* Soporta multimoneda.
-* Soporta subledgers AR/AP.
-* Soporta cierres fiscales.
-* Soporta cierres contables.
-* Mantiene trazabilidad completa.
-* Mantiene atomicidad transaccional.
-* Mantiene experiencia de usuario fluida.
-* Mantiene consistencia de Smart Select dependientes.
-* Impide inconsistencias contables.
-* Impide mezcla de monedas.
-* Impide posteo en periodos inválidos.
+deben coincidir cuando se usan los mismos filtros.
+
+---
+
+## CA-009 — Filtros preservados en navegación
+
+Al navegar de un reporte a otro, los filtros activos deben conservarse.
+
+---
+
+## CA-010 — Exportación jerárquica
+
+Excel debe exportar la estructura jerárquica con indentación visual.
+
+CSV puede exportarse plano, pero debe incluir columna `level`.
+
+---
+
+# 13. Resultado esperado
+
+El sistema debe mantener una arquitectura centralizada y confiable, pero ofrecer reportes financieros con presentación profesional, navegable y entendible para contadores.
+
+La mejora clave es esta:
+
+```text
+No cambiar el motor.
+Cambiar la forma de presentar y navegar los resultados.
+```
+
+El backend debe seguir siendo único.
+La experiencia visual debe adaptarse al tipo de reporte.
