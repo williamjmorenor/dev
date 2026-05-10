@@ -112,7 +112,7 @@ def _naming_series_label(naming_series: NamingSeries) -> str:
     return f"{naming_series.name} ({naming_series.entity_type})"
 
 
-def _passthrough_label(value: Any) -> str:
+def _string_label(value: Any) -> str:
     return str(value)
 
 
@@ -266,7 +266,7 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=Party,
         search_fields=("party_type",),
         value_field="party_type",
-        label_builder=_passthrough_label,
+        label_builder=_string_label,
         allowed_filters={"is_active": "is_active"},
         default_filters={"is_active": True},
         deduplicate_by_value=True,
@@ -276,7 +276,7 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=GLEntry,
         search_fields=("voucher_type",),
         value_field="voucher_type",
-        label_builder=_passthrough_label,
+        label_builder=_string_label,
         allowed_filters={"company": "company", "ledger": "ledger_id"},
         default_filters={},
         deduplicate_by_value=True,
@@ -286,18 +286,8 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=GLEntry,
         search_fields=("document_no", "voucher_id"),
         value_field="document_no",
-        label_builder=_passthrough_label,
+        label_builder=_string_label,
         allowed_filters={"company": "company", "ledger": "ledger_id"},
-        default_filters={},
-        deduplicate_by_value=True,
-    ),
-    "voucher_status": SearchSelectSpec(
-        doctype="voucher_status",
-        model=GLEntry,
-        search_fields=("is_cancelled",),
-        value_field="is_cancelled",
-        label_builder=lambda row: "cancelled" if getattr(row, "is_cancelled", False) else "submitted",
-        allowed_filters={"company": "company"},
         default_filters={},
         deduplicate_by_value=True,
     ),

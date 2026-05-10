@@ -108,13 +108,14 @@ _MONEY_COLUMNS = {
 }
 _RIGHT_ALIGN_COLUMNS = _MONEY_COLUMNS | {"level"}
 _ALWAYS_VISIBLE_COLUMNS = {"debit", "credit", "difference", "account_code", "account_name", "section", "amount"}
+_EMPTY_CELL_VALUE = "—"
 
 
 def _format_number(value: object) -> str:
     try:
         amount = value if isinstance(value, Decimal) else Decimal(str(value))
     except DecimalException:
-        return "—"
+        return _EMPTY_CELL_VALUE
     formatted = f"{abs(amount):,.2f}"
     return f"({formatted})" if amount < 0 else formatted
 
@@ -128,7 +129,7 @@ def _column_label(column: str, ledger_currency: str | None) -> str:
 
 def _format_cell(column: str, value: object, ledger_currency: str | None) -> str:
     if value is None or value == "":
-        return "—"
+        return _EMPTY_CELL_VALUE
     if column in _MONEY_COLUMNS:
         return _format_number(value)
     if column == "posting_date" and isinstance(value, date):
@@ -165,13 +166,12 @@ def _build_context_summary(report, report_filters: FinancialReportFilters) -> di
     }
 
 
-def _is_report_balanced(display_totals: dict[str, str]) -> bool:
-    difference = display_totals.get("difference")
+def _is_report_balanced(raw_totals: dict[str, Decimal]) -> bool:
+    difference = raw_totals.get("difference")
     if difference is None:
         return False
-    normalized_difference = difference.replace(",", "").replace("(", "-").replace(")", "")
     try:
-        return Decimal(normalized_difference) == Decimal("0")
+        return Decimal(str(difference)) == Decimal("0")
     except DecimalException:
         return False
 
@@ -297,7 +297,7 @@ def _render_financial_report(report_code: str, report_title: str, report, report
         ledger_currency=report.ledger_currency,
         context_summary=_build_context_summary(report, report_filters),
         right_align_columns=_RIGHT_ALIGN_COLUMNS,
-        is_balanced=_is_report_balanced(display_totals),
+        is_balanced=_is_report_balanced(report.totals),
     )
 
 

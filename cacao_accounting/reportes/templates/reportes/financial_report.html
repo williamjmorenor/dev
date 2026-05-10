@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{# smart_select_field: label, name, doctype, value, field_id, min_chars, filters(dict), filter_sources(list), required_filters(list) #}
 {% macro smart_select_field(label, name, doctype, value='', field_id='', min_chars=1, filters=None, filter_sources=None, required_filters=None) -%}
 <label class="form-label mb-0">
   {{ _(label) }}
@@ -93,8 +94,8 @@
         <div class="d-flex flex-wrap gap-2 mt-2">
           <button class="btn btn-primary" type="submit">{{ _("Aplicar filtros") }}</button>
           <a class="btn btn-outline-secondary" href="{{ request.path }}">{{ _("Limpiar filtros") }}</a>
-          <button class="btn btn-outline-secondary" type="button">{{ _("Guardar vista") }}</button>
-          <button class="btn btn-outline-secondary" type="button">{{ _("Columnas") }}</button>
+          <button class="btn btn-outline-secondary" type="button" disabled title="{{ _('Próximamente') }}">{{ _("Guardar vista") }}</button>
+          <button class="btn btn-outline-secondary" type="button" disabled title="{{ _('Próximamente') }}">{{ _("Columnas") }}</button>
         </div>
       </form>
     </div>
