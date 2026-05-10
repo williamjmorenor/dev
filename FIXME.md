@@ -84,6 +84,61 @@ Se espera que comprobante y su anulación esten en el mismo mes.
 
 ## Eliminar Level, no tiene sentido tener esa columna
 
-## Entiendo que se ha creado un framework centralizado para la gestión de reportes financieros
+# Test estan fallando
 
-Pero lamentablemente los contadores tradicionales en reportes como Balanza de Comprobación, Estado de Resultados y Balance General esperan ver el tree view con nodos colapsables y poder navegar el arbol de cuentas en el archivo requerimiento.md he agregado contexto adicional del cambio requerido
+## FAILED tests/test_11_contabilidad_coverage.py::test_route_entity_set_default - sqlalchemy.exc.InvalidRequestError: Entity namespace for "entity" has no property "predeterminada"
+
+# dev/cacao_accounting/database/helpers.py
+
+## Honor sequence reset policies before incrementing
+
+Line 359 in d17a9ad
+
+ next_val = get_next_sequence_value(sequence_id) 
+
+For series whose Sequence.reset_policy is yearly or monthly, generate_identifier increments the sequence directly and never calls the reset helpers added below. After the first identifier in a new year/month, documents keep numbering from the previous period (for example 2026-...-00042 instead of resetting to 00001), so fiscal/period-based series do not satisfy their configured reset policy.
+
+# cacao_accounting/bancos/__init__.py
+
+## Restore invoice allocations when cancelling payments
+
+    if registro.docstatus != 1:
+        abort(400)
+    try:
+        cancel_document(registro)
+
+When cancelling a PaymentEntry that was created with invoice references, this only reverses the GL entries; the PaymentReference rows created in _save_payment_references remain active and the invoice outstanding_amount cache is not restored. In that scenario AR/AP reports still subtract the cancelled payment while the GL has been reversed, so invoice balances and the ledger diverge. The cancel path should remove/void those references and refresh the affected invoices before committing.
+
+# cacao_accounting/bancos/__init__.py
+
+## Reconcile payment amount with allocated references
+
+Comment on lines +741 to +742
+            allocated = _save_payment_references(payment)
+            if amount == 0 and allocated:
+
+When the payment form posts invoice references and the entered payment amount is greater than the sum allocated by _save_payment_references, the code commits the full paid_amount/received_amount but only reduces invoices by the allocated total. Submitting that payment posts the full amount against AR/AP because references exist, while subledger/outstanding reports only see the smaller allocation, leaving GL and invoice balances inconsistent. Either require amount == allocated for referenced payments or explicitly record the remainder as an advance.
+
+
+# cacao_accounting/__init__.py
+
+
+## Add CSRF tokens before enabling global CSRF
+
+        from flask_wtf.csrf import CSRFProtect
+
+        csrf = CSRFProtect()
+        csrf.init_app(app)
+
+With global CSRFProtect enabled here, every POST is rejected unless the submitted form includes a valid csrf_token. I found changed POST forms that still omit it, for example cacao_accounting/admin/templates/admin/taxes.html posts to /settings/taxes with no hidden token, so saving taxes in a normal browser session will now return 400 before lista_impuestos runs (tests mostly set WTF_CSRF_ENABLED=False, so this can slip through).
+
+# cacao_accounting/__init__.py
+
+## Add CSRF tokens or exemptions for protected write flows
+
+        from flask_wtf.csrf import CSRFProtect
+
+        csrf = CSRFProtect()
+        csrf.init_app(app)
+
+Enabling global CSRFProtect makes every POST/PUT/DELETE require a token, but several callers added in this commit do not send one: for example the journal preferences fetch(..., { method: 'PUT'/'DELETE' }) only sends JSON headers/credentials, and new admin forms such as admin/taxes.html have no csrf_token input. In those UI paths Flask-WTF rejects the request with 400 before the route runs, so either include CSRF tokens in all forms/fetches or explicitly exempt JSON API endpoints that use another protection.
