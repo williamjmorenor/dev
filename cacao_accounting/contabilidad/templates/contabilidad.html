@@ -113,23 +113,19 @@
 
       {% if acceso.autorizado %}
       <li>
-        <a href="{{ url_for('contabilidad.listar_comprobantes') }}">Diario</a>
+        <a href="{{ url_for('reportes.account_movement') }}">Detalle de Movimiento Contable</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       <li>
-        <a href="{{ url_for('reportes.subledger') }}">Mayor</a>
+        <a href="{{ url_for('reportes.trial_balance') }}">Balanza de Comprobación</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       <li>
-        <a href="{{ url_for('reportes.reconciliations') }}">Balanza de Comprobación</a>
+        <a href="{{ url_for('reportes.balance_sheet') }}">Balance General</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       <li>
-        <a href="{{ url_for('reportes.subledger') }}">Balance General</a>
-        <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
-      </li>
-      <li>
-        <a href="{{ url_for('reportes.subledger') }}">Ganancias y Pérdidas</a>
+        <a href="{{ url_for('reportes.income_statement') }}">Estado de Resultado</a>
         <span class="ca-status-dot ca-status-ok" title="Disponible"></span>
       </li>
       {% else %}
