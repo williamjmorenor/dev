@@ -164,7 +164,7 @@
             {% for column in columns %}
             <td class="{% if column in right_align_columns %}text-end{% endif %}" {% if meta and meta.code %}data-code="{{ meta.code }}" data-parent="{{ meta.parent }}" data-level="{{ meta.level }}"{% endif %}>
               {% if column == 'account_code' and row.get(column) not in (None, '—', '') %}
-              <span class="ca-tree-label" style="padding-left: {{ ((meta.level if meta else 1) - 1) * 1.1 }}rem;">
+              <span class="ca-tree-label" data-indent="{{ (meta.level if meta else 1) - 1 }}">
                 {% if meta and meta.drilldown_url %}
                 <a href="{{ meta.drilldown_url }}">{{ row.get(column, "—") }}</a>
                 {% else %}
