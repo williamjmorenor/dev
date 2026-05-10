@@ -142,3 +142,16 @@ With global CSRFProtect enabled here, every POST is rejected unless the submitte
         csrf.init_app(app)
 
 Enabling global CSRFProtect makes every POST/PUT/DELETE require a token, but several callers added in this commit do not send one: for example the journal preferences fetch(..., { method: 'PUT'/'DELETE' }) only sends JSON headers/credentials, and new admin forms such as admin/taxes.html have no csrf_token input. In those UI paths Flask-WTF rejects the request with 400 before the route runs, so either include CSRF tokens in all forms/fetches or explicitly exempt JSON API endpoints that use another protection.
+
+
+# cacao_accounting/search_select.py
+
+## SEARCH_SELECT_REGISTRY es un diccionario una forma mas robusta para ese contenedor de datos
+
+# cacao_accounting/auth/helpers.py
+
+## def validar_clave_segura(clave: str) -> bool: Refactorizar como match/case 
+
+# cacao_accounting/contabilidad/default_accounts.py
+
+## SPECIAL_ACCOUNT_TYPES asegura que todos los tipos de cuentas necesarios estan disponibles para crear nuevas cuentas contables /accounting/account/new
