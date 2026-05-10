@@ -1791,3 +1791,63 @@ Completar capacidades pendientes del framework de reportes: vistas guardadas, se
 - `python -m ruff check cacao_accounting/`
 - `python -m mypy cacao_accounting/`
 - `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True`
+
+
+## 2026-05-10 (iteración FIXME: reportes + bancos + secuencias + seguridad)
+
+### Peticion del usuario
+Corregir issues listados en `FIXME.md` priorizando reportes financieros y regresiones funcionales detectadas.
+
+### Plan implementado
+1. Ajustar UX/flujo del reporte financiero (`account-movement`) para filtros y columnas.
+2. Corregir consistencia contable en pagos con referencias y cancelaciones.
+3. Respetar política de reinicio de secuencias al generar identificadores.
+4. Aplicar refactor puntual solicitado y ampliar tipos especiales de cuentas.
+5. Actualizar bitácora/estado/backlog de la iteración.
+
+### Resumen tecnico de cambios
+- `reportes/financial_report.html`: renombre de filtro a `Comprobante`, botones de aplicar/limpiar en parte superior e inferior, ocultar badge `Cuadrado`, persistencia visual de toggle avanzado con query param `advanced`, y selector de columnas en bloque colapsable tipo modal ligero.
+- `bancos/__init__.py`: validación estricta de monto vs asignación de referencias; en cancelación de pago se eliminan referencias y se refresca `outstanding` de documentos afectados.
+- `database/helpers.py`: `generate_identifier` ahora aplica `should_reset_sequence` + `reset_sequence` antes de incrementar secuencia.
+- `auth/helpers.py`: `validar_clave_segura` refactorizado con `match/case`.
+- `contabilidad/default_accounts.py`: `SPECIAL_ACCOUNT_TYPES` ampliado con tipos base para creación de cuentas.
+
+
+## 2026-05-10 (iteración FIXME pendientes: filtros iniciales y consistencia de selectores)
+
+### Peticion del usuario
+Resolver issues pendientes del `FIXME.md`.
+
+### Resumen tecnico de cambios
+- `reportes/__init__.py`: reportes financieros no cargan datos hasta aplicar filtros (`apply_filters=1`), y se agregó filtro de primer nivel `show_cancellations` para incluir anulaciones.
+- `reportes/financial_report.html`: envío explícito de `apply_filters`, checkbox `Mostrar anulaciones`, y ampliación de columnas visibles para `reference_type`, `is_reversal`, `reversal_of`.
+- `search_select.py`: etiquetas de `party_type`, `voucher_type` y `document_no` ahora se serializan como texto de negocio, evitando representación tipo objeto.
+- `contabilidad/__init__.py`: corrección de `entity/set_default` para usar campos reales del modelo (`default`) en lugar de `predeterminada`; corrección de `enabled` en activar entidad.
+
+
+## 2026-05-10 (cierre adicional FIXME: subtotales, CSRF y anulaciones)
+
+### Resumen tecnico de cambios
+- Se añadió subtotal por agrupador en `account-movement` para filas agrupadas (`group_subtotal`).
+- Se agregó token CSRF al formulario de impuestos admin (`admin/taxes.html`).
+- Se añadieron headers `X-CSRFToken` para operaciones `PUT/DELETE` de preferencias en `journal_nuevo.html`.
+- Se reforzó reporte financiero con filtro primario de anulaciones y columnas extra (`reference_type`, `is_reversal`, `reversal_of`).
+
+
+## 2026-05-10 (cierre final FIXME pendientes)
+
+### Resumen tecnico de cambios
+- Vistas guardadas en reportes: flujo completar guardar/aplicar/eliminar con nombre via modal y listado de vistas disponibles.
+- Columnas visibles migradas a modal dedicado con soporte de campos extra (`reference_type`, `is_reversal`, `reversal_of`).
+- Filtros tipo tercero/tipo comprobante ajustados a `minChars=0` para mostrar resultados al comenzar a escribir.
+- `SEARCH_SELECT_REGISTRY` endurecido con `MappingProxyType` (solo lectura).
+
+
+## 2026-05-10 (cierre documental de pendientes FIXME)
+
+### Peticion del usuario
+Cerrar formalmente los pendientes en `PENDIENTE.md` relacionados con los issues ya corregidos de `FIXME.md` y confirmar que no quedan pendientes de ese bloque.
+
+### Resumen tecnico de cambios
+- `PENDIENTE.md`: pendientes del bloque `FIXME actual` marcados como completados y agregado bloque de cierre final.
+- `FIXME.md`: agregado estado de cierre indicando resolución completa del listado.

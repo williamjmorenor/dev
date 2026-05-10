@@ -115,6 +115,11 @@ SPECIAL_ACCOUNT_TYPES: frozenset[str] = frozenset(
         "payment_discount",
         "period_profit_loss",
         "retained_earnings",
+        "asset",
+        "liability",
+        "equity",
+        "income",
+        "expense",
     }
 )
 
@@ -152,6 +157,11 @@ MANUAL_BLOCKED_ACCOUNT_TYPES: frozenset[str] = frozenset(
         "bridge",
         "period_profit_loss",
         "retained_earnings",
+        "asset",
+        "liability",
+        "equity",
+        "income",
+        "expense",
     }
 )
 

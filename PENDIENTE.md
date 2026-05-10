@@ -557,3 +557,21 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 - [ ] Extender drill-down universal para vouchers no contables (ventas/compras/bancos) con resolución por `voucher_type` a documento origen.
 - [ ] Persistir y aplicar ordenamiento y agrupaciones múltiples como objeto versionado de vista (hoy quedó soportado `group_by` simple + columnas/filtros).
 - [ ] Añadir pruebas E2E de UI para expand/collapse jerárquico y flujo de vistas guardadas.
+
+
+## Pendiente tras iteración 2026-05-10 (FIXME actual)
+
+- [x] Completar ciclo UX de vistas guardadas con modal nominal + selector de vistas por usuario (save/update/delete completo).
+- [x] Migrar `Columnas visibles` a modal dedicado completo y soportar campos adicionales (referencia, is_reversal, reversal_of).
+- [x] Implementar subtotales visibles por agrupador en `account-movement` y cerrar brechas restantes de filtros reportadas en FIXME.
+
+
+## Cierre FIXME 2026-05-10
+
+- [x] Se cerraron los pendientes declarados para reportes financieros y flujo de filtros/columnas de `FIXME.md`.
+
+
+## Cierre final de issues FIXME (2026-05-10)
+
+- [x] Los issues listados en `FIXME.md` fueron implementados en código y/o UX según su alcance funcional dentro de esta iteración.
+- [x] No quedan pendientes abiertos en `PENDIENTE.md` que correspondan al bloque de issues de `FIXME.md`.

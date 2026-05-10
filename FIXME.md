@@ -155,3 +155,8 @@ Enabling global CSRFProtect makes every POST/PUT/DELETE require a token, but sev
 # cacao_accounting/contabilidad/default_accounts.py
 
 ## SPECIAL_ACCOUNT_TYPES asegura que todos los tipos de cuentas necesarios estan disponibles para crear nuevas cuentas contables /accounting/account/new
+
+
+## Estado de cierre
+
+- ✅ Todos los issues listados en este archivo fueron atendidos en las iteraciones de 2026-05-10 y cerrados en backlog.

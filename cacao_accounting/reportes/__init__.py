@@ -28,6 +28,7 @@ from cacao_accounting.reportes.services import (
     KardexFilters,
     OperationalReportFilters,
     SubledgerFilters,
+    PaginatedReport,
     get_account_movement_detail,
     get_aging_report,
     get_ar_ap_subledger,
@@ -501,6 +502,7 @@ def _bool_arg(name: str) -> bool:
 
 def _financial_filters() -> FinancialReportFilters:
     company_code = _resolve_company(request.args.get("company", "cacao"))
+    show_cancellations = _bool_arg("show_cancellations")
     return FinancialReportFilters(
         company=company_code,
         ledger=request.args.get("ledger") or None,
@@ -515,7 +517,7 @@ def _financial_filters() -> FinancialReportFilters:
         party_type=request.args.get("party_type") or None,
         party_id=request.args.get("party_id") or None,
         voucher_type=request.args.get("voucher_type") or None,
-        status=request.args.get("status") or "submitted",
+        status=(request.args.get("status") or "submitted") if not show_cancellations else None,
         include_running_balance=_bool_arg("include_running_balance"),
         page=max(_int_arg("page", 1), 1),
         page_size=max(_int_arg("page_size", 100), 1),
@@ -523,6 +525,17 @@ def _financial_filters() -> FinancialReportFilters:
         sort_dir=request.args.get("sort_dir", "asc"),
         export_all=False,
     )
+
+
+def _should_run_financial_report() -> bool:
+    """Evita cargar datos al abrir la vista sin aplicar filtros explícitos."""
+    if request.args.get("apply_filters") in {"1", "true", "yes", "on"}:
+        return True
+    return "export" in request.args
+
+
+def _empty_financial_report() -> PaginatedReport:
+    return PaginatedReport(rows=[], totals={}, columns=[], total_rows=0, page=1, page_size=100, ledger_currency=None)
 
 
 def _report_to_matrix(report) -> tuple[list[str], list[list[object]]]:
@@ -661,16 +674,46 @@ def _render_financial_report(
     grouped_rows: list[dict[str, object]] = []
     if report_code == "account-movement" and group_by and group_by in display_columns:
         current_group = None
+        group_debit = Decimal("0")
+        group_credit = Decimal("0")
         for row in display_rows:
             group_value = row.get(group_by, _EMPTY_CELL_VALUE)
             if group_value != current_group:
+                if current_group is not None:
+                    grouped_rows.append(
+                        {
+                            "__row_type": "group_subtotal",
+                            "__group_title": _("Subtotal"),
+                            "debit": _format_cell("debit", group_debit, report.ledger_currency),
+                            "credit": _format_cell("credit", group_credit, report.ledger_currency),
+                        }
+                    )
                 group_row: dict[str, object] = {
                     "__row_type": "group",
                     "__group_title": f"{_(group_by.replace('_', ' ').title())}: {group_value}",
                 }
                 grouped_rows.append(group_row)
                 current_group = group_value
+                group_debit = Decimal("0")
+                group_credit = Decimal("0")
+            try:
+                group_debit += Decimal(str(row.get("debit", "0")).replace(",", "").replace("(", "-").replace(")", ""))
+            except DecimalException:
+                pass
+            try:
+                group_credit += Decimal(str(row.get("credit", "0")).replace(",", "").replace("(", "-").replace(")", ""))
+            except DecimalException:
+                pass
             grouped_rows.append(row)
+        if current_group is not None:
+            grouped_rows.append(
+                {
+                    "__row_type": "group_subtotal",
+                    "__group_title": _("Subtotal"),
+                    "debit": _format_cell("debit", group_debit, report.ledger_currency),
+                    "credit": _format_cell("credit", group_credit, report.ledger_currency),
+                }
+            )
     else:
         grouped_rows = display_rows
     display_totals = {key: _format_cell(key, value, report.ledger_currency) for key, value in report.totals.items()}
@@ -706,7 +749,7 @@ def _render_financial_report(
 def account_movement():
     """Reporte unificado de detalle de movimiento contable."""
     filters, selected_view, saved_views = _resolve_view_context("account-movement", _financial_filters())
-    report = get_account_movement_detail(filters)
+    report = get_account_movement_detail(filters) if _should_run_financial_report() else _empty_financial_report()
     if request.args.get("export") in {"csv", "xlsx"}:
         export_report = get_account_movement_detail(replace(filters, export_all=True, page=1))
         return _render_financial_report(
@@ -734,7 +777,7 @@ def account_movement():
 def trial_balance():
     """Reporte de balanza de comprobación."""
     filters, selected_view, saved_views = _resolve_view_context("trial-balance", _financial_filters())
-    report = get_trial_balance_report(filters)
+    report = get_trial_balance_report(filters) if _should_run_financial_report() else _empty_financial_report()
     return _render_financial_report(
         "trial-balance",
         _("Balanza de Comprobación"),
@@ -752,7 +795,7 @@ def trial_balance():
 def income_statement():
     """Reporte de estado de resultado."""
     filters, selected_view, saved_views = _resolve_view_context("income-statement", _financial_filters())
-    report = get_income_statement_report(filters)
+    report = get_income_statement_report(filters) if _should_run_financial_report() else _empty_financial_report()
     return _render_financial_report(
         "income-statement",
         _("Estado de Resultado"),
@@ -770,7 +813,7 @@ def income_statement():
 def balance_sheet():
     """Reporte de balance general."""
     filters, selected_view, saved_views = _resolve_view_context("balance-sheet", _financial_filters())
-    report = get_balance_sheet_report(filters)
+    report = get_balance_sheet_report(filters) if _should_run_financial_report() else _empty_financial_report()
     return _render_financial_report(
         "balance-sheet",
         _("Balance General"),

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Callable, Sequence
 
 from sqlalchemy import Select, case, cast, func, or_, select, true
@@ -119,7 +120,19 @@ def _string_label(value: Any) -> str:
     return str(value)
 
 
-SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
+def _party_type_label(party: Party) -> str:
+    return str(getattr(party, "party_type", "") or "")
+
+
+def _voucher_type_label(entry: GLEntry) -> str:
+    return str(getattr(entry, "voucher_type", "") or "")
+
+
+def _document_no_label(entry: GLEntry) -> str:
+    return str(getattr(entry, "document_no", "") or getattr(entry, "voucher_id", "") or "")
+
+
+_SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
     "company": SearchSelectSpec(
         doctype="company",
         model=Entity,
@@ -269,7 +282,7 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=Party,
         search_fields=("party_type",),
         value_field="party_type",
-        label_builder=_string_label,
+        label_builder=_party_type_label,
         allowed_filters={"is_active": "is_active"},
         default_filters={"is_active": True},
         deduplicate_by_value=True,
@@ -279,7 +292,7 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=GLEntry,
         search_fields=("voucher_type",),
         value_field="voucher_type",
-        label_builder=_string_label,
+        label_builder=_voucher_type_label,
         allowed_filters={"company": "company", "ledger": "ledger_id"},
         default_filters={},
         deduplicate_by_value=True,
@@ -289,12 +302,13 @@ SEARCH_SELECT_REGISTRY: dict[str, SearchSelectSpec] = {
         model=GLEntry,
         search_fields=("document_no", "voucher_id"),
         value_field="document_no",
-        label_builder=_string_label,
+        label_builder=_document_no_label,
         allowed_filters={"company": "company", "ledger": "ledger_id"},
         default_filters={},
         deduplicate_by_value=True,
     ),
 }
+SEARCH_SELECT_REGISTRY = MappingProxyType(_SEARCH_SELECT_REGISTRY)
 
 
 def search_select(doctype: str, query: str, filters: dict[str, list[str]], limit: int | None = None) -> dict[str, Any]:
