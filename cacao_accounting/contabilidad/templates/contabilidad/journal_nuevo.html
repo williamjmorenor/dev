@@ -315,9 +315,11 @@
 
       savePreferences: function () {
         var self = this;
+        var csrfTokenInput = document.querySelector('input[name="csrf_token"]');
+        var csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
         fetch('/api/form-preferences/' + encodeURIComponent(this.formKey) + '/' + encodeURIComponent(this.viewKey), {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
           credentials: 'same-origin',
           body: JSON.stringify(this.preferences)
         })
@@ -330,8 +332,11 @@
 
       resetPreferences: function () {
         var self = this;
+        var csrfTokenInput = document.querySelector('input[name="csrf_token"]');
+        var csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
         fetch('/api/form-preferences/' + encodeURIComponent(this.formKey) + '/' + encodeURIComponent(this.viewKey), {
           method: 'DELETE',
+          headers: { 'X-CSRFToken': csrfToken },
           credentials: 'same-origin'
         })
           .then(function (response) { return response.json(); })

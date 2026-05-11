@@ -372,3 +372,42 @@ Modelos en DB disponibles pero sin funcionalidad completa:
   - autoancho,
   - hoja adicional `Filtros`.
 - Seguridad reforzada en rutas financieras GL con `@verifica_acceso("accounting")` y normalización de compañía válida.
+
+
+## Actualización incremental — 2026-05-10 (fixes de FIXME en curso)
+
+- Reportes financieros: mejoras de UX de filtros en `/reports/account-movement` (botones arriba/abajo, etiqueta de comprobante, toggle avanzado persistente, ajuste de columnas visibles y limpieza visual de totales).
+- Bancos: cancelación de `PaymentEntry` ahora revierte referencias y recalcula saldos pendientes de facturas referenciadas para mantener consistencia subledger/GL.
+- Series: `generate_identifier` respeta reset anual/mensual de secuencias antes de incrementar.
+
+
+## Actualización incremental — 2026-05-10 (FIXME pendientes)
+
+- Los reportes financieros principales ya no muestran datos al abrirse sin acción explícita de filtros; requieren `Aplicar filtros`.
+- Se añadió filtro primario `Mostrar anulaciones` para incluir comprobantes cancelados en consultas financieras GL.
+- Search Select en reportes corrige etiquetas para evitar valores renderizados como objetos en filtros de tipo tercero/tipo comprobante/comprobante.
+- Ruta de entidad predeterminada corregida para evitar error por columna inexistente `predeterminada`.
+
+
+## Actualización incremental — 2026-05-10 (cierre adicional FIXME)
+
+- `account-movement` muestra subtotal por agrupador cuando se usa `group_by`.
+- Formularios/flows protegidos por CSRF reforzados en impuestos admin y preferencias de Journal Entry.
+
+
+## Actualización incremental — 2026-05-10 (cierre final FIXME)
+
+- Reportes financieros completan ciclo de vistas guardadas con captura de nombre mediante modal.
+- Columnas visibles usan modal dedicado y permiten incluir columnas extendidas de reversión/referencia.
+- Registro de tipos en `search_select` encapsulado como estructura de solo lectura.
+
+
+## Actualización incremental — 2026-05-10 (cierre documental FIXME)
+
+- Se cerraron formalmente en `PENDIENTE.md` los pendientes que estaban vinculados al bloque de issues de `FIXME.md`.
+- `FIXME.md` quedó con estado de cierre explícito para reflejar que el listado fue atendido.
+
+
+## Actualización incremental — 2026-05-11 (posting manual)
+
+- Se eliminó el bloqueo manual para cuentas `income/expense` y otros tipos en Journal Entry; el bloqueo manual queda restringido a cuentas de inventario.

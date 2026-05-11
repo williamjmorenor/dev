@@ -115,6 +115,11 @@ SPECIAL_ACCOUNT_TYPES: frozenset[str] = frozenset(
         "payment_discount",
         "period_profit_loss",
         "retained_earnings",
+        "asset",
+        "liability",
+        "equity",
+        "income",
+        "expense",
     }
 )
 
@@ -145,13 +150,7 @@ ACCOUNT_TYPE_ALLOWED_VOUCHERS: dict[str, frozenset[str]] = {
 
 MANUAL_BLOCKED_ACCOUNT_TYPES: frozenset[str] = frozenset(
     {
-        "receivable",
-        "payable",
         "inventory",
-        "tax",
-        "bridge",
-        "period_profit_loss",
-        "retained_earnings",
     }
 )
 
@@ -249,9 +248,10 @@ def validate_gl_account_usage(account_id: str, voucher_type: str | None) -> None
     account_type = (account.account_type or "").strip()
     if not account_type:
         return
-    if voucher_type in {"comprobante_contable", "journal_entry"} and account_type in MANUAL_BLOCKED_ACCOUNT_TYPES:
+    is_manual_voucher = voucher_type in {"comprobante_contable", "journal_entry"}
+    if is_manual_voucher and account_type in MANUAL_BLOCKED_ACCOUNT_TYPES:
         raise DefaultAccountError(f"La cuenta {account.code} de tipo {account_type} no permite afectacion manual.")
-    if voucher_type in {"comprobante_contable", "journal_entry"} and account_type in {"bank", "cash"}:
+    if is_manual_voucher:
         return
     allowed_vouchers = ACCOUNT_TYPE_ALLOWED_VOUCHERS.get(account_type)
     if allowed_vouchers and voucher_type not in allowed_vouchers:

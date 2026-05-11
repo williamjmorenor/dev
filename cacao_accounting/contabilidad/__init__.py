@@ -310,7 +310,7 @@ def activar_entidad(id_entidad):
     from cacao_accounting.database import Entity
 
     ENTIDAD = database.session.execute(database.select(Entity).filter_by(id=id_entidad)).first()
-    ENTIDAD[0].habilitada = True
+    ENTIDAD[0].enabled = True
     database.session.commit()
 
     return LISTA_ENTIDADES
@@ -325,14 +325,14 @@ def predeterminar_entidad(id_entidad):
     from cacao_accounting.database import Entity
 
     # Establece cualquier entidad establecida como predeterminada a falso
-    ENTIDAD_PREDETERMINADA = database.session.execute(database.select(Entity).filter_by(predeterminada=True)).all()
+    ENTIDAD_PREDETERMINADA = database.session.execute(database.select(Entity).filter_by(default=True)).all()
 
     if ENTIDAD_PREDETERMINADA:
         for e in ENTIDAD_PREDETERMINADA:
-            e[0].predeterminada = False
+            e[0].default = False
 
     ENTIDAD = database.session.execute(database.select(Entity).filter_by(id=id_entidad)).first()
-    ENTIDAD[0].predeterminada = True
+    ENTIDAD[0].default = True
     database.session.commit()
 
     return LISTA_ENTIDADES
