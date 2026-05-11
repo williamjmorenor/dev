@@ -1851,3 +1851,13 @@ Cerrar formalmente los pendientes en `PENDIENTE.md` relacionados con los issues 
 ### Resumen tecnico de cambios
 - `PENDIENTE.md`: pendientes del bloque `FIXME actual` marcados como completados y agregado bloque de cierre final.
 - `FIXME.md`: agregado estado de cierre indicando resolución completa del listado.
+
+
+## 2026-05-11 (fix bloqueo manual de cuentas income/expense en Journal Entry)
+
+### Peticion del usuario
+Corregir error en posting manual: cuentas de tipo `income` no deben bloquearse en comprobantes manuales; solo inventario debe bloquearse por requerir metadatos de kardex.
+
+### Resumen tecnico de cambios
+- `contabilidad/default_accounts.py`: `MANUAL_BLOCKED_ACCOUNT_TYPES` reducido a `inventory`.
+- `validate_gl_account_usage`: para vouchers manuales (`comprobante_contable`/`journal_entry`) se bloquea únicamente inventario y se permite el resto de tipos contables.

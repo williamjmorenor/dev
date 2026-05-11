@@ -406,3 +406,8 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 
 - Se cerraron formalmente en `PENDIENTE.md` los pendientes que estaban vinculados al bloque de issues de `FIXME.md`.
 - `FIXME.md` quedó con estado de cierre explícito para reflejar que el listado fue atendido.
+
+
+## Actualización incremental — 2026-05-11 (posting manual)
+
+- Se eliminó el bloqueo manual para cuentas `income/expense` y otros tipos en Journal Entry; el bloqueo manual queda restringido a cuentas de inventario.
