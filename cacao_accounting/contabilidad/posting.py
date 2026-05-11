@@ -649,7 +649,16 @@ def post_sales_invoice(document: SalesInvoice, ledger_code: str | None = None) -
 
         _append_sales_tax_entries(entries=entries, context=context, document=document, tax_result=tax_result)
 
-    return _add_entries(entries)
+    result = _add_entries(entries)
+
+    from cacao_accounting.document_flow.service import refresh_outstanding_amount_cache
+
+    if not document.grand_total:
+        # Se asume que el debito a cuentas por cobrar (amount_total calculado arriba) es el total
+        document.grand_total = abs(_invoice_items_total(items, document) + _signed_tax_delta(document, tax_result))
+    refresh_outstanding_amount_cache(document)
+
+    return result
 
 
 def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = None) -> list[GLEntry]:
@@ -732,6 +741,12 @@ def post_purchase_invoice(document: PurchaseInvoice, ledger_code: str | None = N
             )
 
     result = _add_entries(entries)
+
+    from cacao_accounting.document_flow.service import refresh_outstanding_amount_cache
+
+    if not document.grand_total:
+        document.grand_total = abs(amount_total)
+    refresh_outstanding_amount_cache(document)
 
     from cacao_accounting.compras.purchase_reconciliation_service import EventType, emit_economic_event
 
