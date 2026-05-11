@@ -1,3 +1,10 @@
+# Actualización incremental — 2026-05-11 (UX Uniforme y Mejoras FIXME)
+
+- Se unificó la interfaz de usuario en todo el módulo de Contabilidad siguiendo el patrón de diseño de "Comprobante Contable".
+- Se resolvieron todos los puntos pendientes en FIXME.md, incluyendo listados de recurrentes/cierres, filtros de búsqueda, smart-select en catálogos y limpieza de formularios.
+- El formulario de Cuentas Contables ahora soporta búsqueda dinámica de cuenta padre y cuenta con un selector de tipo de cuenta exhaustivo.
+- Se mejoró la navegación y legibilidad en las vistas de detalle de Entidades, Cuentas, Libros y Proyectos.
+
 # ESTADO ACTUAL DEL PROYECTO
 
 ## Actualizacion incremental - 2026-05-11 (menu cierre mensual)

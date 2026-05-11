@@ -1,3 +1,9 @@
+## Actualización incremental — 2026-05-11 (UX y FIXME)
+
+- [x] Resolver todos los issues identificados en FIXME.md.
+- [x] Unificar UX del módulo contable.
+- [x] Implementar filtros de búsqueda en listados contables.
+
 # PENDIENTE — Cacao Accounting
 
 ## Actualizacion incremental - 2026-05-11 (menu cierre mensual)
