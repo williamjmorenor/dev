@@ -21,41 +21,53 @@ Al finalizar cada iteración actualiza:
 
 Issues actuales que deben corregirse:
 
-## En el menú de contabilidad agregar Comprobantes Contables de Cierre
+## /accounting/journal/recurring
 
-Lo que yo haría es agregar un query en la URL /accounting/journal/new?isclosing=true
+Agregar botón "Nueva Plantilla"
+Agregar lista de plantillas de comprobantes recurrentes.
 
-si isclosing es verdadero marcar el selector de etapa de cierre como Cierre
+## /accounting/period-close/monthly
 
-## En los reportes eliminar los dos botones al final
+No queda claro como iniciar el proceso de cierre mensual
+Agregar botón "Nuevo Cierre"
+Agregar lista de cierres
 
-Ahorra que en la parte superior estas las opciones para guardar o cargar layouts al final del
-formulario los botones de Guardar Vista y Eliminar Vista se deben eliminar
+## /accounting/account/new
 
-## Toggle de Mostrar/Ocultar filtros avanzados no funciona
+Seguir el UX definido en la implementación de comprobantes contables
+Eliminar campo de Moneda. La multimoneda la maneja el backend
+Hay dos selectores de Tipo, uno esta vacío y debe eliminarse el otro debe completarse con los tipos de cuenta que requiere el sistema: cacao_accounting/contabilidad/ctas/catalogos/base_en.json el tipo de cuenta no es requerido para crear una cuenta
+Activo y Habilitado esta duplicado dejar solo un campo visible
+Selector de cuenta padre debe actualizarse para usar smart-select filtrando solo cuentas de la compañia de la misma clasificación y que sean cuentas de grupo
 
-Los filtros avanzados deben estar dentro de un contenedor que reponda a Mostrar / Ocultar filtros avanzados
+## /accounting/account/<compañia>/<codigo_cuenta>
 
-## Busqueda de tercero no funciona
+Actualizar la vista para visualizar una cuenta para seguir el UX de la implementación de comprobantes contables
+Agregar botones "Editar" y "Cancelar"
 
-El selector de tipo de tercero muestra supplier/customer la busqueda de terceros no funciona
+## Al crear una nueva compañia se debe de crear un centro de costos por defecto
 
-## Agrupar por tipo de comprobante no funciona
+Aplicar las mismas mejoras visuales que a la implementación de cuentas contables
 
-No funciona el agrupador por comprobante
+## /accounting/entity/<code>
 
-## Mover el filtro de Comprobante dentro de los filtros avanzados
+Aplicar mismo UX que la implementación de comprobante contable 
 
-## En las vistas de Balanza de Comprobación, Balance General y Estado de Resultado
+## /accounting/entity/edit/<code>
 
-1. Ocultar el selector de columnas visibles
-2. Filtros avanzados colapsados por defecto
+Aplicar el mismo UX que la implementación de comprobante contable
 
-## Prefill filtros al seleccionar la compañia o en la carga inicial
+## /accounting/entity/new
 
-1. Cargar Libro Fiscal por defecto
-2. Seleccionar periodo contable en base a la fecha actual
+Aplicar el mismo UX que la implementación de comprobante contable
 
-## Incluir en pruebas unitarias pruebas de stress en reportes
+## Actualizar el UX de la implementación de comprobante contable para Unidades de Negocio, Libros Contabilidad, Proyectos, Monedas, Tipos de Cambio, Periodos Contables y Años Fiscales
 
-Estresa los reportes con multiple filtros haz una prueba end to end de reportes financieros
+El UX debe ser uniforme en todo el modulo de contabilidad, tomando como base el UX de la implementación de comprobantes contables
+
+Las paginas que muestran listados necesitan contar con filtros apropiados para facilitar localizar registros sin tener que navegar todos los registros.
+
+
+
+
+
