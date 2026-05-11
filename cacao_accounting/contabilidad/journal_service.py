@@ -20,7 +20,14 @@ from cacao_accounting.contabilidad.journal_repository import (
     replace_journal_lines,
 )
 from cacao_accounting.contabilidad.posting import PostingError, cancel_document, post_comprobante_contable
-from cacao_accounting.database import Accounts, ComprobanteContable, ComprobanteContableDetalle, CostCenter, FiscalYear, database
+from cacao_accounting.database import (
+    Accounts,
+    ComprobanteContable,
+    ComprobanteContableDetalle,
+    CostCenter,
+    FiscalYear,
+    database,
+)
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 
 JOURNAL_ENTITY_TYPE = "journal_entry"

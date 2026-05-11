@@ -15,7 +15,6 @@ from cacao_accounting.database import (
     Accounts,
     CompanyDefaultAccount,
     ComprobanteContable,
-    ComprobanteContableDetalle,
     FiscalYear,
     GLEntry,
     database,

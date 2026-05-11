@@ -1976,6 +1976,7 @@ def external_counter_audit_log(counter_id: str):
         titulo="Auditoria de Contador Externo - " + APPNAME,
     )
 
+
 @contabilidad.route("/fiscal_year_closing/list")
 @login_required
 @modulo_activo("accounting")
