@@ -1,5 +1,16 @@
 # ESTADO ACTUAL DEL PROYECTO
 
+## Actualizacion incremental - 2026-05-11 (CI Smart Select JS)
+
+- El workflow `.github/workflows/python-package.yml` ahora instala dependencias JavaScript en `cacao_accounting/static` y ejecuta `npm test`, cubriendo `static/test/smart-select.test.js`.
+- El script `npm test` del paquete estatico es portable para Windows/CI al usar comillas dobles en el patron de Mocha.
+
+## Actualizacion incremental - 2026-05-11 (validacion CI)
+
+- Los checks del workflow `.github/workflows/python-package.yml` pasan correctamente usando `venv` con Python 3.13.
+- La Balanza de Comprobacion ya no expone la columna tecnica `Level` ni en la tabla ni en el modal `Columnas visibles`.
+- Las pruebas quedaron alineadas con dos reglas vigentes: los reportes financieros requieren `apply_filters=1` para cargar datos y el Journal Entry manual solo bloquea cuentas de inventario.
+
 ## Actualizacion incremental - 2026-05-11 (columnas de reportes)
 
 - El modal `Columnas visibles` de reportes financieros ahora muestra etiquetas amigables para todas las columnas disponibles, incluyendo campos tecnicos extendidos como tipo de referencia, reversa y comprobante reversado.

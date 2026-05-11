@@ -588,3 +588,12 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 ## Actualizacion incremental - 2026-05-11 (columnas de reportes)
 
 - Sin nuevos pendientes derivados del ajuste de etiquetas amigables en el modal `Columnas visibles`.
+
+## Actualizacion incremental - 2026-05-11 (validacion CI)
+
+- Sin nuevos pendientes derivados de la validacion del workflow.
+- Nota tecnica: `python -m build` pasa, pero setuptools sigue mostrando advertencias de empaquetado por directorios estaticos/templates detectados como paquetes potenciales; no bloquean el workflow actual.
+
+## Actualizacion incremental - 2026-05-11 (CI Smart Select JS)
+
+- Sin nuevos pendientes derivados de integrar `smart-select.test.js` al workflow.

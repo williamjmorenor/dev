@@ -660,7 +660,7 @@ def test_trial_balance_uses_tree_presentation_without_level_column(app_ctx):
         session["_user_id"] = report_user.id
         session["_fresh"] = True
 
-    response = client.get("/reports/trial-balance?company=cacao&ledger=FISC&accounting_period=2026-05")
+    response = client.get("/reports/trial-balance?apply_filters=1&company=cacao&ledger=FISC&accounting_period=2026-05")
     html = response.get_data(as_text=True)
     assert response.status_code == 200
     assert "Activo Corriente" in html

@@ -1,5 +1,39 @@
 # SESSIONS
 
+## 2026-05-11 (smart-select JS en workflow CI)
+
+### Peticion del usuario
+Asegurar que `cacao_accounting/static/test/smart-select.test.js` se ejecute como parte de `.github/workflows/python-package.yml`.
+
+### Resumen tecnico de cambios
+- `.github/workflows/python-package.yml`: se agrego setup de Node.js 22 con cache de npm, instalacion con `npm ci` en `cacao_accounting/static` y ejecucion de `npm test`.
+- `cacao_accounting/static/package.json`: el script `test` usa comillas dobles para que Mocha resuelva `test/**/*.test.js` tambien en Windows.
+- `cacao_accounting/static/test/smart-select.test.js`: la expectativa de auto-seleccion default conserva las opciones pre-cargadas, alineada con el comportamiento vigente del componente.
+
+### Verificacion ejecutada
+- `npm.cmd --prefix cacao_accounting\\static ci`
+- `npm.cmd --prefix cacao_accounting\\static test`
+
+## 2026-05-11 (validacion workflow CI con venv)
+
+### Peticion del usuario
+Asegurar que todos los checks definidos en `.github/workflows/python-package.yml` pasen correctamente usando el `venv` del proyecto.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/reportes/__init__.py`: la columna tecnica `level` se excluye tambien del modal `Columnas visibles` en Balanza de Comprobacion, no solo de la tabla renderizada.
+- `tests/test_08_reconciliation_reports.py`: la prueba de Balanza simula correctamente el submit de filtros con `apply_filters=1`, respetando la regla de no cargar datos al abrir reportes.
+- `tests/test_11_contabilidad_coverage.py`: la cobertura de bloqueo manual se alinea con la politica vigente: en Journal Entry manual solo se bloquean cuentas de inventario.
+
+### Verificacion ejecutada
+- `venv\\Scripts\\python.exe -m pip install --upgrade pip setuptools flake8 bandit`
+- `venv\\Scripts\\python.exe -m pip install -r development.txt`
+- `venv\\Scripts\\python.exe -m build`
+- `venv\\Scripts\\python.exe -m twine check dist/*`
+- `venv\\Scripts\\python.exe -m flake8 cacao_accounting/`
+- `venv\\Scripts\\python.exe -m ruff check cacao_accounting/`
+- `venv\\Scripts\\python.exe -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS venv\\Scripts\\python.exe -m pytest -v -s --exitfirst --slow=True`
+
 ## 2026-05-11 (etiquetas amigables en selector de columnas)
 
 ### Peticion del usuario

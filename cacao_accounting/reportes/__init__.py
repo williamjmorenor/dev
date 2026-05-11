@@ -644,6 +644,8 @@ def _render_financial_report(
         display_columns = columns
     extra_columns = ["reference_type", "is_reversal", "reversal_of"]
     all_columns = list(dict.fromkeys([*(report.columns or []), *extra_columns]))
+    if report_code == "trial-balance":
+        all_columns = [column for column in all_columns if column != "level"]
     display_headers = {column: _column_label(column, report.ledger_currency) for column in display_columns}
     all_column_headers = {column: _column_label(column, report.ledger_currency) for column in all_columns}
     source_rows = [dict(row.values) for row in report.rows]

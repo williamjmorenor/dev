@@ -16,7 +16,6 @@ import pytest
 from cacao_accounting import create_app
 from cacao_accounting.config import configuracion
 
-
 # ---------------------------------------------------------------------------
 # Shared fixture
 # ---------------------------------------------------------------------------
@@ -79,9 +78,7 @@ def test_auxiliares_obtener_catalogo_base_with_entity(app_ctx):
     from cacao_accounting.contabilidad.auxiliares import obtener_catalogo_base
     from cacao_accounting.database import Accounts, database
 
-    database.session.add(
-        Accounts(entity="cacao", code="1", name="Activo", active=True, enabled=True, group=True, parent=None)
-    )
+    database.session.add(Accounts(entity="cacao", code="1", name="Activo", active=True, enabled=True, group=True, parent=None))
     database.session.commit()
     result = obtener_catalogo_base(entidad_="cacao")
     assert isinstance(result, list)
@@ -308,7 +305,7 @@ def test_default_accounts_validate_gl_account_usage_blocked_manual(app_ctx):
     from cacao_accounting.contabilidad.default_accounts import DefaultAccountError, validate_gl_account_usage
     from cacao_accounting.database import Accounts, database
 
-    acct = Accounts(entity="cacao", code="AR001", name="AR", active=True, enabled=True, account_type="receivable")
+    acct = Accounts(entity="cacao", code="INV001", name="Inventario", active=True, enabled=True, account_type="inventory")
     database.session.add(acct)
     database.session.commit()
     with pytest.raises(DefaultAccountError, match="no permite afectacion manual"):
@@ -441,7 +438,11 @@ def test_journal_service_cancel_nonexistent(app_ctx):
 
 
 def test_journal_service_cancel_not_submitted(app_ctx):
-    from cacao_accounting.contabilidad.journal_service import JournalValidationError, cancel_submitted_journal, create_journal_draft
+    from cacao_accounting.contabilidad.journal_service import (
+        JournalValidationError,
+        cancel_submitted_journal,
+        create_journal_draft,
+    )
     from cacao_accounting.database import Accounts, database
 
     debit = Accounts(entity="cacao", code="EXP-C1", name="Gasto", active=True, enabled=True)
@@ -511,7 +512,11 @@ def test_journal_service_duplicate_nonexistent(app_ctx):
 
 
 def test_journal_service_duplicate_cancelled_status(app_ctx):
-    from cacao_accounting.contabilidad.journal_service import JournalValidationError, create_journal_draft, duplicate_journal_as_draft
+    from cacao_accounting.contabilidad.journal_service import (
+        JournalValidationError,
+        create_journal_draft,
+        duplicate_journal_as_draft,
+    )
     from cacao_accounting.database import Accounts, ComprobanteContable, database
 
     debit = Accounts(entity="cacao", code="EXP-D1", name="Gasto", active=True, enabled=True)
@@ -581,7 +586,9 @@ def test_journal_service_update_nonexistent(app_ctx):
     from cacao_accounting.contabilidad.journal_service import JournalValidationError, update_journal_draft
 
     with pytest.raises(JournalValidationError, match="no existe"):
-        update_journal_draft("nonexistent-id", {"company": "cacao", "posting_date": "2026-05-01", "lines": []}, user_id="admin")
+        update_journal_draft(
+            "nonexistent-id", {"company": "cacao", "posting_date": "2026-05-01", "lines": []}, user_id="admin"
+        )
 
 
 def test_journal_service_update_not_draft(app_ctx):
@@ -990,13 +997,29 @@ def test_journal_service_books_from_book_key(app_ctx):
 def test_ctas_value_function_aliases(app_ctx):
     from cacao_accounting.contabilidad.ctas import _value, _is_group
 
-    row_es = {"codigo": "1.01", "nombre": "Caja", "padre": "", "grupo": "no", "rubro": "Activo", "tipo": "", "tipo_cuenta": "cash"}
+    row_es = {
+        "codigo": "1.01",
+        "nombre": "Caja",
+        "padre": "",
+        "grupo": "no",
+        "rubro": "Activo",
+        "tipo": "",
+        "tipo_cuenta": "cash",
+    }
     assert _value(row_es, "code") == "1.01"
     assert _value(row_es, "name") == "Caja"
     assert _is_group("0") is False
     assert _is_group("") is False
 
-    row_en = {"code": "1.01", "name": "Cash", "parent": "", "group": "1", "classification": "Asset", "type": "", "account_type": ""}
+    row_en = {
+        "code": "1.01",
+        "name": "Cash",
+        "parent": "",
+        "group": "1",
+        "classification": "Asset",
+        "type": "",
+        "account_type": "",
+    }
     assert _value(row_en, "code") == "1.01"
     assert _is_group("1") is True
 
@@ -1996,8 +2019,7 @@ def test_route_naming_series_toggle_default(app_ctx):
     database.session.add(seq)
     database.session.flush()
     series = NamingSeries(
-        name="Serie1", entity_type="journal_entry", is_active=True, is_default=False,
-        prefix_template="{YYYY}-"
+        name="Serie1", entity_type="journal_entry", is_active=True, is_default=False, prefix_template="{YYYY}-"
     )
     database.session.add(series)
     database.session.flush()
@@ -2028,8 +2050,7 @@ def test_route_naming_series_edit_get(app_ctx):
     database.session.add(seq)
     database.session.flush()
     series = NamingSeries(
-        name="Serie2", entity_type="journal_entry", is_active=True, is_default=False,
-        prefix_template="{YYYY}-"
+        name="Serie2", entity_type="journal_entry", is_active=True, is_default=False, prefix_template="{YYYY}-"
     )
     database.session.add(series)
     database.session.flush()
@@ -2060,8 +2081,7 @@ def test_route_naming_series_delete(app_ctx):
     database.session.add(seq)
     database.session.flush()
     series = NamingSeries(
-        name="SerieX", entity_type="journal_entry", is_active=True, is_default=False,
-        prefix_template="{YYYY}-"
+        name="SerieX", entity_type="journal_entry", is_active=True, is_default=False, prefix_template="{YYYY}-"
     )
     database.session.add(series)
     database.session.flush()
@@ -2092,8 +2112,7 @@ def test_route_naming_series_toggle_active_deactivate(app_ctx):
     database.session.add(seq)
     database.session.flush()
     series = NamingSeries(
-        name="SerieA", entity_type="journal_entry", is_active=True, is_default=True,
-        prefix_template="{YYYY}-"
+        name="SerieA", entity_type="journal_entry", is_active=True, is_default=True, prefix_template="{YYYY}-"
     )
     database.session.add(series)
     database.session.flush()
@@ -2114,8 +2133,7 @@ def test_route_naming_series_toggle_active_activate(app_ctx):
     database.session.add(seq)
     database.session.flush()
     series = NamingSeries(
-        name="SerieB", entity_type="journal_entry", is_active=False, is_default=False,
-        prefix_template="{YYYY}-"
+        name="SerieB", entity_type="journal_entry", is_active=False, is_default=False, prefix_template="{YYYY}-"
     )
     database.session.add(series)
     database.session.flush()
@@ -2756,9 +2774,7 @@ def test_route_nueva_cuenta_post_success(app_ctx):
 def test_route_editar_proyecto_post_success(app_ctx):
     from cacao_accounting.database import Project, User, database
 
-    database.session.add(
-        Project(code="PRJEDIT", name="Edit Proyecto", entity="cacao", enabled=True, start=date(2026, 1, 1))
-    )
+    database.session.add(Project(code="PRJEDIT", name="Edit Proyecto", entity="cacao", enabled=True, start=date(2026, 1, 1)))
     database.session.commit()
     user = User.query.filter_by(user="admin").first()
     client = app_ctx.test_client()
