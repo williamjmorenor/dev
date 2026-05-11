@@ -1996,3 +1996,14 @@ Identificar pendientes para cerrar el módulo de contabilidad y aplicar las corr
 - `python -m flake8 cacao_accounting/`
 - `python -m ruff check cacao_accounting/`
 - `python -m black cacao_accounting/`
+
+## Sesión: 2026-05-11 - Mejora de UX y Consistencia en Módulo Contable
+**Petición:** Solucionar los issues detallados en FIXME.md, asegurando un UX uniforme en todo el módulo contable siguiendo el patrón de Comprobante Contable.
+
+**Plan implementado:**
+1.  **Comprobantes Recurrentes y Cierre Mensual:** Se implementaron las listas de plantillas y cierres, y se mejoró el Asistente de Cierre Mensual.
+2.  **Cuentas Contables:** Se rediseñó el formulario de creación (eliminando campos innecesarios, corrigiendo selectores de tipo e implementando smart-select para cuenta padre) y la vista de detalle.
+3.  **Gestión de Entidades:** Se actualizaron las vistas de CRUD de entidades al nuevo estándar UX.
+4.  **UX Uniforme:** Se aplicó el nuevo diseño (heredado de Journal Entry) a Unidades de Negocio, Libros, Proyectos, Monedas, Tasas de Cambio, Periodos y Años Fiscales.
+5.  **Filtros:** Se agregaron filtros de búsqueda en todas las páginas de listado del módulo contable.
+6.  **Validación:** Se verificó la consistencia visual y se ejecutaron las pruebas unitarias existentes.
