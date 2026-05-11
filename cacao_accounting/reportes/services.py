@@ -98,6 +98,7 @@ class FinancialReportFilters:
     voucher_type: str | None = None
     status: str | None = None
     include_running_balance: bool = False
+    include_closing: bool = False
     page: int = 1
     page_size: int = 100
     sort_by: str = "posting_date"
@@ -394,6 +395,8 @@ def _period_bounds(company: str, period_name: str | None) -> tuple[date | None, 
 
 def _apply_gl_filters(query: Any, filters: FinancialReportFilters, period_start: date | None, period_end: date | None) -> Any:
     query = query.where(GLEntry.company == filters.company)
+    if not filters.include_closing:
+        query = query.where(GLEntry.is_fiscal_year_closing.is_(False))
     if filters.voucher_number:
         like_value = f"%{filters.voucher_number.strip()}%"
         query = query.where(GLEntry.document_no.ilike(like_value))
