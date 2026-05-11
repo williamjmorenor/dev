@@ -64,7 +64,7 @@
       </button>
     </div>
     <div class="p-3" x-show="!collapsed">
-      <form method="get" class="d-grid gap-2">
+      <form method="get" class="d-grid gap-2" id="financial-filter-form">
         <input type="hidden" name="apply_filters" value="1">
         <input type="hidden" name="advanced" :value="advanced ? '1' : '0'">
                 <div class="d-flex flex-wrap gap-2 mb-2">
@@ -87,25 +87,25 @@
             </div>
           </div>
         </label>
-        {{ smart_select_field("Compañía", "company", "company", request.args.get('company', 'cacao'), "report-company") }}
-        {{ smart_select_field("Libro contable", "ledger", "book", request.args.get('ledger', ''), "report-ledger", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
-        {{ smart_select_field("Periodo contable", "accounting_period", "accounting_period", request.args.get('accounting_period', ''), "report-accounting-period", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
-        {{ smart_select_field("Comprobante", "voucher_number", "document_no", request.args.get('voucher_number', ''), "report-voucher-number", 0, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
-        {{ smart_select_field("Cuenta contable", "account_code", "account_code", request.args.get('account_code', ''), "report-account-code", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+        {{ smart_select_field("Compañía", "company", "company", report_filters.company, "report-company") }}
+        {{ smart_select_field("Libro contable", "ledger", "book", report_filters.ledger or '', "report-ledger", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+        {{ smart_select_field("Periodo contable", "accounting_period", "accounting_period", report_filters.accounting_period or '', "report-accounting-period", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+        {{ smart_select_field("Cuenta contable", "account_code", "account_code", report_filters.account_code or '', "report-account-code", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
         <button class="btn btn-link text-start p-0 mt-1" type="button" @click="advanced = !advanced">
           <span x-show="!advanced">{{ _("Mostrar filtros avanzados") }}</span>
           <span x-show="advanced">{{ _("Ocultar filtros avanzados") }}</span>
         </button>
-        <div class="d-grid gap-2" x-show="advanced">
-          {{ smart_select_field("Rango cuenta desde", "account_from", "account_code", request.args.get('account_from', ''), "report-account-from", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
-          {{ smart_select_field("Rango cuenta hasta", "account_to", "account_code", request.args.get('account_to', ''), "report-account-to", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
-          {{ smart_select_field("Centro de costos", "cost_center_code", "cost_center", request.args.get('cost_center_code', ''), "report-cost-center", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
-          {{ smart_select_field("Unidad de negocio", "unit_code", "unit", request.args.get('unit_code', ''), "report-unit", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
-          {{ smart_select_field("Proyecto", "project_code", "project", request.args.get('project_code', ''), "report-project", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
-          {{ smart_select_field("Tipo de tercero", "party_type", "party_type", request.args.get('party_type', ''), "report-party-type", 0) }}
-          {{ smart_select_field("Tercero", "party_id", "party", request.args.get('party_id', ''), "report-party-id", 1, {"company": {"selector": "#report-company"}, "party_type": {"selector": "#report-party-type"}}, ["#report-company", "#report-party-type"], ["company"]) }}
-          {{ smart_select_field("Tipo de comprobante", "voucher_type", "voucher_type", request.args.get('voucher_type', ''), "report-voucher-type", 0, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
-          {{ smart_select_field("Estado", "status", "report_status", request.args.get('status', 'submitted'), "report-status") }}
+        <div class="d-grid gap-2" x-show="advanced" x-cloak>
+          {{ smart_select_field("Comprobante", "voucher_number", "document_no", report_filters.voucher_number or '', "report-voucher-number", 0, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
+          {{ smart_select_field("Rango cuenta desde", "account_from", "account_code", report_filters.account_from or '', "report-account-from", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Rango cuenta hasta", "account_to", "account_code", report_filters.account_to or '', "report-account-to", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Centro de costos", "cost_center_code", "cost_center", report_filters.cost_center_code or '', "report-cost-center", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Unidad de negocio", "unit_code", "unit", report_filters.unit_code or '', "report-unit", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Proyecto", "project_code", "project", report_filters.project_code or '', "report-project", 1, {"company": {"selector": "#report-company"}}, ["#report-company"], ["company"]) }}
+          {{ smart_select_field("Tipo de tercero", "party_type", "party_type", report_filters.party_type or '', "report-party-type", 0) }}
+          {{ smart_select_field("Tercero", "party_id", "party", report_filters.party_id or '', "report-party-id", 1, {"company": {"selector": "#report-company"}, "party_type": {"selector": "#report-party-type"}}, ["#report-company", "#report-party-type"], ["company"]) }}
+          {{ smart_select_field("Tipo de comprobante", "voucher_type", "voucher_type", report_filters.voucher_type or '', "report-voucher-type", 0, {"company": {"selector": "#report-company"}, "ledger": {"selector": "#report-ledger"}}, ["#report-company", "#report-ledger"], ["company"]) }}
+          {{ smart_select_field("Estado", "status", "report_status", report_filters.status or 'submitted', "report-status") }}
           <label class="form-label mb-0">
             {{ _("Agrupar por") }}
             <select class="form-select" name="group_by">
@@ -123,13 +123,13 @@
             <input class="form-check-input" type="checkbox" name="show_cancellations" value="1" {% if request.args.get('show_cancellations') in ('1','true','on','yes') %}checked{% endif %}>
             <span class="form-check-label">{{ _("Mostrar anulaciones") }}</span>
           </label>
+          {% if allow_column_selection %}
           <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#columnsModal">{{ _("Columnas visibles") }}</button>
+          {% endif %}
         </div>
         <div class="d-flex flex-wrap gap-2 mt-2">
           <button class="btn btn-primary" type="submit">{{ _("Aplicar filtros") }}</button>
           <a class="btn btn-outline-secondary" href="{{ request.path }}">{{ _("Limpiar filtros") }}</a>
-          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#saveViewModal">{{ _("Guardar vista") }}</button>
-          <button class="btn btn-outline-danger" type="submit" name="view_action" value="reset">{{ _("Eliminar vista") }}</button>
         </div>
       </form>
     </div>
@@ -235,6 +235,7 @@
   </div>
 </div>
 
+{% if allow_column_selection %}
 <div class="modal fade" id="columnsModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -255,6 +256,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 <style>
   .ca-report-layout{display:flex;gap:1rem;min-height:70vh}
@@ -279,10 +281,7 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    const filterForm = document.querySelector('.ca-report-filters form');
-    if (filterForm) {
-      filterForm.id = 'financial-filter-form';
-    }
+    const filterForm = document.getElementById('financial-filter-form');
     const saveViewConfirm = document.getElementById('save-view-confirm');
     const saveViewName = document.getElementById('save-view-name');
     if (saveViewConfirm && saveViewName && filterForm) {

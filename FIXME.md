@@ -1,3 +1,5 @@
+Estado 2026-05-11: issues implementados y cubiertos con pruebas focalizadas. Se conserva el detalle historico debajo como referencia de la iteracion.
+
 Para trabajar en estos issues primeto debes cargar el contexto disponible de:
 
 - AGENTS.md

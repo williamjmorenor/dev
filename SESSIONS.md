@@ -1900,17 +1900,6 @@ Resolver issues pendientes del `FIXME.md`.
 - Filtros tipo tercero/tipo comprobante ajustados a `minChars=0` para mostrar resultados al comenzar a escribir.
 - `SEARCH_SELECT_REGISTRY` endurecido con `MappingProxyType` (solo lectura).
 
-
-## 2026-05-10 (cierre documental de pendientes FIXME)
-
-### Peticion del usuario
-Cerrar formalmente los pendientes en `PENDIENTE.md` relacionados con los issues ya corregidos de `FIXME.md` y confirmar que no quedan pendientes de ese bloque.
-
-### Resumen tecnico de cambios
-- `PENDIENTE.md`: pendientes del bloque `FIXME actual` marcados como completados y agregado bloque de cierre final.
-- `FIXME.md`: agregado estado de cierre indicando resolución completa del listado.
-
-
 ## 2026-05-11 (fix bloqueo manual de cuentas income/expense en Journal Entry)
 
 ### Peticion del usuario
@@ -1919,3 +1908,56 @@ Corregir error en posting manual: cuentas de tipo `income` no deben bloquearse e
 ### Resumen tecnico de cambios
 - `contabilidad/default_accounts.py`: `MANUAL_BLOCKED_ACCOUNT_TYPES` reducido a `inventory`.
 - `validate_gl_account_usage`: para vouchers manuales (`comprobante_contable`/`journal_entry`) se bloquea únicamente inventario y se permite el resto de tipos contables.
+
+## 2026-05-11 (FIXME reportes financieros y comprobantes de cierre)
+
+### Peticion del usuario
+Proceder a solucionar los issues detallados en `FIXME.md`.
+
+### Plan implementado
+1. Agregar acceso a comprobantes contables de cierre desde el menu de contabilidad.
+2. Preseleccionar etapa `Cierre` en `/accounting/journal/new?isclosing=true`.
+3. Ajustar filtros de reportes financieros: mover `Comprobante` a filtros avanzados, corregir toggle avanzado, quitar botones finales duplicados y ocultar `Columnas visibles` en reportes resumidos.
+4. Prefill de filtros financieros con libro predeterminado/primario y periodo contable vigente.
+5. Corregir busqueda de tipo de tercero/tercero y agrupacion por tipo de comprobante.
+6. Agregar pruebas focalizadas de regresion y stress de filtros financieros.
+
+### Resumen tecnico de cambios
+- `contabilidad/templates/contabilidad.html`: nuevo enlace `Comprobantes Contables de Cierre`.
+- `contabilidad/__init__.py`: `nuevo_comprobante` reconoce `isclosing=true` y entrega estado inicial al formulario.
+- `reportes/__init__.py`: defaults de libro/periodo, agrupacion robusta por campos no visibles y control de disponibilidad del modal de columnas.
+- `reportes/templates/reportes/financial_report.html`: filtros avanzados encapsulados, `Comprobante` movido al bloque avanzado, acciones finales duplicadas eliminadas y modal de columnas condicionado.
+- `search_select.py`: `party_type` como opcion estatica con etiquetas `Cliente`/`Proveedor`.
+- Tests: cobertura para cierre, UX de reportes, prefill, agrupacion por comprobante y busqueda de terceros.
+
+### Verificacion ejecutada
+- `venv\\Scripts\\python.exe -m black cacao_accounting\\contabilidad\\__init__.py cacao_accounting\\reportes\\__init__.py cacao_accounting\\search_select.py tests\\test_08_reconciliation_reports.py tests\\test_09_journal_entry_form.py`
+- `venv\\Scripts\\python.exe -m flake8 cacao_accounting\\contabilidad\\__init__.py cacao_accounting\\reportes\\__init__.py cacao_accounting\\search_select.py tests\\test_08_reconciliation_reports.py tests\\test_09_journal_entry_form.py`
+- `venv\\Scripts\\python.exe -m ruff check cacao_accounting\\contabilidad\\__init__.py cacao_accounting\\reportes\\__init__.py cacao_accounting\\search_select.py tests\\test_08_reconciliation_reports.py tests\\test_09_journal_entry_form.py`
+- `venv\\Scripts\\python.exe -m mypy cacao_accounting\\contabilidad\\__init__.py cacao_accounting\\reportes\\__init__.py cacao_accounting\\search_select.py`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS venv\\Scripts\\python.exe -m pytest tests\\test_09_journal_entry_form.py -q`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS venv\\Scripts\\python.exe -m pytest tests\\test_08_reconciliation_reports.py -k "financial_report_filters_prefill or financial_report_can_group_by_voucher_type or search_select_party_type_labels or financial_report_view_persistence_and_column_selection or trial_balance_uses_tree" -q`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS venv\\Scripts\\python.exe -m pytest tests\\test_09_journal_entry_form.py tests\\test_08_reconciliation_reports.py -k "journal_new_closing_query_prefills_closing_stage or financial_report_filters_prefill or financial_report_can_group_by_voucher_type or search_select_party_type_labels or financial_report_view_persistence_and_column_selection or trial_balance_uses_tree" -q`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS venv\\Scripts\\python.exe -m pytest -v -s --exitfirst --slow=True` -> 570 passed.
+
+## 2026-05-11 (menu de comprobantes recurrentes y cierre mensual)
+
+### Peticion del usuario
+Agregar al menu de transacciones de contabilidad las entradas `Comprobante Recurrente` y `Asistente de Cierre Mensual` con base en `requerimiento.md`.
+
+### Resumen tecnico de cambios
+- `contabilidad/templates/contabilidad.html`: se agregaron las entradas en el bloque de registros/transacciones del modulo contable.
+- `contabilidad/__init__.py`: nuevas rutas iniciales `/accounting/journal/recurring` y `/accounting/period-close/monthly`.
+- `contabilidad/templates/contabilidad/recurring_journal_lista.html`: pantalla inicial para plantillas de comprobantes recurrentes, con estados y reglas contables clave.
+- `contabilidad/templates/contabilidad/monthly_close_assistant.html`: pantalla inicial del asistente de cierre mensual, enfocada en el paso 1 de aplicar comprobantes recurrentes.
+- `tests/test_11_contabilidad_coverage.py`: cobertura de menu y rutas nuevas.
+
+### Nota de alcance
+Esta iteracion agrega navegacion y pantallas base alineadas al requerimiento tecnico. La persistencia de plantillas, tabla de aplicaciones y generacion real de comprobantes quedan registradas como pendientes.
+
+### Verificacion ejecutada
+- `venv\\Scripts\\python.exe -m black cacao_accounting\\contabilidad\\__init__.py tests\\test_11_contabilidad_coverage.py`
+- `venv\\Scripts\\python.exe -m flake8 cacao_accounting/`
+- `venv\\Scripts\\python.exe -m ruff check cacao_accounting/`
+- `venv\\Scripts\\python.exe -m mypy cacao_accounting/`
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS venv\\Scripts\\python.exe -m pytest tests\\test_11_contabilidad_coverage.py -k "route_conta or route_comprobantes_recurrentes or route_asistente_cierre_mensual" -q`

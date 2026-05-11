@@ -1070,7 +1070,10 @@ def test_route_conta(app_ctx):
     client = app_ctx.test_client()
     _login(client, user.id)
     response = client.get("/accounting/")
+    html = response.get_data(as_text=True)
     assert response.status_code == 200
+    assert "Comprobante Recurrente" in html
+    assert "Asistente de Cierre Mensual" in html
 
 
 def test_route_monedas(app_ctx):
@@ -1732,6 +1735,32 @@ def test_route_listar_comprobantes(app_ctx):
     assert response.status_code == 200
 
 
+def test_route_comprobantes_recurrentes(app_ctx):
+    from cacao_accounting.database import User
+
+    user = User.query.filter_by(user="admin").first()
+    client = app_ctx.test_client()
+    _login(client, user.id)
+    response = client.get("/accounting/journal/recurring")
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Comprobante Recurrente" in html
+    assert "Plantillas contables recurrentes" in html
+
+
+def test_route_asistente_cierre_mensual(app_ctx):
+    from cacao_accounting.database import User
+
+    user = User.query.filter_by(user="admin").first()
+    client = app_ctx.test_client()
+    _login(client, user.id)
+    response = client.get("/accounting/period-close/monthly")
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Asistente de Cierre Mensual" in html
+    assert "aplicar comprobantes recurrentes" in html
+
+
 def test_route_ver_comprobante_not_found(app_ctx):
     from cacao_accounting.database import User
 
@@ -1830,8 +1859,8 @@ def test_route_ver_comprobante_no_currency(app_ctx):
 
 
 def test_route_duplicar_comprobante_error(app_ctx):
-    from cacao_accounting.contabilidad.journal_service import create_journal_draft, submit_journal, cancel_submitted_journal
-    from cacao_accounting.database import Accounts, AccountingPeriod, Book, ComprobanteContable, User, database
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft
+    from cacao_accounting.database import Accounts, Book, ComprobanteContable, User, database
 
     debit = Accounts(entity="cacao", code="EXP-DC", name="Gasto", active=True, enabled=True)
     credit = Accounts(entity="cacao", code="CAJ-DC", name="Caja", active=True, enabled=True)
@@ -1904,8 +1933,8 @@ def test_route_editar_comprobante_not_found(app_ctx):
 
 
 def test_route_editar_comprobante_not_draft(app_ctx):
-    from cacao_accounting.contabilidad.journal_service import create_journal_draft, submit_journal
-    from cacao_accounting.database import Accounts, AccountingPeriod, Book, ComprobanteContable, User, database
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft
+    from cacao_accounting.database import Accounts, Book, ComprobanteContable, User, database
 
     debit = Accounts(entity="cacao", code="EXP-ED", name="Gasto", active=True, enabled=True)
     credit = Accounts(entity="cacao", code="CAJ-ED", name="Caja", active=True, enabled=True)

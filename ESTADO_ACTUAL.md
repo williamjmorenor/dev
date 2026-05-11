@@ -1,5 +1,19 @@
 # ESTADO ACTUAL DEL PROYECTO
 
+## Actualizacion incremental - 2026-05-11 (menu cierre mensual)
+
+- El menu de transacciones de Contabilidad ahora incluye `Comprobante Recurrente` y `Asistente de Cierre Mensual`.
+- Se agregaron rutas iniciales `/accounting/journal/recurring` y `/accounting/period-close/monthly` con pantallas informativas alineadas al requerimiento tecnico de `requerimiento.md`.
+- Las nuevas pantallas documentan el contrato funcional esperado: plantillas recurrentes que no impactan GL al aprobarse, aplicacion por periodo desde cierre mensual, estados, elegibilidad, prevencion de duplicados y trazabilidad.
+
+## Actualizacion incremental - 2026-05-11 (FIXME reportes y cierre)
+
+- El modulo de contabilidad incluye acceso directo a `Comprobantes Contables de Cierre`, abriendo `/accounting/journal/new?isclosing=true` y preseleccionando la etapa `Cierre`.
+- Los reportes financieros ajustan la UX de filtros: `Comprobante` vive en filtros avanzados, el toggle avanzado controla todo el bloque, se eliminaron botones finales duplicados de vistas guardadas y `Columnas visibles` queda oculto en Balanza, Balance General y Estado de Resultado.
+- Los filtros financieros precargan libro predeterminado/primario y periodo contable segun la fecha actual cuando existe configuracion activa.
+- La busqueda de tipo de tercero muestra etiquetas `Cliente`/`Proveedor` con valores tecnicos `customer`/`supplier`, y la busqueda de terceros dependiente vuelve a filtrar correctamente.
+- La agrupacion de Detalle de Movimiento por tipo de comprobante funciona aunque la columna agrupadora no este visible.
+
 ## Actualizacion incremental - 2026-05-11 (CI Smart Select JS)
 
 - El workflow `.github/workflows/python-package.yml` ahora instala dependencias JavaScript en `cacao_accounting/static` y ejecuta `npm test`, cubriendo `static/test/smart-select.test.js`.

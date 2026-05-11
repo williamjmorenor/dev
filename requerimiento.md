@@ -1,466 +1,465 @@
-Sí. Aquí el requerimiento claro para mejorar los 3 reportes sin romper el backend común.
+Requerimiento Técnico: Comprobantes Recurrentes y Asistente de Cierre Mensual
 
-# Requerimiento técnico — Reportes financieros jerárquicos y navegables
+1. Objetivo
 
-## 1. Objetivo
+Implementar una funcionalidad de Comprobantes Recurrentes que permita definir una afectación contable completa una sola vez y aplicarla automáticamente por periodo contable, sin duplicaciones, como parte del proceso de Cierre Mensual.
 
-Mejorar los reportes financieros principales de **Cacao Accounting**:
+El comprobante recurrente no debe afectar directamente el ledger al aprobarse. Su aprobación crea una plantilla contable activa que podrá ser aplicada posteriormente desde el Asistente de Cierre Mensual.
 
-* Balanza de Comprobación
-* Balance General
-* Estado de Resultado
+1. Concepto General
 
-manteniendo un **framework centralizado de reportes financieros**, pero permitiendo que cada reporte tenga una **presentación especializada**, más cercana a la expectativa de contadores tradicionales.
+Un Comprobante Recurrente representa una plantilla contable aprobada para generar comprobantes contables reales en periodos futuros.
 
-El objetivo no es convertir cada reporte en un módulo independiente, sino separar correctamente:
+Ejemplos:
 
-* **Backend común de cálculo**
-* **Modelo común de datos financieros**
-* **Renderer especializado por tipo de reporte**
-* **Navegación contable unificada**
+Amortización mensual de seguros pagados por anticipado.
+Depreciación mensual.
+Devengo mensual de gastos.
+Reclasificaciones periódicas.
+Provisiones recurrentes.
+Distribuciones contables mensuales.
+3. Estados del Comprobante Recurrente
 
----
+El comprobante recurrente debe manejar los siguientes estados:
 
-# 2. Principio arquitectónico
+3.1 Borrador
 
-La implementación actual usa el mismo backend para los cuatro reportes.
-Esto debe mantenerse.
+Estado inicial.
 
-El backend común garantiza que:
+Características:
 
-* Los saldos sean consistentes.
-* La Balanza, Balance General, Estado de Resultado y Detalle de Movimiento usen la misma fuente contable.
-* No existan diferencias numéricas entre reportes.
-* La lógica de filtros, período, compañía, libro contable, estado y moneda sea compartida.
+Editable.
+No puede aplicarse.
+No afecta ledger.
+Puede eliminarse si no tiene historial de aplicación.
+3.2 Aprobado
 
-Sin embargo, los reportes financieros no deben verse todos como tablas planas.
+Estado activo.
 
-Debe existir una capa adicional:
+Características:
 
-```text
-Financial Report Engine
-        ↓
-Financial Report Dataset común
-        ↓
-Renderer especializado
-        ↓
-Vista del reporte
-```
+No debe ser editable en sus líneas contables críticas.
+Puede ser aplicado por periodo desde el Asistente de Cierre Mensual.
+No afecta ledger al momento de aprobación.
+Representa una plantilla válida para generación de comprobantes.
+3.3 Cancelado
 
----
+Estado inactivo por decisión del usuario.
 
-# 3. Problema actual
+Características:
 
-Actualmente los reportes:
+No puede aplicarse a nuevos periodos.
+Conserva historial de aplicaciones anteriores.
+No elimina comprobantes ya generados.
+Debe requerir motivo de cancelación.
+3.4 Completado
 
-* Se ven demasiado técnicos.
-* Presentan datos como tablas planas.
-* No muestran claramente el árbol de cuentas.
-* No permiten navegar naturalmente desde un saldo hasta sus movimientos.
-* No reflejan el formato tradicional esperado por contadores.
-* Balance General y Estado de Resultado no tienen formato financiero suficientemente legible.
+Estado final automático o manual controlado.
 
----
+Características:
 
-# 4. Requerimiento principal
+Se alcanza cuando ya fue aplicado el comprobante correspondiente al último periodo definido.
+No puede aplicarse nuevamente.
+Conserva historial completo.
+No debe permitir nuevas aplicaciones.
+4. Campos Principales del Comprobante Recurrente
+4.1 Header
 
-Los reportes de:
+Campos mínimos:
 
-* Balanza de Comprobación
-* Balance General
-* Estado de Resultado
+ID.
+Código o número interno.
+Compañía.
+Libro contable / ledger.
+Nombre del comprobante recurrente.
+Descripción.
+Fecha de inicio.
+Fecha de fin.
+Periodicidad: por ahora mensual.
+Estado.
+Moneda.
+Tipo de comprobante.
+Diario contable, si aplica.
+Referencia.
+Creado por.
+Fecha de creación.
+Aprobado por.
+Fecha de aprobación.
+Cancelado por.
+Fecha de cancelación.
+Motivo de cancelación.
+Fecha de último periodo aplicado.
+Próximo periodo sugerido.
+Indicación de si está completamente aplicado.
+4.2 Líneas contables
 
-deben renderizarse como **estructuras jerárquicas basadas en el árbol de cuentas contables**, con nodos expandibles y colapsables.
+Cada comprobante recurrente debe contener una afectación contable completa:
+
+Cuenta contable.
+Débito.
+Crédito.
+Descripción de línea.
+Centro de costo.
+Unidad de negocio.
+Proyecto.
+Dimensiones analíticas adicionales.
+Tercero / proveedor / cliente, si aplica.
+Moneda.
+Tipo de cambio, si aplica.
+Referencia documental, si aplica.
+
+Regla crítica:
+
+La plantilla debe estar balanceada antes de poder aprobarse.
+
+1. Reglas Contables
+5.1 Aprobación no afecta ledger
+
+Al aprobar un comprobante recurrente:
+
+No se crea movimiento en gl_entry.
+No se crea comprobante contable real.
+Solo se cambia el estado de la plantilla a aprobado.
+5.2 Aplicación sí genera comprobante contable
+
+Cuando el comprobante recurrente se aplica a un periodo:
+
+Se genera un comprobante contable real.
+Ese comprobante se comporta igual que un comprobante manual.
+Se generan entradas reales en el ledger.
+El comprobante generado queda vinculado al comprobante recurrente origen.
+5.3 Comprobante generado
+
+El comprobante generado debe tener:
+
+is_recurrent = true.
+recurrent_template_id.
+recurrent_application_id.
+Periodo contable aplicado.
+Badge visual: “Recurrente”.
+Mismo comportamiento contable que un comprobante manual.
+Mismas validaciones de balance.
+Mismo proceso de auditoría.
+Misma capacidad de consulta, impresión y drill-down.
+6. Tabla Intermedia de Aplicación por Periodo
+
+Debe existir una tabla intermedia para controlar qué comprobantes recurrentes ya fueron aplicados por periodo.
+
+Nombre sugerido:
+
+recurring_journal_application
+
+6.1 Propósito
+
+Garantizar que un comprobante recurrente solo pueda aplicarse una vez por periodo contable.
+
+6.2 Campos mínimos
+ID.
+Compañía.
+Ledger / libro contable.
+ID del comprobante recurrente.
+Año fiscal.
+Periodo contable.
+Mes.
+Fecha de aplicación.
+Estado de aplicación.
+ID del comprobante contable generado.
+Usuario que aplicó.
+Fecha y hora de ejecución.
+Resultado.
+Mensaje de error, si aplica.
+Hash o firma de control opcional.
+Creado en.
+Actualizado en.
+6.3 Estados de aplicación
+
+Estados sugeridos:
+
+pending
+applied
+failed
+reversed
+skipped
+6.4 Restricción única obligatoria
+
+Debe existir una restricción única sobre:
+
+company_id + ledger_id + recurring_journal_id + fiscal_year + accounting_period
+
+Esto garantiza que no se pueda aplicar dos veces el mismo comprobante recurrente en el mismo periodo.
+
+1. Asistente de Cierre Mensual
+7.1 Objetivo
+
+Implementar un Asistente de Cierre Mensual como flujo guiado para ejecutar actividades necesarias al cierre del mes.
+
+Por ahora, el primer y único paso será:
+
+Aplicar comprobantes recurrentes del mes actual.
+
+1. Paso 1: Aplicar Comprobantes Recurrentes
+8.1 Pantalla del asistente
+
+El sistema debe mostrar:
+
+Compañía.
+Año fiscal.
+Periodo actual.
+Fecha de cierre sugerida.
+Lista de comprobantes recurrentes aplicables.
+Estado de cada comprobante recurrente para el periodo.
+Acción para aplicar individualmente.
+Acción para aplicar todos los pendientes.
+8.2 Clasificación visual
+
+Cada comprobante recurrente debe mostrarse con estado visual:
+
+Pendiente de aplicar.
+Ya aplicado.
+No aplicable.
+Fallido.
+Completado.
+Cancelado.
+8.3 Aplicación masiva
+
+El usuario debe poder ejecutar:
+
+Aplicar todos los comprobantes recurrentes pendientes del periodo actual.
+
+El sistema debe:
+
+Validar cada plantilla.
+Evitar duplicados.
+Generar comprobantes reales.
+Registrar la aplicación en la tabla intermedia.
+Mostrar resultado individual por comprobante.
+Permitir revisar errores sin afectar los comprobantes exitosos.
+9. Reglas de Elegibilidad
+
+Un comprobante recurrente es aplicable si:
+
+Está en estado aprobado.
+Pertenece a la compañía seleccionada.
+Pertenece al ledger seleccionado.
+La fecha del periodo está entre fecha inicio y fecha fin.
+No ha sido aplicado previamente en ese periodo.
+Sus cuentas contables están activas.
+El periodo contable está abierto.
+El comprobante está balanceado.
+La moneda y dimensiones son válidas.
+
+No es aplicable si:
+
+Está en borrador.
+Está cancelado.
+Está completado.
+El periodo ya fue aplicado.
+El periodo está cerrado.
+La fecha del periodo está fuera del rango.
+Tiene cuentas inactivas.
+Tiene líneas inválidas o desbalanceadas.
+10. Generación del Comprobante Contable
+
+Al aplicar una plantilla recurrente, el sistema debe crear un comprobante contable real.
+
+10.1 Fecha del comprobante
+
+Debe definirse una regla clara.
+
+Opciones recomendadas:
+
+Fecha del último día del periodo.
+Fecha configurada por el usuario en el asistente.
+Fecha contable del periodo seleccionado.
+
+Recomendación:
+
+Por defecto usar el último día del periodo contable, permitiendo ajuste si el periodo sigue abierto.
+
+10.2 Numeración
+
+El comprobante generado debe usar la serie normal de comprobantes contables.
+
+Debe conservar una referencia visible al comprobante recurrente origen.
 
 Ejemplo:
 
-```text
-▾ 1 Activos
-  ▾ 1.1 Activo corriente
-    ▾ 1.1.01 Efectivo y equivalentes
-        1.1.01.001 Caja
-```
-
-No deben mostrarse únicamente como una tabla plana.
-
----
-
-# 5. Navegación contable obligatoria
-
-Debe implementarse navegación real desde los reportes hacia el detalle que integra cada saldo.
-
-## 5.1 Balance General
-
-Flujo esperado:
-
-```text
-Balance General
-→ clic en cuenta o rubro
-→ abre Detalle de Movimiento Contable filtrado por cuenta
-→ clic en comprobante
-→ abre comprobante contable
-```
-
-## 5.2 Estado de Resultado
-
-Flujo esperado:
-
-```text
-Estado de Resultado
-→ clic en sección o rubro
-→ expande cuentas relacionadas
-→ clic en cuenta
-→ abre Detalle de Movimiento Contable filtrado por cuenta
-→ clic en comprobante
-→ abre documento/comprobante contable
-```
-
-## 5.3 Balanza de Comprobación
-
-Flujo esperado:
-
-```text
-Balanza de Comprobación
-→ clic en cuenta
-→ abre Detalle de Movimiento Contable filtrado por cuenta
-→ clic en comprobante
-→ abre comprobante contable
-```
-
----
-
-# 6. Formato financiero esperado
-
-## 6.1 Balance General
-
-Debe mostrarse en formato financiero, no como tabla técnica.
-
-Ejemplo:
-
-```text
-ACTIVOS
-
-Activo corriente
-  Efectivo y equivalentes                     1,000.00
-  Cuentas por cobrar                            500.00
-TOTAL ACTIVO CORRIENTE                        1,500.00
-
-TOTAL ACTIVOS                                 1,500.00
-
-
-PASIVOS
-
-Pasivo corriente
-  Cuentas por pagar                              300.00
-TOTAL PASIVO CORRIENTE                          300.00
-
-TOTAL PASIVOS                                   300.00
-
-
-PATRIMONIO
-
-Capital en acciones comunes                   1,200.00
-TOTAL PATRIMONIO                              1,200.00
-
-TOTAL PASIVO + PATRIMONIO                     1,500.00
-```
-
----
-
-## 6.2 Estado de Resultado
-
-Debe mostrarse en formato financiero:
-
-```text
-INGRESOS
-
-Ingresos por ventas                           5,000.00
-TOTAL INGRESOS                                5,000.00
-
-
-COSTOS
-
-Costo de ventas                               2,000.00
-TOTAL COSTOS                                  2,000.00
-
-UTILIDAD BRUTA                                3,000.00
-
-
-GASTOS
-
-Gastos administrativos                          800.00
-Gastos de ventas                                500.00
-TOTAL GASTOS                                  1,300.00
-
-UTILIDAD NETA                                 1,700.00
-```
-
----
-
-## 6.3 Balanza de Comprobación
-
-Debe conservar su naturaleza tabular, pero con jerarquía contable:
-
-```text
-▾ 1 Activos
-  ▾ 1.1 Activo corriente
-      1.1.01.001 Caja        0.00    1,000.00    0.00    1,000.00
-
-▾ 3 Patrimonio
-      3.1 Capital            0.00        0.00  1,000.00  (1,000.00)
-```
-
-Columnas mínimas:
-
-* Cuenta
-* Nombre de cuenta
-* Saldo inicial
-* Débito
-* Crédito
-* Saldo final
-* Nivel
-
----
-
-# 7. Comportamiento de jerarquías
-
-Cada nodo del árbol debe soportar:
-
-* Expandir
-* Colapsar
-* Mostrar subtotal acumulado
-* Mostrar saldo propio si aplica
-* Mostrar saldo consolidado de hijos
-* Diferenciar visualmente secciones, grupos y cuentas finales
-
-Los nodos padres deben calcularse a partir de sus hijos.
-
-Las cuentas hoja deben permitir navegación hacia movimientos.
-
----
-
-# 8. Reglas de interacción
-
-## 8.1 Clic en cuenta contable
-
-Al hacer clic en una cuenta contable, el sistema debe abrir:
-
-```text
-/reports/account-movement
-```
-
-con filtros preaplicados:
-
-* Compañía
-* Libro contable
-* Período
-* Cuenta contable
-* Estado
-* Moneda, si aplica
-* Dimensiones activas, si aplica
-
-## 8.2 Clic en comprobante desde Detalle de Movimiento
-
-Al hacer clic en el comprobante:
-
-```text
-cacao-JOU-2026-05-00002
-```
-
-el sistema debe abrir el comprobante contable correspondiente.
-
----
-
-# 9. Requerimiento de backend
-
-El backend debe seguir siendo común.
-
-Debe producir un dataset estructurado que permita dos modos de consumo:
-
-## 9.1 Modo plano
-
-Para:
-
-* Exportar CSV
-* Exportar Excel
-* Detalle de Movimiento Contable
-* Validaciones internas
-
-## 9.2 Modo jerárquico
-
-Para:
-
-* Balanza de Comprobación
-* Balance General
-* Estado de Resultado
-
-El dataset jerárquico debe incluir como mínimo:
-
-```json
-{
-  "account": "1.1.01.001",
-  "account_name": "Caja",
-  "parent_account": "1.1.01",
-  "level": 4,
-  "is_group": false,
-  "section": "ACTIVOS",
-  "opening_balance": 0,
-  "debit": 1000,
-  "credit": 0,
-  "final_balance": 1000,
-  "has_children": false,
-  "movement_url": "/reports/account-movement?...",
-  "children": []
-}
-```
-
----
-
-# 10. Requerimiento de UI
-
-La interfaz debe conservar:
-
-* Sidebar izquierdo del sistema
-* Columna izquierda de filtros
-* Área principal del reporte
-* Botones de exportación
-
-Pero el área principal del reporte debe mejorar visualmente.
+Origen recurrente: DEP-MENSUAL-001
+Periodo aplicado: 2026-05
+11. Reversión y Anulación
+
+Debe definirse el comportamiento si un comprobante generado necesita anularse.
+
+Reglas recomendadas:
+
+Si se anula el comprobante generado, la aplicación debe marcarse como reversed.
+No debe eliminarse el historial.
+El sistema puede permitir reaplicar el periodo solo si la aplicación anterior está reversed.
+La reaplicación debe generar un nuevo comprobante.
+Debe quedar trazabilidad completa.
+12. Trazabilidad
+
+Debe existir trazabilidad bidireccional.
+
+Desde el comprobante recurrente:
+
+Ver aplicaciones por periodo.
+Ver comprobantes generados.
+Ver estado de cada aplicación.
+Ver usuario y fecha de ejecución.
+
+Desde el comprobante generado:
+
+Ver comprobante recurrente origen.
+Ver periodo aplicado.
+Ver aplicación asociada.
+Mostrar badge “Recurrente”.
+13. Auditoría
+
+Eventos auditables mínimos:
+
+Creación del comprobante recurrente.
+Modificación en borrador.
+Aprobación.
+Cancelación.
+Aplicación por periodo.
+Fallo de aplicación.
+Reversión de comprobante generado.
+Marcado automático como completado.
+
+Cada evento debe registrar:
+
+Usuario.
+Fecha y hora.
+Acción.
+Estado anterior.
+Estado nuevo.
+Comentario o motivo.
+Referencia al documento afectado.
+14. UI / UX
+14.1 Lista de comprobantes recurrentes
+
+Debe mostrar:
+
+Código.
+Nombre.
+Compañía.
+Ledger.
+Fecha inicio.
+Fecha fin.
+Estado.
+Último periodo aplicado.
+Próximo periodo sugerido.
+Badge de estado.
+14.2 Vista detalle
 
 Debe incluir:
 
-* Encabezado financiero claro
-* Secciones contables destacadas
-* Subtotales visibles
-* Totales finales destacados
-* Nodos expandibles
-* Cuentas clicables
-* Indicador de reporte cuadrado cuando aplique
-* Mejor alineación numérica
-* Mejor separación visual entre secciones
+Header.
+Líneas contables.
+Historial de aplicaciones.
+Comprobantes generados.
+Botones según estado.
+14.3 Badges sugeridos
 
----
+Para comprobantes recurrentes:
 
-# 11. Exportación
+Borrador: gris.
+Aprobado: azul.
+Cancelado: rojo.
+Completado: verde.
 
-Los reportes deben permitir exportar:
+Para comprobantes generados:
 
-* Excel
-* CSV
+Badge adicional: “Recurrente”.
+15. Validaciones Críticas
 
-La exportación debe soportar:
+Antes de aprobar:
 
-* Versión plana
-* Versión jerárquica indentada
+Debe tener al menos dos líneas.
+Debe estar balanceado.
+Debe tener fecha inicio.
+Debe tener fecha fin.
+Fecha fin debe ser mayor o igual a fecha inicio.
+Debe tener compañía.
+Debe tener ledger.
+Todas las cuentas deben estar activas.
+Las dimensiones requeridas deben estar completas.
 
-En Excel, debe respetarse la indentación de niveles.
+Antes de aplicar:
 
-Ejemplo:
+Periodo abierto.
+No duplicado por periodo.
+Plantilla aprobada.
+Rango de fechas válido.
+Balance válido.
+Cuentas activas.
+Permisos suficientes.
+16. Seguridad y Permisos
 
-```text
-ACTIVOS
-  Activo corriente
-    Efectivo y equivalentes
-      Caja
-TOTAL ACTIVOS
-```
+Permisos sugeridos:
 
----
+Ver comprobantes recurrentes.
+Crear comprobantes recurrentes.
+Editar borradores.
+Aprobar comprobantes recurrentes.
+Cancelar comprobantes recurrentes.
+Ejecutar asistente de cierre mensual.
+Aplicar comprobantes recurrentes.
+Revertir aplicación recurrente.
+Ver historial de aplicación.
+17. Criterios de Aceptación
+CA-001 — Aprobación sin afectar ledger
 
-# 12. Criterios de aceptación
+Dado un comprobante recurrente válido, cuando se aprueba, entonces no debe crear entradas en ledger ni comprobante contable real.
 
-## CA-001 — Backend común preservado
+CA-002 — Aplicación desde cierre mensual
 
-Los cuatro reportes deben seguir usando el mismo backend financiero base.
+Dado un comprobante recurrente aprobado, cuando se ejecuta el paso de cierre mensual, entonces debe generarse un comprobante contable real para el periodo actual.
 
-No debe duplicarse lógica de cálculo por reporte.
+CA-003 — Prevención de duplicados
 
----
+Dado un comprobante recurrente ya aplicado en un periodo, cuando se intenta aplicar nuevamente, entonces el sistema debe bloquear la operación.
 
-## CA-002 — Jerarquía visible
+CA-004 — Tabla intermedia obligatoria
 
-Balanza de Comprobación, Balance General y Estado de Resultado deben mostrar el árbol contable con niveles expandibles.
+Cada aplicación debe registrarse en la tabla intermedia con compañía, ledger, comprobante recurrente, periodo y comprobante generado.
 
----
+CA-005 — Comprobante generado equivalente a manual
 
-## CA-003 — Navegación desde saldo
+El comprobante generado debe comportarse igual que un comprobante manual, salvo por la bandera is_recurrent = true y sus referencias de origen.
 
-Al hacer clic en una cuenta con saldo, el sistema debe abrir Detalle de Movimiento Contable filtrado por esa cuenta y contexto.
+CA-006 — Badge visual
 
----
+Todo comprobante generado desde una plantilla recurrente debe mostrar un badge visual “Recurrente”.
 
-## CA-004 — Navegación hasta comprobante
+CA-007 — Estado completado
 
-Desde Detalle de Movimiento Contable, el usuario debe poder abrir el comprobante contable que originó el movimiento.
+Cuando se aplique el último periodo definido por fecha fin, el comprobante recurrente debe cambiar automáticamente a completado.
 
----
+CA-008 — Cancelación controlada
 
-## CA-005 — Balance General con formato financiero
+Un comprobante recurrente cancelado no debe poder aplicarse a nuevos periodos.
 
-Balance General debe mostrarse por secciones:
+CA-009 — Periodo cerrado
 
-* Activos
-* Pasivos
-* Patrimonio
-* Total Pasivo + Patrimonio
+No debe permitirse aplicar comprobantes recurrentes en periodos cerrados.
 
----
+CA-010 — Reversión trazable
 
-## CA-006 — Estado de Resultado con formato financiero
+Si se anula un comprobante generado por recurrencia, la aplicación debe conservar historial y marcarse como revertida.
 
-Estado de Resultado debe mostrarse por secciones:
+1. Recomendación de Implementación
 
-* Ingresos
-* Costos
-* Utilidad bruta
-* Gastos
-* Utilidad neta
+La arquitectura recomendada es separar tres conceptos:
 
----
+RecurringJournalTemplate
+    Define la plantilla recurrente.
 
-## CA-007 — Balanza con árbol contable
+RecurringJournalApplication
+    Controla la aplicación por periodo.
 
-La Balanza de Comprobación debe mantener columnas contables, pero agrupadas jerárquicamente por el árbol de cuentas.
+JournalEntry
+    Representa el comprobante contable real generado.
 
----
-
-## CA-008 — Totales consistentes
-
-Los totales mostrados en:
-
-* Balanza de Comprobación
-* Balance General
-* Estado de Resultado
-* Detalle de Movimiento Contable
-
-deben coincidir cuando se usan los mismos filtros.
-
----
-
-## CA-009 — Filtros preservados en navegación
-
-Al navegar de un reporte a otro, los filtros activos deben conservarse.
-
----
-
-## CA-010 — Exportación jerárquica
-
-Excel debe exportar la estructura jerárquica con indentación visual.
-
-CSV puede exportarse plano, pero debe incluir columna `level`.
-
----
-
-# 13. Resultado esperado
-
-El sistema debe mantener una arquitectura centralizada y confiable, pero ofrecer reportes financieros con presentación profesional, navegable y entendible para contadores.
-
-La mejora clave es esta:
-
-```text
-No cambiar el motor.
-Cambiar la forma de presentar y navegar los resultados.
-```
-
-El backend debe seguir siendo único.
-La experiencia visual debe adaptarse al tipo de reporte.
+Esto mantiene limpia la contabilidad, evita duplicados y permite que el Asistente de Cierre Mensual crezca en el futuro sin convertir cada proceso de cierre en un módulo aislado.

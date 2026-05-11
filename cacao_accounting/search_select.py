@@ -35,6 +35,7 @@ _DEDUP_QUERY_LIMIT_MULTIPLIER = 5
 _DEDUP_QUERY_LIMIT_MIN = 25
 _STATIC_SEARCH_SELECT_OPTIONS: dict[str, tuple[tuple[str, str], ...]] = {
     "report_status": (("submitted", "Contabilizado"), ("cancelled", "Cancelado")),
+    "party_type": (("customer", "Cliente"), ("supplier", "Proveedor")),
 }
 
 
@@ -121,7 +122,9 @@ def _string_label(value: Any) -> str:
 
 
 def _party_type_label(party: Party) -> str:
-    return str(getattr(party, "party_type", "") or "")
+    labels = {"customer": "Cliente", "supplier": "Proveedor"}
+    party_type = str(getattr(party, "party_type", "") or "")
+    return labels.get(party_type, party_type)
 
 
 def _voucher_type_label(entry: GLEntry) -> str:

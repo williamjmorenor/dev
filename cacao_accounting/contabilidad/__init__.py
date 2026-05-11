@@ -1202,6 +1202,30 @@ def listar_comprobantes():
     )
 
 
+@contabilidad.route("/journal/recurring")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def comprobantes_recurrentes():
+    """Lista inicial de comprobantes recurrentes."""
+    return render_template(
+        "contabilidad/recurring_journal_lista.html",
+        titulo="Comprobantes Recurrentes - " + APPNAME,
+    )
+
+
+@contabilidad.route("/period-close/monthly")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def asistente_cierre_mensual():
+    """Asistente inicial de cierre mensual."""
+    return render_template(
+        "contabilidad/monthly_close_assistant.html",
+        titulo="Asistente de Cierre Mensual - " + APPNAME,
+    )
+
+
 @contabilidad.route("/journal/new", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
@@ -1226,13 +1250,14 @@ def nuevo_comprobante():
 
     TITULO = "Nuevo Comprobante Contable - " + APPNAME
     column_preferences = get_form_preference(str(current_user.id), JOURNAL_FORM_KEY, DEFAULT_VIEW_KEY)
+    initial_journal = {"is_closing": True} if request.args.get("isclosing", "").lower() in {"1", "true", "yes", "on"} else None
     return render_template(
         "contabilidad/journal_nuevo.html",
         titulo=TITULO,
         column_preferences=column_preferences,
         form_key=JOURNAL_FORM_KEY,
         view_key=DEFAULT_VIEW_KEY,
-        initial_journal=None,
+        initial_journal=initial_journal,
         submit_url=url_for("contabilidad.nuevo_comprobante"),
         cancel_url=url_for("contabilidad.conta"),
         currencies=obtener_lista_monedas(),

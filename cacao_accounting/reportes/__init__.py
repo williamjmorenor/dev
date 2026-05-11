@@ -19,7 +19,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
-from cacao_accounting.database import Accounts, Entity, UserFormPreference, database
+from cacao_accounting.database import Accounts, AccountingPeriod, Book, Entity, UserFormPreference, database
 from cacao_accounting.decorators import modulo_activo, verifica_acceso
 from cacao_accounting.form_preferences import get_form_preference, reset_form_preference, save_form_preference
 from cacao_accounting.reportes.services import (
@@ -360,6 +360,35 @@ def _resolve_company(company_code: str) -> str:
     return default_company or "cacao"
 
 
+def _default_ledger_for_company(company_code: str) -> str | None:
+    return database.session.execute(
+        database.select(Book.code)
+        .where(Book.entity == company_code)
+        .order_by(Book.default.desc(), Book.is_primary.desc(), Book.code.asc())
+    ).scalar_one_or_none()
+
+
+def _default_period_for_company(company_code: str, target_date: date | None = None) -> str | None:
+    effective_date = target_date or date.today()
+    period_name = database.session.execute(
+        database.select(AccountingPeriod.name)
+        .where(
+            AccountingPeriod.entity == company_code,
+            AccountingPeriod.enabled.is_(True),
+            AccountingPeriod.start <= effective_date,
+            AccountingPeriod.end >= effective_date,
+        )
+        .order_by(AccountingPeriod.start.desc())
+    ).scalar_one_or_none()
+    if period_name:
+        return period_name
+    return database.session.execute(
+        database.select(AccountingPeriod.name)
+        .where(AccountingPeriod.entity == company_code, AccountingPeriod.enabled.is_(True))
+        .order_by(AccountingPeriod.start.desc())
+    ).scalar_one_or_none()
+
+
 def _build_drill_down_url(values: dict[str, object], company: str, ledger: str | None) -> str | None:
     account_code = values.get("account_code")
     if account_code in (None, "", _EMPTY_CELL_VALUE):
@@ -508,10 +537,12 @@ def _bool_arg(name: str) -> bool:
 def _financial_filters() -> FinancialReportFilters:
     company_code = _resolve_company(request.args.get("company", "cacao"))
     show_cancellations = _bool_arg("show_cancellations")
+    ledger = request.args.get("ledger") or _default_ledger_for_company(company_code)
+    accounting_period = request.args.get("accounting_period") or _default_period_for_company(company_code)
     return FinancialReportFilters(
         company=company_code,
-        ledger=request.args.get("ledger") or None,
-        accounting_period=request.args.get("accounting_period") or None,
+        ledger=ledger,
+        accounting_period=accounting_period,
         voucher_number=request.args.get("voucher_number") or None,
         account_code=request.args.get("account_code") or None,
         account_from=request.args.get("account_from") or None,
@@ -646,6 +677,7 @@ def _render_financial_report(
     all_columns = list(dict.fromkeys([*(report.columns or []), *extra_columns]))
     if report_code == "trial-balance":
         all_columns = [column for column in all_columns if column != "level"]
+    allow_column_selection = report_code == "account-movement"
     display_headers = {column: _column_label(column, report.ledger_currency) for column in display_columns}
     all_column_headers = {column: _column_label(column, report.ledger_currency) for column in all_columns}
     source_rows = [dict(row.values) for row in report.rows]
@@ -682,12 +714,13 @@ def _render_financial_report(
         display_rows.append(formatted_row)
     group_by = request.args.get("group_by") or _preferred_group_by_from_view(report_code, saved_view)
     grouped_rows: list[dict[str, object]] = []
-    if report_code == "account-movement" and group_by and group_by in display_columns:
+    if report_code == "account-movement" and group_by and group_by in (report.columns or []):
         current_group = None
         group_debit = Decimal("0")
         group_credit = Decimal("0")
-        for row in display_rows:
-            group_value = row.get(group_by, _EMPTY_CELL_VALUE)
+        for index, row in enumerate(display_rows):
+            raw_group_value = source_rows[index].get(group_by)
+            group_value = _format_cell(group_by, raw_group_value, report.ledger_currency)
             if group_value != current_group:
                 if current_group is not None:
                     grouped_rows.append(
@@ -743,12 +776,14 @@ def _render_financial_report(
         page_size=report.page_size,
         ledger_currency=report.ledger_currency,
         context_summary=_build_context_summary(report, report_filters),
+        report_filters=report_filters,
         right_align_columns=_RIGHT_ALIGN_COLUMNS,
         is_balanced=_is_report_balanced(report.totals),
         saved_view=saved_view,
         saved_views=saved_views,
         selected_columns=display_columns,
         all_columns=all_columns,
+        allow_column_selection=allow_column_selection,
         group_by=group_by,
     )
 

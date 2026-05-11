@@ -568,6 +568,166 @@ def test_financial_report_view_persistence_and_column_selection(app_ctx):
     assert ">is_reversal<" not in html
 
 
+def test_financial_report_filters_prefill_and_hide_columns_for_summary_reports(app_ctx):
+    from cacao_accounting.database import AccountingPeriod, Book, FiscalYear, Modules, User, database
+
+    accounting_module = Modules(module="accounting", default=True, enabled=True)
+    report_user = User(
+        user="report-filter-user", name="Report Filter User", password=b"x", classification="admin", active=True
+    )
+    fiscal_year = FiscalYear(
+        entity="cacao",
+        name="FY-2026",
+        year_start_date=date(2026, 1, 1),
+        year_end_date=date(2026, 12, 31),
+    )
+    database.session.add_all([accounting_module, report_user, fiscal_year])
+    database.session.flush()
+    database.session.add_all(
+        [
+            Book(entity="cacao", code="FISC", name="Fiscal", currency="NIO", is_primary=True, default=True),
+            AccountingPeriod(
+                entity="cacao",
+                fiscal_year_id=fiscal_year.id,
+                name="2026-05",
+                start=date(2026, 5, 1),
+                end=date(2026, 5, 31),
+                enabled=True,
+                is_closed=False,
+            ),
+        ]
+    )
+    database.session.commit()
+
+    app_ctx.config["SECRET_KEY"] = "testing"
+    client = app_ctx.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = report_user.id
+        session["_fresh"] = True
+
+    summary_response = client.get("/reports/trial-balance")
+    summary_html = summary_response.get_data(as_text=True)
+    detail_response = client.get("/reports/account-movement")
+    detail_html = detail_response.get_data(as_text=True)
+
+    assert summary_response.status_code == 200
+    assert 'initialValue: "FISC"' in summary_html
+    assert 'initialValue: "2026-05"' in summary_html
+    assert "Columnas visibles" not in summary_html
+    assert 'data-bs-target="#saveViewModal">Guardar vista' not in summary_html
+    assert 'name="view_action" value="reset">Eliminar vista' not in summary_html
+    assert 'x-show="advanced" x-cloak' in summary_html
+    assert detail_response.status_code == 200
+    assert "Columnas visibles" in detail_html
+
+
+def test_financial_report_can_group_by_voucher_type_when_column_is_hidden(app_ctx):
+    from cacao_accounting.database import Accounts, AccountingPeriod, Book, FiscalYear, GLEntry, Modules, User, database
+
+    accounting_module = Modules(module="accounting", default=True, enabled=True)
+    report_user = User(user="report-group-user", name="Report Group User", password=b"x", classification="admin", active=True)
+    fiscal_year = FiscalYear(
+        entity="cacao",
+        name="FY-2026-G",
+        year_start_date=date(2026, 1, 1),
+        year_end_date=date(2026, 12, 31),
+    )
+    book = Book(entity="cacao", code="FISC", name="Fiscal", currency="NIO", is_primary=True, default=True)
+    account = Accounts(entity="cacao", code="1.01.99", name="Caja Grupo", active=True, enabled=True)
+    offset = Accounts(entity="cacao", code="3.01.99", name="Capital Grupo", active=True, enabled=True)
+    database.session.add_all([accounting_module, report_user, fiscal_year, book, account, offset])
+    database.session.flush()
+    period = AccountingPeriod(
+        entity="cacao",
+        fiscal_year_id=fiscal_year.id,
+        name="2026-05",
+        start=date(2026, 5, 1),
+        end=date(2026, 5, 31),
+        enabled=True,
+        is_closed=False,
+    )
+    database.session.add(period)
+    database.session.flush()
+    database.session.add_all(
+        [
+            GLEntry(
+                posting_date=date(2026, 5, 8),
+                company="cacao",
+                ledger_id=book.id,
+                accounting_period_id=period.id,
+                account_id=account.id,
+                account_code=account.code,
+                debit=Decimal("10.00"),
+                credit=Decimal("0"),
+                voucher_type="journal_entry",
+                voucher_id="JE-G",
+                document_no="JE-G",
+            ),
+            GLEntry(
+                posting_date=date(2026, 5, 8),
+                company="cacao",
+                ledger_id=book.id,
+                accounting_period_id=period.id,
+                account_id=offset.id,
+                account_code=offset.code,
+                debit=Decimal("0"),
+                credit=Decimal("10.00"),
+                voucher_type="journal_entry",
+                voucher_id="JE-G",
+                document_no="JE-G",
+            ),
+        ]
+    )
+    database.session.commit()
+
+    app_ctx.config["SECRET_KEY"] = "testing"
+    client = app_ctx.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = report_user.id
+        session["_fresh"] = True
+
+    response = client.get(
+        "/reports/account-movement?apply_filters=1&company=cacao&ledger=FISC&accounting_period=2026-05"
+        "&group_by=voucher_type&visible_columns=posting_date&visible_columns=account_code&visible_columns=debit"
+        "&visible_columns=credit"
+    )
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Voucher Type: journal_entry" in html
+    assert "Subtotal" in html
+
+
+def test_search_select_party_type_labels_and_party_filter(app_ctx):
+    from cacao_accounting.database import CompanyParty, Modules, Party, User, database
+
+    user = User(user="party-filter-user", name="Party Filter User", password=b"x", classification="admin", active=True)
+    database.session.add_all(
+        [
+            Modules(module="accounting", default=True, enabled=True),
+            user,
+            Party(id="SUPP-F", party_type="supplier", name="Proveedor F", tax_id="SUPP-F", is_active=True),
+            Party(id="CUST-F", party_type="customer", name="Cliente F", tax_id="CUST-F", is_active=True),
+            CompanyParty(company="cacao", party_id="SUPP-F", is_active=True),
+            CompanyParty(company="cacao", party_id="CUST-F", is_active=True),
+        ]
+    )
+    database.session.commit()
+
+    app_ctx.config["SECRET_KEY"] = "testing"
+    client = app_ctx.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = user.id
+        session["_fresh"] = True
+
+    party_type_payload = client.get("/api/search-select?doctype=party_type&q=prove").json
+    supplier_payload = client.get("/api/search-select?doctype=party&q=Proveedor&company=cacao&party_type=supplier").json
+
+    assert party_type_payload["results"][0]["value"] == "supplier"
+    assert party_type_payload["results"][0]["display_name"] == "Proveedor"
+    assert [item["value"] for item in supplier_payload["results"]] == ["SUPP-F"]
+
+
 def test_trial_balance_uses_tree_presentation_without_level_column(app_ctx):
     from cacao_accounting.database import (
         Accounts,
@@ -923,7 +1083,6 @@ def test_example_seed_creates_company_base_records(app_ctx):
     from cacao_accounting.database import (
         AccountingPeriod,
         Book,
-        CompanyDefaultAccount,
         CostCenter,
         Entity,
         FiscalYear,

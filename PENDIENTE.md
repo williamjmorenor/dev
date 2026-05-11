@@ -1,5 +1,16 @@
 # PENDIENTE — Cacao Accounting
 
+## Actualizacion incremental - 2026-05-11 (menu cierre mensual)
+
+- Pendiente implementar la logica completa de `Comprobante Recurrente`: modelos `RecurringJournalTemplate`/lineas, estados, aprobacion sin GL, cancelacion con motivo e historial.
+- Pendiente implementar `RecurringJournalApplication` con restriccion unica por compania, ledger, plantilla, fiscal year y periodo.
+- Pendiente implementar la aplicacion real desde el `Asistente de Cierre Mensual`, generando comprobantes contables reales y marcandolos como recurrentes.
+
+## Actualizacion incremental - 2026-05-11 (FIXME reportes y cierre)
+
+- Sin nuevos pendientes derivados de esta iteracion.
+- Quedan cerrados los issues actuales de `FIXME.md` relacionados con acceso a comprobantes de cierre, filtros de reportes financieros, busqueda de tercero, agrupacion por comprobante, prefill de libro/periodo y cobertura E2E focalizada de reportes.
+
 ## Actualización incremental — 2026-05-10
 
 - Sin nuevos pendientes derivados de esta iteración.

@@ -232,6 +232,20 @@ def test_journal_new_route_renders_new_backend_form(app_ctx):
     assert "/accounting/gl/new" not in html
 
 
+def test_journal_new_closing_query_prefills_closing_stage(app_ctx):
+    from cacao_accounting.database import User
+
+    user = User.query.filter_by(user="admin").first()
+    client = app_ctx.test_client()
+    _login(client, user.id)
+
+    response = client.get("/accounting/journal/new?isclosing=true")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert '"is_closing": true' in html
+
+
 def test_journal_post_creates_draft_without_gl_entries(app_ctx):
     from cacao_accounting.database import Accounts, Book, ComprobanteContable, GLEntry, User, database
 
@@ -492,7 +506,7 @@ def test_submit_journal_converts_foreign_currency_to_book_currency(app_ctx):
 
 
 def test_submit_journal_allows_cash_account_in_manual_entry(app_ctx):
-    from cacao_accounting.contabilidad.journal_service import create_journal_draft, submit_journal
+    from cacao_accounting.contabilidad.journal_service import create_journal_draft
     from cacao_accounting.database import Accounts, Book, ComprobanteContable, User, database
 
     cash_account = Accounts(entity="cacao", code="11.01.001.001", name="Caja General", active=True, enabled=True, group=False)
@@ -837,7 +851,7 @@ def test_reject_journal_draft_changes_status_without_gl_entries(app_ctx):
 
 def test_journal_detail_shows_readable_labels_and_detail_action(app_ctx):
     from cacao_accounting.contabilidad.journal_service import create_journal_draft
-    from cacao_accounting.database import Accounts, Book, ComprobanteContable, CostCenter, User, database
+    from cacao_accounting.database import Accounts, Book, CostCenter, User, database
 
     debit_account = Accounts(entity="cacao", code="11.01.001.001", name="Caja General", active=True, enabled=True, group=False)
     credit_account = Accounts(entity="cacao", code="31.01", name="Capital Social", active=True, enabled=True, group=False)
