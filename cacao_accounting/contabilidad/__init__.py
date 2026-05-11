@@ -1211,11 +1211,142 @@ def listar_comprobantes():
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
 def comprobantes_recurrentes():
-    """Lista inicial de comprobantes recurrentes."""
+    """Lista de plantillas de comprobantes recurrentes."""
+    from cacao_accounting.database import RecurringJournalTemplate
+
+    consulta = database.paginate(
+        database.select(RecurringJournalTemplate).order_by(RecurringJournalTemplate.code),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+
     return render_template(
         "contabilidad/recurring_journal_lista.html",
+        consulta=consulta,
         titulo="Comprobantes Recurrentes - " + APPNAME,
     )
+
+
+@contabilidad.route("/journal/recurring/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def nuevo_comprobante_recurrente():
+    """Nueva plantilla de comprobante recurrente."""
+    from cacao_accounting.contabilidad.forms import FormularioRecurringJournalTemplate
+    from cacao_accounting.contabilidad.recurring_journal_service import (
+        RecurringJournalError,
+        create_recurring_template,
+    )
+    import json
+
+    formulario = FormularioRecurringJournalTemplate()
+    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.currency.choices = [("", "— Moneda local —")] + obtener_lista_monedas()
+    formulario.ledger_id.choices = [("", "— Seleccione libro —")]
+
+    if formulario.validate_on_submit():
+        try:
+            items_json = request.form.get("items_json")
+            if not items_json:
+                raise RecurringJournalError("Debe incluir al menos dos líneas contables.")
+
+            items = json.loads(items_json)
+            create_recurring_template(
+                data={
+                    "code": formulario.code.data,
+                    "name": formulario.name.data,
+                    "company": formulario.company.data,
+                    "ledger_id": formulario.ledger_id.data or None,
+                    "description": formulario.description.data,
+                    "start_date": formulario.start_date.data,
+                    "end_date": formulario.end_date.data,
+                    "frequency": formulario.frequency.data,
+                    "currency": formulario.currency.data or None,
+                },
+                items=items,
+                user_id=str(current_user.id),
+            )
+            flash("Plantilla de comprobante recurrente creada.", "success")
+            return redirect(url_for("contabilidad.comprobantes_recurrentes"))
+        except (RecurringJournalError, json.JSONDecodeError) as exc:
+            flash(str(exc), "danger")
+
+    return render_template(
+        "contabilidad/recurring_journal_nuevo.html",
+        form=formulario,
+        titulo="Nueva Plantilla Recurrente - " + APPNAME,
+    )
+
+
+@contabilidad.route("/journal/recurring/<identifier>")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def ver_plantilla_recurrente(identifier: str):
+    """Ver detalle de plantilla recurrente."""
+    from cacao_accounting.database import RecurringJournalTemplate, RecurringJournalItem, RecurringJournalApplication
+
+    plantilla = database.session.get(RecurringJournalTemplate, identifier)
+    if not plantilla:
+        flash("Plantilla no encontrada.", "warning")
+        return redirect(url_for("contabilidad.comprobantes_recurrentes"))
+
+    lineas = database.session.query(RecurringJournalItem).filter_by(template_id=plantilla.id).all()
+    aplicaciones = (
+        database.session.query(RecurringJournalApplication)
+        .filter_by(template_id=plantilla.id)
+        .order_by(RecurringJournalApplication.application_date.desc())
+        .all()
+    )
+
+    return render_template(
+        "contabilidad/recurring_journal_ver.html",
+        plantilla=plantilla,
+        lineas=lineas,
+        aplicaciones=aplicaciones,
+        titulo="Detalle de Plantilla Recurrente - " + APPNAME,
+    )
+
+
+@contabilidad.route("/journal/recurring/<identifier>/approve", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def aprobar_plantilla_recurrente(identifier: str):
+    """Aprueba una plantilla recurrente."""
+    from cacao_accounting.contabilidad.recurring_journal_service import RecurringJournalError, approve_recurring_template
+
+    try:
+        approve_recurring_template(identifier, user_id=str(current_user.id))
+        flash("Plantilla recurrente aprobada.", "success")
+    except RecurringJournalError as exc:
+        flash(str(exc), "danger")
+
+    return redirect(url_for("contabilidad.ver_plantilla_recurrente", identifier=identifier))
+
+
+@contabilidad.route("/journal/recurring/<identifier>/cancel", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def cancelar_plantilla_recurrente(identifier: str):
+    """Cancela una plantilla recurrente."""
+    from cacao_accounting.contabilidad.recurring_journal_service import RecurringJournalError, cancel_recurring_template
+
+    motivo = request.form.get("reason")
+    if not motivo:
+        flash("Debe indicar un motivo de cancelación.", "danger")
+        return redirect(url_for("contabilidad.ver_plantilla_recurrente", identifier=identifier))
+
+    try:
+        cancel_recurring_template(identifier, reason=motivo, user_id=str(current_user.id))
+        flash("Plantilla recurrente cancelada.", "warning")
+    except RecurringJournalError as exc:
+        flash(str(exc), "danger")
+
+    return redirect(url_for("contabilidad.ver_plantilla_recurrente", identifier=identifier))
 
 
 @contabilidad.route("/period-close/monthly")
@@ -1223,10 +1354,120 @@ def comprobantes_recurrentes():
 @modulo_activo("accounting")
 @verifica_acceso("accounting")
 def asistente_cierre_mensual():
-    """Asistente inicial de cierre mensual."""
+    """Asistente de cierre mensual."""
+    from cacao_accounting.database import Entity, Book, AccountingPeriod
+    from cacao_accounting.contabilidad.recurring_journal_service import get_applicable_templates
+
+    company_code = request.args.get("company")
+    ledger_id = request.args.get("ledger")
+    period_id = request.args.get("period")
+
+    entidades = database.session.execute(database.select(Entity)).scalars().all()
+    books = []
+    if company_code:
+        books = database.session.execute(database.select(Book).filter_by(entity=company_code, status="activo")).scalars().all()
+
+    periods = []
+    if company_code:
+        periods = (
+            database.session.execute(database.select(AccountingPeriod).filter_by(entity=company_code, is_closed=False))
+            .scalars()
+            .all()
+        )
+
+    templates = []
+    selected_period = None
+    if company_code and ledger_id and period_id:
+        selected_period = database.session.get(AccountingPeriod, period_id)
+        if selected_period:
+            templates = get_applicable_templates(company_code, ledger_id, selected_period.end)
+
+    from cacao_accounting.database import RecurringJournalApplication
+
+    applied_ids = []
+    if selected_period:
+        applied_apps = (
+            database.session.query(RecurringJournalApplication)
+            .filter_by(
+                company=company_code,
+                ledger_id=ledger_id,
+                fiscal_year=str(selected_period.fiscal_year_id),
+                accounting_period=selected_period.name,
+                status="applied",
+            )
+            .all()
+        )
+        applied_ids = [app.template_id for app in applied_apps]
+
     return render_template(
         "contabilidad/monthly_close_assistant.html",
         titulo="Asistente de Cierre Mensual - " + APPNAME,
+        entidades=entidades,
+        books=books,
+        periods=periods,
+        company_code=company_code,
+        ledger_id=ledger_id,
+        period_id=period_id,
+        templates=templates,
+        applied_ids=applied_ids,
+        selected_period=selected_period,
+    )
+
+
+@contabilidad.route("/period-close/monthly/apply-recurring", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def aplicar_recurrentes_cierre():
+    """Aplica plantillas recurrentes desde el asistente de cierre."""
+    from cacao_accounting.contabilidad.recurring_journal_service import (
+        RecurringJournalError,
+        apply_recurring_template,
+    )
+    from cacao_accounting.database import AccountingPeriod
+
+    template_ids = request.form.getlist("template_ids")
+    period_id = request.form.get("period_id")
+    ledger_id = request.form.get("ledger_id")
+
+    if not template_ids or not period_id:
+        flash("Debe seleccionar al menos una plantilla y un periodo.", "warning")
+        return redirect(url_for("contabilidad.asistente_cierre_mensual"))
+
+    period = database.session.get(AccountingPeriod, period_id)
+    if not period:
+        flash("Periodo no encontrado.", "danger")
+        return redirect(url_for("contabilidad.asistente_cierre_mensual"))
+
+    success_count = 0
+    errors = []
+
+    for tid in template_ids:
+        try:
+            apply_recurring_template(
+                template_id=tid,
+                fiscal_year=str(period.fiscal_year_id),
+                period_name=period.name,
+                application_date=period.end,
+                user_id=str(current_user.id),
+            )
+            success_count += 1
+        except RecurringJournalError as exc:
+            errors.append(str(exc))
+
+    if success_count > 0:
+        flash(f"Se aplicaron {success_count} plantillas correctamente.", "success")
+    if errors:
+        for err in errors:
+            flash(err, "danger")
+
+    return redirect(
+        url_for(
+            "contabilidad.asistente_cierre_mensual",
+            company=period.entity,
+            ledger=ledger_id,
+            period=period_id,
+        )
     )
 
 

@@ -2,9 +2,9 @@
 
 ## Actualizacion incremental - 2026-05-11 (menu cierre mensual)
 
-- Pendiente implementar la logica completa de `Comprobante Recurrente`: modelos `RecurringJournalTemplate`/lineas, estados, aprobacion sin GL, cancelacion con motivo e historial.
-- Pendiente implementar `RecurringJournalApplication` con restriccion unica por compania, ledger, plantilla, fiscal year y periodo.
-- Pendiente implementar la aplicacion real desde el `Asistente de Cierre Mensual`, generando comprobantes contables reales y marcandolos como recurrentes.
+- [x] Implementar la logica completa de `Comprobante Recurrente`: modelos `RecurringJournalTemplate`/lineas, estados, aprobacion sin GL, cancelacion con motivo e historial.
+- [x] Implementar `RecurringJournalApplication` con restriccion unica por compania, ledger, plantilla, fiscal year y periodo.
+- [x] Implementar la aplicacion real desde el `Asistente de Cierre Mensual`, generando comprobantes contables reales y marcandolos como recurrentes.
 
 ## Actualizacion incremental - 2026-05-11 (FIXME reportes y cierre)
 
