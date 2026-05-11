@@ -123,6 +123,10 @@
             <input class="form-check-input" type="checkbox" name="show_cancellations" value="1" {% if request.args.get('show_cancellations') in ('1','true','on','yes') %}checked{% endif %}>
             <span class="form-check-label">{{ _("Mostrar anulaciones") }}</span>
           </label>
+          <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="include_closing" value="1" {% if request.args.get('include_closing') in ('1','true','on','yes') %}checked{% endif %}>
+            <span class="form-check-label">{{ _("Incluir Registro de Cierre") }}</span>
+          </label>
           {% if allow_column_selection %}
           <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#columnsModal">{{ _("Columnas visibles") }}</button>
           {% endif %}

@@ -974,6 +974,10 @@ def fiscal_year_edit(fy_id):
     TITULO = "Editar Año Fiscal - " + APPNAME
 
     if formulario.validate_on_submit():
+        if fiscal_year.financial_closed and not bool(formulario.cerrado.data):
+            flash("No se puede abrir un año con cierre contable realizado.", "danger")
+            return redirect(url_for("contabilidad.fiscal_year_edit", fy_id=fy_id))
+
         fiscal_year.entity = request.form.get("entidad", fiscal_year.entity)
         fiscal_year.name = request.form.get("id", fiscal_year.name)
         fiscal_year.year_start_date = formulario.inicio.data
@@ -2212,3 +2216,101 @@ def external_counter_audit_log(counter_id: str):
         registros=registros,
         titulo="Auditoria de Contador Externo - " + APPNAME,
     )
+
+
+@contabilidad.route("/fiscal_year_closing/list")
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def fiscal_year_closing_list():
+    """Listado de cierres de año fiscal."""
+    from cacao_accounting.database import FiscalYear
+
+    company_filter = request.args.get("company", type=str)
+    query = database.select(FiscalYear)
+    if company_filter:
+        query = query.filter_by(entity=company_filter)
+
+    consulta = database.paginate(
+        query.order_by(FiscalYear.year_end_date.desc()),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+
+    from cacao_accounting.database import Entity
+    entidades = database.session.execute(database.select(Entity)).scalars().all()
+
+    return render_template(
+        "contabilidad/fiscal_year_closing_lista.html",
+        titulo="Cierres de Año Fiscal - " + APPNAME,
+        consulta=consulta,
+        entidades=entidades,
+        company_filter=company_filter,
+        statusweb=STATUS,
+    )
+
+
+@contabilidad.route("/fiscal_year_closing/new", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def fiscal_year_closing_new():
+    """Formulario para ejecutar un nuevo cierre de año fiscal."""
+    if current_user.classification != "admin":
+        flash("Solo el administrador del sistema puede ejecutar el cierre de año fiscal.", "danger")
+        return redirect(url_for("contabilidad.fiscal_year_closing_list"))
+
+    from cacao_accounting.database import Entity, FiscalYear
+    from cacao_accounting.contabilidad.fiscal_year_closing import (
+        FiscalYearClosingError,
+        create_fiscal_year_closing_voucher,
+    )
+
+    entidades = database.session.execute(database.select(Entity)).scalars().all()
+
+    if request.method == "POST":
+        company = request.form.get("company")
+        fiscal_year_id = request.form.get("fiscal_year_id")
+        try:
+            create_fiscal_year_closing_voucher(company, fiscal_year_id, user_id=str(current_user.id))
+            flash("Cierre de año fiscal ejecutado correctamente.", "success")
+            return redirect(url_for("contabilidad.fiscal_year_closing_list"))
+        except FiscalYearClosingError as exc:
+            flash(str(exc), "danger")
+
+    # Obtener años fiscales cerrados administrativamente pero no financieramente
+    fiscal_years = database.session.execute(
+        database.select(FiscalYear).filter_by(is_closed=True, financial_closed=False)
+    ).scalars().all()
+
+    return render_template(
+        "contabilidad/fiscal_year_closing_nuevo.html",
+        titulo="Nuevo Cierre de Año Fiscal - " + APPNAME,
+        entidades=entidades,
+        fiscal_years=fiscal_years,
+    )
+
+
+@contabilidad.route("/fiscal_year_closing/reverse/<fy_id>", methods=["POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def fiscal_year_closing_reverse(fy_id):
+    """Revierte un cierre de año fiscal."""
+    if current_user.classification != "admin":
+        flash("Solo el administrador del sistema puede revertir el cierre de año fiscal.", "danger")
+        return redirect(url_for("contabilidad.fiscal_year_closing_list"))
+
+    from cacao_accounting.contabilidad.fiscal_year_closing import (
+        FiscalYearClosingError,
+        reverse_fiscal_year_closing,
+    )
+
+    try:
+        reverse_fiscal_year_closing(fy_id, user_id=str(current_user.id))
+        flash("Cierre de año fiscal revertido correctamente.", "success")
+    except FiscalYearClosingError as exc:
+        flash(str(exc), "danger")
+
+    return redirect(url_for("contabilidad.fiscal_year_closing_list"))

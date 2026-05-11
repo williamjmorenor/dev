@@ -418,6 +418,8 @@ class FiscalYear(database.Model, BaseTabla):  # type: ignore[name-defined]
     year_start_date = database.Column(database.Date(), nullable=False)
     year_end_date = database.Column(database.Date(), nullable=False)
     is_closed = database.Column(database.Boolean(), default=False, nullable=False)
+    financial_closed = database.Column(database.Boolean(), default=False, nullable=False)
+    closing_voucher_id = database.Column(database.String(26), database.ForeignKey("comprobante_contable.id"), nullable=True)
 
 
 class AccountingPeriod(database.Model, BaseTabla):  # type: ignore[name-defined]
@@ -1582,6 +1584,8 @@ class ComprobanteContable(database.Model, BaseTransaccion):  # type: ignore[name
     transaction_currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
     exchange_rate = database.Column(database.Numeric(precision=20, scale=9), nullable=True)
     is_closing = database.Column(database.Boolean(), default=False, nullable=False)
+    is_fiscal_year_closing = database.Column(database.Boolean(), default=False, nullable=False)
+    fiscal_year_id = database.Column(database.String(26), database.ForeignKey("fiscal_year.id"), nullable=True)
     is_recurrent = database.Column(database.Boolean(), default=False, nullable=False)
     recurrent_template_id = database.Column(
         database.String(26), database.ForeignKey("recurring_journal_template.id"), nullable=True
@@ -1728,6 +1732,7 @@ class GLEntry(database.Model):  # type: ignore[name-defined]
     party_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
     bank_account_id = database.Column(database.String(26), database.ForeignKey("bank_account.id"), nullable=True, index=True)
     is_advance = database.Column(database.Boolean(), default=False, nullable=False)
+    is_fiscal_year_closing = database.Column(database.Boolean(), default=False, nullable=False)
     # Trazabilidad de voucher — permite rastrear el origen de cada entrada
     voucher_type = database.Column(database.String(50), nullable=False, index=True)
     voucher_id = database.Column(database.String(26), nullable=False, index=True)
