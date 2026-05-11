@@ -1961,3 +1961,38 @@ Esta iteracion agrega navegacion y pantallas base alineadas al requerimiento tec
 - `venv\\Scripts\\python.exe -m ruff check cacao_accounting/`
 - `venv\\Scripts\\python.exe -m mypy cacao_accounting/`
 - `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS venv\\Scripts\\python.exe -m pytest tests\\test_11_contabilidad_coverage.py -k "route_conta or route_comprobantes_recurrentes or route_asistente_cierre_mensual" -q`
+
+## 2026-05-12 (Cierre del módulo de contabilidad: Comprobantes Recurrentes y Asistente de Cierre)
+
+### Peticion del usuario
+Identificar pendientes para cerrar el módulo de contabilidad y aplicar las correcciones necesarias. Documentar cambios en bitácora.
+
+### Plan implementado
+1. Implementar funcionalidad de Comprobantes Recurrentes (plantillas, aprobación, aplicación).
+2. Completar el Asistente de Cierre Mensual para permitir la aplicación de recurrentes.
+3. Asegurar la inicialización de `outstanding_amount` en el posting de facturas.
+4. Agregar cobertura de pruebas para las nuevas funcionalidades.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/database/__init__.py`:
+    - Nuevos modelos: `RecurringJournalTemplate`, `RecurringJournalItem`, `RecurringJournalApplication`.
+    - Campos agregados a `ComprobanteContable`: `is_recurrent`, `recurrent_template_id`, `recurrent_application_id`.
+- `cacao_accounting/contabilidad/recurring_journal_service.py`: Nuevo servicio con lógica de negocio para plantillas recurrentes (crear, validar balance, aprobar, cancelar, aplicar).
+- `cacao_accounting/contabilidad/forms.py`: Agregado `FormularioRecurringJournalTemplate`.
+- `cacao_accounting/contabilidad/__init__.py`:
+    - Rutas CRUD para `RecurringJournalTemplate`.
+    - Lógica operativa para `Asistente de Cierre Mensual` (selección de periodo y aplicación de plantillas).
+- `cacao_accounting/contabilidad/posting.py`:
+    - `post_sales_invoice` y `post_purchase_invoice` ahora inicializan `grand_total` y refrescan el cache de `outstanding_amount` al momento de la contabilización.
+- `cacao_accounting/contabilidad/templates/contabilidad/`:
+    - `recurring_journal_lista.html`: Lista operativa con estados y badges.
+    - `recurring_journal_nuevo.html`: Formulario dinámico con Alpine.js para captura de líneas contables y balanceo en tiempo real.
+    - `recurring_journal_ver.html`: Vista de detalle con historial de aplicaciones.
+    - `monthly_close_assistant.html`: Interfaz del asistente para aplicar recurrentes por periodo.
+- `tests/test_11_contabilidad_coverage.py`: Extendida la cobertura para incluir las nuevas rutas y lógica de recurrentes.
+
+### Verificacion ejecutada
+- `python -m pytest tests/test_11_contabilidad_coverage.py`
+- `python -m flake8 cacao_accounting/`
+- `python -m ruff check cacao_accounting/`
+- `python -m black cacao_accounting/`

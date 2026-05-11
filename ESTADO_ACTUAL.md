@@ -444,3 +444,10 @@ Modelos en DB disponibles pero sin funcionalidad completa:
 ## Actualización incremental — 2026-05-11 (posting manual)
 
 - Se eliminó el bloqueo manual para cuentas `income/expense` y otros tipos en Journal Entry; el bloqueo manual queda restringido a cuentas de inventario.
+
+## Actualización incremental — 2026-05-12 (Cierre del módulo)
+
+- **Comprobantes Recurrentes:** Implementado el framework completo para plantillas contables que no impactan el ledger al aprobarse, permitiendo su aplicación diferida. Incluye validación de balance y estados operativos (`draft`, `approved`, `cancelled`, `completed`).
+- **Asistente de Cierre Mensual:** Activado el primer paso operativo del asistente, permitiendo filtrar y aplicar plantillas recurrentes aprobadas para un periodo contable específico.
+- **Integración Contable:** Los comprobantes generados desde recurrentes quedan vinculados a su plantilla de origen y heredan el comportamiento de un comprobante manual.
+- **Posting de Facturas:** Se aseguró que al aprobar una factura de compra o venta, se inicialice correctamente el saldo pendiente (`outstanding_amount`) y el gran total, permitiendo un seguimiento inmediato de AR/AP.
