@@ -88,8 +88,13 @@ _COLUMN_LABELS = {
     "party_type": "Party Type",
     "party_id": "Party",
     "created_by": "User",
+    "created": "Creation Date",
     "created_at": "Creation Date",
     "line_comment": "Reference",
+    "reference_type": "Reference Type",
+    "is_reversal": "Is Reversal",
+    "reversal_of": "Reversal Of",
+    "status": "Status",
     "voucher_status": "Status",
     "section": "Section",
     "amount": "Amount",
@@ -637,7 +642,10 @@ def _render_financial_report(
     ]
     if not display_columns:
         display_columns = columns
+    extra_columns = ["reference_type", "is_reversal", "reversal_of"]
+    all_columns = list(dict.fromkeys([*(report.columns or []), *extra_columns]))
     display_headers = {column: _column_label(column, report.ledger_currency) for column in display_columns}
+    all_column_headers = {column: _column_label(column, report.ledger_currency) for column in all_columns}
     source_rows = [dict(row.values) for row in report.rows]
     source_rows = _build_hierarchical_financial_rows(report_code, source_rows, report_filters.company)
     row_metadata = []
@@ -725,6 +733,7 @@ def _render_financial_report(
         rows=report.rows,
         columns=display_columns,
         display_headers=display_headers,
+        all_column_headers=all_column_headers,
         display_rows=grouped_rows,
         totals=display_totals,
         total_rows=report.total_rows,
@@ -737,7 +746,7 @@ def _render_financial_report(
         saved_view=saved_view,
         saved_views=saved_views,
         selected_columns=display_columns,
-        all_columns=report.columns or [],
+        all_columns=all_columns,
         group_by=group_by,
     )
 

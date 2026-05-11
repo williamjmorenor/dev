@@ -562,6 +562,10 @@ def test_financial_report_view_persistence_and_column_selection(app_ctx):
     assert response_apply.status_code == 200
     html = response_apply.get_data(as_text=True)
     assert "vista-mensual" in html
+    assert "Reference Type" in html
+    assert "Is Reversal" in html
+    assert ">reference_type<" not in html
+    assert ">is_reversal<" not in html
 
 
 def test_trial_balance_uses_tree_presentation_without_level_column(app_ctx):

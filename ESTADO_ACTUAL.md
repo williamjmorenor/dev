@@ -1,5 +1,13 @@
 # ESTADO ACTUAL DEL PROYECTO
 
+## Actualizacion incremental - 2026-05-11 (columnas de reportes)
+
+- El modal `Columnas visibles` de reportes financieros ahora muestra etiquetas amigables para todas las columnas disponibles, incluyendo campos tecnicos extendidos como tipo de referencia, reversa y comprobante reversado.
+
+## Actualizacion incremental - 2026-05-11 (UX vistas guardadas)
+
+- En reportes financieros, el campo `Vista guardada` ahora muestra sus acciones (`Cargar`, `Guardar`, `Eliminar`) debajo del input para mejorar la legibilidad del panel lateral y evitar una fila demasiado apretada.
+
 ## Actualización incremental — 2026-05-10 (presentación jerárquica financiera)
 
 - Se mejoró la presentación visual de los reportes financieros principales (`Balanza de Comprobación`, `Balance General`, `Estado de Resultado`) con un renderer jerárquico por cuentas, nodos expandibles/colapsables y subtotales por agrupador.

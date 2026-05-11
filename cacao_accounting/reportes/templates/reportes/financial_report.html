@@ -73,16 +73,18 @@
         </div>
         <label class="form-label mb-0">
           {{ _("Vista guardada") }}
-          <div class="d-flex gap-2">
+          <div class="d-grid gap-2">
             <input name="saved_view" class="form-control" list="saved-views-list" value="{{ saved_view }}">
             <datalist id="saved-views-list">
               {% for view_name in saved_views %}
               <option value="{{ view_name }}"></option>
               {% endfor %}
             </datalist>
-            <button class="btn btn-outline-secondary" type="submit" name="view_action" value="apply">{{ _("Cargar") }}</button>
-            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#saveViewModal">{{ _("Guardar") }}</button>
-            <button class="btn btn-outline-danger" type="submit" name="view_action" value="reset">{{ _("Eliminar") }}</button>
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-outline-secondary" type="submit" name="view_action" value="apply">{{ _("Cargar") }}</button>
+              <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#saveViewModal">{{ _("Guardar") }}</button>
+              <button class="btn btn-outline-danger" type="submit" name="view_action" value="reset">{{ _("Eliminar") }}</button>
+            </div>
           </div>
         </label>
         {{ smart_select_field("Compañía", "company", "company", request.args.get('company', 'cacao'), "report-company") }}
@@ -239,10 +241,10 @@
       <div class="modal-header"><h5 class="modal-title">{{ _("Columnas visibles") }}</h5></div>
       <div class="modal-body">
         <div class="row row-cols-2">
-          {% for available in all_columns + ["reference_type", "is_reversal", "reversal_of"] %}
+          {% for available in all_columns %}
           <label class="form-check col">
             <input class="form-check-input" type="checkbox" name="visible_columns" form="financial-filter-form" value="{{ available }}" {% if available in selected_columns %}checked{% endif %}>
-            <span class="form-check-label">{{ display_headers.get(available, available) }}</span>
+            <span class="form-check-label">{{ all_column_headers.get(available, available) }}</span>
           </label>
           {% endfor %}
         </div>

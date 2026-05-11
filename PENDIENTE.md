@@ -580,3 +580,11 @@ El servicio `cacao_accounting/contabilidad/posting.py` ya contabiliza documentos
 ## Ajuste 2026-05-11 — bloqueo manual por tipo de cuenta
 
 - [x] Corregido: cuentas `income` ya no bloquean comprobantes manuales; solo `inventory` mantiene restricción manual por dependencia de metadatos de kardex.
+
+## Actualizacion incremental - 2026-05-11
+
+- Sin nuevos pendientes derivados del ajuste visual de `Vista guardada` en reportes financieros.
+
+## Actualizacion incremental - 2026-05-11 (columnas de reportes)
+
+- Sin nuevos pendientes derivados del ajuste de etiquetas amigables en el modal `Columnas visibles`.

@@ -1,5 +1,29 @@
 # SESSIONS
 
+## 2026-05-11 (etiquetas amigables en selector de columnas)
+
+### Peticion del usuario
+Corregir el modal `Columnas visibles` de reportes financieros porque algunas columnas aparecian con nombres tecnicos como `cost_center`, `party_type` o `is_reversal`.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/reportes/__init__.py`: se completaron etiquetas amigables para columnas tecnicas de reportes y se genera un mapa de encabezados para todas las columnas disponibles del modal, no solo para las visibles en la tabla.
+- `cacao_accounting/reportes/templates/reportes/financial_report.html`: el modal ahora usa `all_column_headers` y evita duplicar columnas extra.
+- `tests/test_08_reconciliation_reports.py`: se agrego cobertura para validar etiquetas amigables de columnas extendidas.
+
+### Verificacion ejecutada
+- `c:/code/cacao-accounting/venv/Scripts/python.exe -m pytest tests/test_08_reconciliation_reports.py -k "financial_report_view_persistence_and_column_selection" -q`
+
+## 2026-05-11 (ajuste visual de vistas guardadas en reportes)
+
+### Peticion del usuario
+Mover los botones de `Cargar`, `Guardar` y `Eliminar` debajo del campo `Vista guardada` en el panel lateral de filtros de reportes.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/reportes/templates/reportes/financial_report.html`: el campo `saved_view` queda en una fila propia y las acciones de vista guardada se agrupan debajo con `flex-wrap` para conservar el layout compacto del panel.
+
+### Verificacion ejecutada
+- Cambio visual puntual en plantilla HTML; no se ejecutaron pruebas automatizadas.
+
 ## 2026-05-10 (mejora visual jerárquica en reportes financieros)
 
 ### Peticion del usuario
