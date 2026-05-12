@@ -205,7 +205,6 @@ class FormularioCuenta(FlaskForm):
         validators=[Optional()],
     )
     activo = BooleanField("Activo", default=True)
-    habilitado = BooleanField("Habilitado", default=True)
 
 
 class FormularioCentroCosto(FlaskForm):
@@ -215,7 +214,6 @@ class FormularioCentroCosto(FlaskForm):
     nombre = StringField("Nombre", validators=[DataRequired()])
     entidad = SelectField("Entidad", validators=[DataRequired()])
     activo = BooleanField("Activo", default=True)
-    habilitado = BooleanField("Habilitado", default=True)
     predeterminado = BooleanField("Predeterminado", default=False)
     grupo = BooleanField("Grupo", default=False)
     padre = SelectField("Centro Padre", choices=[], validators=[Optional()])

@@ -148,7 +148,13 @@ def entidades():
     query = database.select(Entity)
     search = request.args.get("search")
     if search:
-        query = query.filter(or_(Entity.code.ilike(f"%{search}%"), Entity.name.ilike(f"%{search}%"), Entity.company_name.ilike(f"%{search}%")))
+        query = query.filter(
+            or_(
+                Entity.code.ilike(f"%{search}%"),
+                Entity.name.ilike(f"%{search}%"),
+                Entity.company_name.ilike(f"%{search}%"),
+            )
+        )
 
     CONSULTA = database.paginate(
         query,
@@ -678,6 +684,56 @@ def nueva_cuenta():
     )
 
 
+@contabilidad.route("/account/<entity>/<id_cta>/edit", methods=["GET", "POST"])
+@login_required
+@modulo_activo("accounting")
+@verifica_acceso("accounting")
+def editar_cuenta(entity, id_cta):
+    """Formulario para editar una cuenta contable existente."""
+    from cacao_accounting.contabilidad.forms import FormularioCuenta
+    from cacao_accounting.database import Accounts
+
+    registro = database.session.execute(
+        database.select(Accounts).filter(Accounts.code == id_cta, Accounts.entity == entity)
+    ).scalar_one_or_none()
+
+    if registro is None:
+        flash("La cuenta contable indicada no existe.", "warning")
+        return redirect(url_for("contabilidad.cuentas"))
+
+    formulario = FormularioCuenta(obj=registro)
+    formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
+    formulario.entidad.data = registro.entity
+    formulario.padre.choices = [("", "Sin padre")]
+    if registro.parent:
+        padre_row = database.session.execute(
+            database.select(Accounts).filter(Accounts.code == registro.parent, Accounts.entity == entity)
+        ).scalar_one_or_none()
+        if padre_row:
+            formulario.padre.choices.append((padre_row.code, f"{padre_row.code} - {padre_row.name}"))
+        formulario.padre.data = registro.parent
+
+    TITULO = "Editar Cuenta Contable - " + APPNAME
+
+    if formulario.validate_on_submit():
+        registro.name = formulario.name.data
+        registro.group = bool(formulario.grupo.data)
+        registro.parent = formulario.padre.data or None
+        registro.classification = formulario.clasificacion.data or None
+        registro.account_type = formulario.account_type.data or None
+        registro.active = bool(formulario.activo.data)
+        registro.enabled = bool(formulario.activo.data)
+        database.session.commit()
+        return redirect(url_for("contabilidad.cuenta", entity=entity, id_cta=registro.code))
+
+    return render_template(
+        "contabilidad/cuenta_crear.html",
+        titulo=TITULO,
+        form=formulario,
+        edit=True,
+    )
+
+
 @contabilidad.route("/costs_center", methods=["GET", "POST"])
 @login_required
 @modulo_activo("accounting")
@@ -716,7 +772,7 @@ def nuevo_centro_costo():
             code=request.form.get("id", None),
             name=request.form.get("nombre", None),
             active=bool(formulario.activo.data),
-            enabled=bool(formulario.habilitado.data),
+            enabled=bool(formulario.activo.data),
             default=bool(formulario.predeterminado.data),
             group=bool(formulario.grupo.data),
             parent=request.form.get("padre") or None,
@@ -756,7 +812,7 @@ def editar_centro_costo(id_cc):
         registro.name = request.form.get("nombre", registro.name)
         registro.entity = request.form.get("entidad", registro.entity)
         registro.active = bool(formulario.activo.data)
-        registro.enabled = bool(formulario.habilitado.data)
+        registro.enabled = bool(formulario.activo.data)
         registro.default = bool(formulario.predeterminado.data)
         registro.group = bool(formulario.grupo.data)
         registro.parent = request.form.get("padre") or None
@@ -1404,7 +1460,11 @@ def asistente_cierre_mensual():
     entidades = database.session.execute(database.select(Entity)).scalars().all()
     books = []
     if company_code:
-        books = database.session.execute(database.select(Book).filter_by(entity=company_code, status="activo")).scalars().all()
+        books = (
+            database.session.execute(database.select(Book).filter_by(entity=company_code, status="activo"))
+            .scalars()
+            .all()
+        )
 
     periods = []
     if company_code:
@@ -1534,7 +1594,8 @@ def nuevo_comprobante():
 
     TITULO = "Nuevo Comprobante Contable - " + APPNAME
     column_preferences = get_form_preference(str(current_user.id), JOURNAL_FORM_KEY, DEFAULT_VIEW_KEY)
-    initial_journal = {"is_closing": True} if request.args.get("isclosing", "").lower() in {"1", "true", "yes", "on"} else None
+    is_closing = request.args.get("isclosing", "").lower() in {"1", "true", "yes", "on"}
+    initial_journal = {"is_closing": True} if is_closing else None
     return render_template(
         "contabilidad/journal_nuevo.html",
         titulo=TITULO,
