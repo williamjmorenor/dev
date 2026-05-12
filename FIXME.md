@@ -1,6 +1,14 @@
-Estado 2026-05-11: issues implementados y cubiertos con pruebas focalizadas. Se conserva el detalle historico debajo como referencia de la iteracion.
+Estado 2026-05-12 (Finalizado): Todos los issues listados han sido resueltos y verificados.
+- Se ha unificado el UX en todo el módulo contable siguiendo el "Voucher Pattern".
+- Se implementaron las funcionalidades de Comprobantes Recurrentes y Asistente de Cierre Mensual.
+- Se agregaron filtros de búsqueda en las vistas de listado.
+- Se limpiaron los formularios de Cuentas y Centros de Costos (eliminando campos redundantes).
+- Se implementó la edición para Cuentas y Unidades de Negocio.
+- Se habilitó `smartSelect` para Cuentas Padre filtrado por entidad y clasificación.
+- Se aseguró la creación automática de Centro de Costos "MAIN" al crear una entidad.
+- Se corrigieron errores de linting (E501) que bloqueaban el CI.
 
-Para trabajar en estos issues primeto debes cargar el contexto disponible de:
+Para trabajar en estos issues primero debes cargar el contexto disponible de:
 
 - AGENTS.md
 - ESTADO_ACTUAL.md
