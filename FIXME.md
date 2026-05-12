@@ -1,4 +1,4 @@
-Estado 2026-05-11: issues implementados y cubiertos con pruebas focalizadas. Se conserva el detalle historico debajo como referencia de la iteracion.
+Estado 2026-05-12: Todos los issues listados han sido resueltos. Se ha unificado el UX en todo el módulo contable, se implementaron las funcionalidades de Comprobantes Recurrentes y Asistente de Cierre Mensual, y se agregaron filtros en las vistas de listado. Se conserva el detalle histórico debajo como referencia.
 
 Para trabajar en estos issues primeto debes cargar el contexto disponible de:
 

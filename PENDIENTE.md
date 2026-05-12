@@ -1,8 +1,10 @@
-## Actualización incremental — 2026-05-11 (UX y FIXME)
+## Actualización incremental — 2026-05-12 (UX y FIXME)
 
 - [x] Resolver todos los issues identificados en FIXME.md.
-- [x] Unificar UX del módulo contable.
-- [x] Implementar filtros de búsqueda en listados contables.
+- [x] Unificar UX del módulo contable siguiendo el patrón de Comprobante Contable.
+- [x] Implementar filtros de búsqueda en listados contables (Entidades, Unidades, Libros, Proyectos, Monedas, Tasas de Cambio, Periodos, Años Fiscales).
+- [x] Implementar funcionalidad completa de Comprobantes Recurrentes.
+- [x] Completar Asistente de Cierre Mensual.
 
 # PENDIENTE — Cacao Accounting
 

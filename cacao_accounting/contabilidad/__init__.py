@@ -69,8 +69,13 @@ def monedas():
     """Listado de monedas registradas en el sistema."""
     from cacao_accounting.database import Currency
 
+    query = database.select(Currency)
+    search = request.args.get("search")
+    if search:
+        query = query.filter(or_(Currency.code.ilike(f"%{search}%"), Currency.name.ilike(f"%{search}%")))
+
     CONSULTA = database.paginate(
-        database.select(Currency),
+        query,
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
@@ -140,8 +145,13 @@ def entidades():
     """Listado de entidades."""
     from cacao_accounting.database import Entity
 
+    query = database.select(Entity)
+    search = request.args.get("search")
+    if search:
+        query = query.filter(or_(Entity.code.ilike(f"%{search}%"), Entity.name.ilike(f"%{search}%"), Entity.company_name.ilike(f"%{search}%")))
+
     CONSULTA = database.paginate(
-        database.select(Entity),  # noqa: E712
+        query,
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
@@ -348,8 +358,13 @@ def unidades():
     """Listado de unidades de negocios."""
     from cacao_accounting.database import Unit, database
 
+    query = database.select(Unit)
+    search = request.args.get("search")
+    if search:
+        query = query.filter(or_(Unit.code.ilike(f"%{search}%"), Unit.name.ilike(f"%{search}%")))
+
     CONSULTA = database.paginate(
-        database.select(Unit),  # noqa: E712
+        query,
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
@@ -431,8 +446,13 @@ def libros():
     """Listado de libros de contabilidad."""
     from cacao_accounting.database import Book, database
 
+    query = database.select(Book)
+    search = request.args.get("search")
+    if search:
+        query = query.filter(or_(Book.code.ilike(f"%{search}%"), Book.name.ilike(f"%{search}%")))
+
     CONSULTA = database.paginate(
-        database.select(Book),  # noqa: E712
+        query,
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
@@ -630,7 +650,6 @@ def nueva_cuenta():
 
     formulario = FormularioCuenta()
     formulario.entidad.choices = obtener_lista_entidades_por_id_razonsocial()
-    formulario.moneda.choices = [("", "Sin moneda específica")] + obtener_lista_monedas()
     formulario.padre.choices = [("", "Sin padre")]
     TITULO = "Nueva Cuenta Contable - " + APPNAME
 
@@ -641,12 +660,12 @@ def nueva_cuenta():
             name=formulario.name.data,
             group=bool(formulario.grupo.data),
             parent=formulario.padre.data or None,
-            currency=formulario.moneda.data or None,
+            currency=None,
             classification=formulario.clasificacion.data or None,
-            type_=formulario.tipo.data or None,
+            type_=None,
             account_type=formulario.account_type.data or None,
             active=bool(formulario.activo.data),
-            enabled=bool(formulario.habilitado.data),
+            enabled=bool(formulario.activo.data),
         )
         database.session.add(DATA)
         database.session.commit()
@@ -796,8 +815,13 @@ def proyectos():
     """Listado de proyectos."""
     from cacao_accounting.database import Project
 
+    query = database.select(Project)
+    search = request.args.get("search")
+    if search:
+        query = query.filter(or_(Project.code.ilike(f"%{search}%"), Project.name.ilike(f"%{search}%")))
+
     consulta = database.paginate(
-        database.select(Project),
+        query,
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
@@ -908,8 +932,13 @@ def fiscal_year_list():
     """Listado de años fiscales."""
     from cacao_accounting.database import FiscalYear
 
+    query = database.select(FiscalYear)
+    search = request.args.get("search")
+    if search:
+        query = query.filter(or_(FiscalYear.name.ilike(f"%{search}%"), FiscalYear.entity.ilike(f"%{search}%")))
+
     CONSULTA = database.paginate(
-        database.select(FiscalYear),
+        query,
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
@@ -1116,8 +1145,13 @@ def tasa_cambio():
     """Listado de tasas de cambio."""
     from cacao_accounting.database import ExchangeRate
 
+    query = database.select(ExchangeRate)
+    search = request.args.get("search")
+    if search:
+        query = query.filter(or_(ExchangeRate.origin.ilike(f"%{search}%"), ExchangeRate.destination.ilike(f"%{search}%")))
+
     CONSULTA = database.paginate(
-        database.select(ExchangeRate),  # noqa: E712
+        query,
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
@@ -1172,8 +1206,13 @@ def periodo_contable():
     """Lista de periodos contables."""
     from cacao_accounting.database import AccountingPeriod
 
+    query = database.select(AccountingPeriod)
+    search = request.args.get("search")
+    if search:
+        query = query.filter(or_(AccountingPeriod.name.ilike(f"%{search}%"), AccountingPeriod.entity.ilike(f"%{search}%")))
+
     CONSULTA = database.paginate(
-        database.select(AccountingPeriod),  # noqa: E712
+        query,
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
