@@ -10,6 +10,12 @@ Estado 2026-05-12 (Finalizado): Todos los issues listados han sido resueltos y v
 
 # ESTADO ACTUAL DEL PROYECTO
 
+## Actualización incremental — 2026-05-14 (Endpoints de Disponibilidad)
+
+- **Endpoints de Salud:** Se han implementado los endpoints `/health` y `/ready` para verificación de disponibilidad.
+- **Lógica de Ready:** El endpoint `/ready` verifica activamente la conexión a la base de datos realizando una consulta `SELECT 1`.
+- **Compatibilidad con Orquestadores:** Estos endpoints permiten la integración con Kubernetes y balanceadores de carga para la gestión del ciclo de vida de la aplicación.
+
 ## Actualización incremental — 2026-05-14 (Ampliación del seed de datos de prueba)
 
 - **Seed de datos robusto:** Se han ampliado los datos de prueba (`dev_data`) para incluir un escenario multimoneda completo para la empresa 'cacao'.

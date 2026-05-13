@@ -5,6 +5,7 @@ Este documento registra lo que queda pendiente tras la consolidación de mayo de
 ---
 
 ## Correcciones Técnicas Resueltas
+- [x] Implementar endpoints de disponibilidad `/health` y `/ready` con verificación de base de datos.
 - [x] Migrar los maestros principales Item, Cliente, Proveedor, Banco y Cuenta Bancaria al estilo visual del comprobante contable.
 - [x] Usar `smart-select` en los maestros principales donde hay relaciones: UOM, compañía, banco, moneda y cuenta contable.
 - [x] Permitir y validar asociación de Cuenta Bancaria con cuenta contable de tipo `bank`.

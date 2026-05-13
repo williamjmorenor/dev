@@ -2220,3 +2220,19 @@ Ampliar el seed inicial de datos de pruebas para el módulo de contabilidad incl
 ### Verificación ejecutada
 - `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s tests/test_seed_accounting.py` (5 passed).
 - Verificación de que el posting engine resuelve correctamente tipos de cambio históricos/del día durante el seed.
+
+## 2026-05-14 (Implementación de Endpoints de Disponibilidad)
+
+### Peticion del usuario
+Implementar dos URL para verificación de disponibilidad: /ready y /health. El endpoint /ready debe confirmar que la aplicación está lista para aceptar tráfico (incluyendo verificación de base de datos) y /health para indicar que la aplicación se está ejecutando.
+
+### Resumen tecnico de cambios
+- `cacao_accounting/app/__init__.py`: se implementaron los endpoints `/health` y `/ready`.
+- Se utilizó `flask.make_response` para garantizar la devolución de códigos HTTP correctos.
+- `/health` devuelve "ok" con status 200.
+- `/ready` realiza una consulta `SELECT 1` a la base de datos y devuelve "ready" con status 200 si es exitosa, o "service unavailable" con status 503 si falla.
+- `tests/test_health_checks.py`: nueva suite de pruebas para validar ambos endpoints.
+
+### Verificacion ejecutada
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest tests/test_health_checks.py` (2 passed).
+- `CACAO_TEST=True LOGURU_LEVEL=WARNING SECRET_KEY=ASD123kljaAddS python -m pytest -v -s --exitfirst --slow=True` (590 passed).
