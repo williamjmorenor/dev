@@ -14,4 +14,12 @@ Rol: Gestión del flujo **Source to Pay (S2P)**.
 - **Maestros:** `TaxTemplate`, `PriceList`, `ItemPrice`.
 
 ## Flujo Operativo
-Solicitud (Material Request) → RFQ → Cotización Proveedor → Orden de Compra (PO) → Recepción (Receipt) → Factura (Invoice) → Pago.
+Solicitud (Material Request) → RFQ → Cotización Proveedor → Comparativo de ofertas → Orden de Compra (PO) → Recepción (Receipt) → Factura (Invoice) → Devolucion → Nota de Debito / Credito → Pago.
+
+### Flujo configurable:
+
+- Permitir Orden de Compra sin Solicitud de Compra.
+- Permitir Factura sin Orden de Compra.
+- Permtir Recepción sin Orden de Compra.
+
+Puede definirse a nivel global o por Proveedor, configuración de proveedor prevalece sobre configuración global.
