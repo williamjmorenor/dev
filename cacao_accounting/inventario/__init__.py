@@ -12,7 +12,7 @@ from flask_login import login_required
 from cacao_accounting.database import Item, StockEntry, StockEntryItem, UOM, Warehouse, database
 from cacao_accounting.database.helpers import get_active_naming_series
 from cacao_accounting.contabilidad.posting import PostingError, cancel_document, submit_document
-from cacao_accounting.document_flow import revert_relations_for_target
+from cacao_accounting.document_flow import create_document_relation, revert_relations_for_target
 from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 from cacao_accounting.decorators import modulo_activo
@@ -385,6 +385,36 @@ def _line_amount(index: int) -> Decimal:
     return _form_decimal(f"qty_{index}", "1") * _form_decimal(f"rate_{index}", "0")
 
 
+def _create_line_relation(
+    index: int,
+    target_type: str,
+    target_id: str,
+    target_item_id: str,
+    qty: Decimal,
+    uom: str | None,
+    rate: Decimal,
+    amount: Decimal,
+) -> None:
+    """Crea relacion documental para una linea importada desde un origen."""
+    source_type = request.form.get(f"source_type_{index}")
+    source_id = request.form.get(f"source_id_{index}")
+    source_item_id = request.form.get(f"source_item_id_{index}")
+    if not (source_type and source_id and source_item_id):
+        return
+    create_document_relation(
+        source_type=source_type,
+        source_id=source_id,
+        source_item_id=source_item_id,
+        target_type=target_type,
+        target_id=target_id,
+        target_item_id=target_item_id,
+        qty=qty,
+        uom=uom,
+        rate=rate,
+        amount=amount,
+    )
+
+
 def _save_stock_entry_items(entry: StockEntry) -> Decimal:
     """Guarda lineas de un movimiento de inventario."""
     i = 0
@@ -395,17 +425,20 @@ def _save_stock_entry_items(entry: StockEntry) -> Decimal:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             line = StockEntryItem(
                 stock_entry_id=entry.id,
                 item_code=item_code,
                 source_warehouse=entry.from_warehouse,
                 target_warehouse=entry.to_warehouse,
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 basic_rate=rate,
                 amount=amount,
             )
             database.session.add(line)
+            database.session.flush()
+            _create_line_relation(i, "stock_entry", entry.id, line.id, qty, uom, rate, amount)
             total += amount
         i += 1
     return total
@@ -421,57 +454,109 @@ def _save_stock_entry_items(entry: StockEntry) -> Decimal:
 @inventario.route("/stock-entry/adjustment-negative/new", methods=["GET", "POST"])
 @modulo_activo("inventory")
 @login_required
-def inventario_entrada_nuevo():
+def inventario_entrada_nuevo(        transaction_config=transaction_config,
+    ):
     """Formulario para crear una entrada de almacén."""
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
     from cacao_accounting.inventario.forms import FormularioEntradaAlmacen
 
-    formulario = FormularioEntradaAlmacen()
-    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
-    selected_company = request.values.get("company") or (
-        formulario.company.choices[0][0] if formulario.company.choices else None
+    formulario = FormularioEntradaAlmacen(        transaction_config=transaction_config,
     )
-    formulario.naming_series.choices = _series_choices("stock_entry", selected_company)
-    warehouse_choices = [("", "")] + [
-        (w[0].code, w[0].name) for w in database.session.execute(database.select(Warehouse).filter_by(is_active=True)).all()
+    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial(        transaction_config=transaction_config,
+    )
+    selected_company = request.values.get("company"        transaction_config=transaction_config,
+    ) or (
+        formulario.company.choices[0][0] if formulario.company.choices else None
+            transaction_config=transaction_config,
+    )
+    formulario.naming_series.choices = _series_choices("stock_entry", selected_company        transaction_config=transaction_config,
+    )
+    warehouse_choices = [("", ""        transaction_config=transaction_config,
+    )] + [
+        (w[0].code, w[0].name        transaction_config=transaction_config,
+    ) for w in database.session.execute(database.select(Warehouse        transaction_config=transaction_config,
+    ).filter_by(is_active=True        transaction_config=transaction_config,
+    )        transaction_config=transaction_config,
+    ).all(        transaction_config=transaction_config,
+    )
     ]
     formulario.from_warehouse.choices = warehouse_choices
     formulario.to_warehouse.choices = warehouse_choices
     items_disponibles = [
         {"code": i[0].code, "name": i[0].name, "uom": i[0].default_uom}
-        for i in database.session.execute(database.select(Item)).all()
+        for i in database.session.execute(database.select(Item        transaction_config=transaction_config,
+    )        transaction_config=transaction_config,
+    ).all(        transaction_config=transaction_config,
+    )
     ]
-    uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
-    purpose = request.args.get("purpose") or _infer_stock_entry_purpose(request.path)
+    uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM        transaction_config=transaction_config,
+    )        transaction_config=transaction_config,
+    ).all(        transaction_config=transaction_config,
+    )]
+    purpose = request.args.get("purpose"        transaction_config=transaction_config,
+    ) or _infer_stock_entry_purpose(request.path        transaction_config=transaction_config,
+    )
     formulario.purpose.data = purpose or formulario.purpose.data
-    source_api_url, source_label = _source_context(request.args.get("source_type"), request.args.get("source_id"))
-    titulo = _stock_entry_title(purpose)
+    source_api_url, source_label = _source_context(request.args.get("source_type"        transaction_config=transaction_config,
+    ), request.args.get("source_id"        transaction_config=transaction_config,
+    )        transaction_config=transaction_config,
+    )
+    titulo = _stock_entry_title(purpose        transaction_config=transaction_config,
+    )
     if request.method == "POST":
         try:
             entry = StockEntry(
-                purpose=request.form.get("purpose") or "material_receipt",
-                company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
-                from_warehouse=request.form.get("from_warehouse") or None,
-                to_warehouse=request.form.get("to_warehouse") or None,
-                remarks=request.form.get("remarks"),
+                purpose=request.form.get("purpose"        transaction_config=transaction_config,
+    ) or "material_receipt",
+                company=request.form.get("company"        transaction_config=transaction_config,
+    ) or None,
+                posting_date=request.form.get("posting_date"        transaction_config=transaction_config,
+    ) or None,
+                from_warehouse=request.form.get("from_warehouse"        transaction_config=transaction_config,
+    ) or None,
+                to_warehouse=request.form.get("to_warehouse"        transaction_config=transaction_config,
+    ) or None,
+                remarks=request.form.get("remarks"        transaction_config=transaction_config,
+    ),
                 docstatus=0,
-            )
-            database.session.add(entry)
-            database.session.flush()
+                    transaction_config=transaction_config,
+    )
+            database.session.add(entry        transaction_config=transaction_config,
+    )
+            database.session.flush(        transaction_config=transaction_config,
+    )
             assign_document_identifier(
                 document=entry,
                 entity_type="stock_entry",
-                posting_date_raw=request.form.get("posting_date"),
-                naming_series_id=request.form.get("naming_series") or None,
-            )
-            entry.total_amount = _save_stock_entry_items(entry)
-            database.session.commit()
-            flash("Entrada de almacén creada correctamente.", "success")
-            return redirect(url_for("inventario.inventario_entrada", entry_id=entry.id))
+                posting_date_raw=request.form.get("posting_date"        transaction_config=transaction_config,
+    ),
+                naming_series_id=request.form.get("naming_series"        transaction_config=transaction_config,
+    ) or None,
+                    transaction_config=transaction_config,
+    )
+            entry.total_amount = _save_stock_entry_items(entry        transaction_config=transaction_config,
+    )
+            database.session.commit(        transaction_config=transaction_config,
+    )
+            flash("Entrada de almacén creada correctamente.", "success"        transaction_config=transaction_config,
+    )
+            return redirect(url_for("inventario.inventario_entrada", entry_id=entry.id        transaction_config=transaction_config,
+    )        transaction_config=transaction_config,
+    )
         except IdentifierConfigurationError as exc:
-            database.session.rollback()
-            flash(str(exc), "danger")
+            database.session.rollback(        transaction_config=transaction_config,
+    )
+            flash(str(exc        transaction_config=transaction_config,
+    ), "danger"        transaction_config=transaction_config,
+    )
+        transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals(        transaction_config=transaction_config,
+    ) else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals(        transaction_config=transaction_config,
+    ) else [],
+        "columns": get_column_preferences(current_user.id, "inventory.stock_entry"        transaction_config=transaction_config,
+    ),
+    }
     return render_template(
         "inventario/entrada_nuevo.html",
         form=formulario,
@@ -480,6 +565,7 @@ def inventario_entrada_nuevo():
         uoms_disponibles=uoms_disponibles,
         source_api_url=source_api_url,
         source_label=source_label,
+            transaction_config=transaction_config,
     )
 
 

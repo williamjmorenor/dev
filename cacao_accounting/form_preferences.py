@@ -142,3 +142,9 @@ def _normalize_width(value: Any) -> int:
     except (TypeError, ValueError):
         width = 1
     return min(max(width, 1), 4)
+
+
+def get_column_preferences(user_id: str, form_key: str, view_key: str = DEFAULT_VIEW_KEY) -> list[dict[str, Any]]:
+    """Obtiene solo la lista de columnas de la preferencia del usuario."""
+    pref = get_form_preference(user_id, form_key, view_key)
+    return pref.get("columns") or []

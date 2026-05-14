@@ -134,6 +134,7 @@ def compras_solicitud_compra_nueva():
 
     formulario = FormularioSolicitudCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -194,6 +195,48 @@ def compras_solicitud_compra(request_id: str):
     return render_template("compras/solicitud_compra.html", registro=registro, items=items, titulo=titulo)
 
 
+@compras.route("/purchase-request/<request_id>/submit", methods=["POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_solicitud_compra_submit(request_id: str):
+    """Aprueba una solicitud de compra."""
+    registro = database.session.get(PurchaseRequest, request_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 0:
+        abort(400)
+    registro.docstatus = 1
+    database.session.commit()
+    flash("Solicitud de compra aprobada.", "success")
+    return redirect(url_for("compras.compras_solicitud_compra", request_id=request_id))
+
+
+@compras.route("/purchase-request/<request_id>/cancel", methods=["POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_solicitud_compra_cancel(request_id: str):
+    """Cancela una solicitud de compra."""
+    registro = database.session.get(PurchaseRequest, request_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 1:
+        abort(400)
+    registro.docstatus = 2
+    database.session.commit()
+    flash("Solicitud de compra cancelada.", "warning")
+    return redirect(url_for("compras.compras_solicitud_compra", request_id=request_id))
+@modulo_activo("purchases")
+@login_required
+def compras_solicitud_compra(request_id: str):
+    """Detalle de solicitud de compra."""
+    registro = database.session.get(PurchaseRequest, request_id)
+    if not registro:
+        abort(404)
+    items = database.session.execute(database.select(PurchaseRequestItem).filter_by(purchase_request_id=request_id)).all()
+    titulo = (registro.document_no or request_id) + " - " + APPNAME
+    return render_template("compras/solicitud_compra.html", registro=registro, items=items, titulo=titulo)
+
+
 @compras.route("/supplier-quotation/list")
 @modulo_activo("purchases")
 @login_required
@@ -219,6 +262,7 @@ def compras_cotizacion_proveedor_nueva():
 
     formulario = FormularioCotizacionProveedor()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -496,6 +540,7 @@ def compras_proveedor_nuevo():
     formulario = FormularioProveedor()
     titulo = "Nuevo Proveedor - " + APPNAME
     company_choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (company_choices[0][0] if company_choices else None)
     company_settings = build_party_company_settings("supplier", selected_company) if selected_company else None
     if request.method == "POST":
@@ -538,6 +583,7 @@ def compras_proveedor_nuevo():
         company_choices=company_choices,
         selected_company=selected_company,
         company_settings=company_settings,
+            transaction_config=transaction_config,
     )
 
 
@@ -778,6 +824,7 @@ def compras_orden_compra_nuevo():
 
     formulario = FormularioOrdenCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -824,12 +871,18 @@ def compras_orden_compra_nuevo():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_order"),
+    }
     return render_template(
         "compras/orden_compra_nuevo.html",
         form=formulario,
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+            transaction_config=transaction_config,
     )
 
 
@@ -871,6 +924,7 @@ def compras_solicitud_cotizacion_nueva():
 
     formulario = FormularioSolicitudCotizacion()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -990,6 +1044,7 @@ def compras_recepcion_nuevo():
 
     formulario = FormularioRecepcionCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -1031,6 +1086,11 @@ def compras_recepcion_nuevo():
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_receipt"),
+    }
             return render_template(
                 "compras/recepcion_nuevo.html",
                 form=formulario,
@@ -1040,7 +1100,8 @@ def compras_recepcion_nuevo():
                 items_disponibles=items_disponibles,
                 uoms_disponibles=uoms_disponibles,
                 bodegas_disponibles=bodegas_disponibles,
-            )
+                    transaction_config=transaction_config,
+    )
         recepcion.total = total
         recepcion.grand_total = total
         database.session.commit()
@@ -1127,6 +1188,7 @@ def compras_factura_compra_nuevo():
 
     formulario = FormularioFacturaCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -1191,6 +1253,11 @@ def compras_factura_compra_nuevo():
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_invoice"),
+    }
             return render_template(
                 "compras/factura_compra_nuevo.html",
                 form=formulario,
@@ -1204,7 +1271,8 @@ def compras_factura_compra_nuevo():
                 document_type=document_type,
                 items_disponibles=items_disponibles,
                 uoms_disponibles=uoms_disponibles,
-            )
+                    transaction_config=transaction_config,
+    )
         factura.total = total
         factura.base_total = total
         factura.grand_total = total
