@@ -624,7 +624,10 @@ def test_financial_report_filters_prefill_and_hide_columns_for_summary_reports(a
         assert 'id="financial-advanced-toggle"' in html
         assert 'aria-controls="financial-advanced-filters"' in html
         assert 'id="financial-advanced-filters"' in html
-        assert 'class="ca-report-advanced-filters d-grid gap-2 is-hidden" id="financial-advanced-filters"' in html
+        assert (
+            'class="ca-report-advanced-filters d-grid gap-2 is-hidden" id="financial-advanced-filters"'
+            in html
+        )
 
         account_index = html.index('name="account_code"')
         cancellations_index = html.index('name="show_cancellations"')
@@ -1342,7 +1345,7 @@ def test_manual_journal_allows_bank_and_untyped_accounts(app_ctx):
                 entity="cacao",
                 account=bank.code,
                 date=bank_journal.date,
-                transaction="journal_entry",
+                transaction=bank_journal.__tablename__,
                 transaction_id=bank_journal.id,
                 value=Decimal("10.00"),
             ),
@@ -1350,7 +1353,7 @@ def test_manual_journal_allows_bank_and_untyped_accounts(app_ctx):
                 entity="cacao",
                 account=free.code,
                 date=bank_journal.date,
-                transaction="journal_entry",
+                transaction=bank_journal.__tablename__,
                 transaction_id=bank_journal.id,
                 value=Decimal("-10.00"),
             ),
@@ -1370,7 +1373,7 @@ def test_manual_journal_allows_bank_and_untyped_accounts(app_ctx):
                 entity="cacao",
                 account=free.code,
                 date=free_journal.date,
-                transaction="journal_entry",
+                transaction=free_journal.__tablename__,
                 transaction_id=free_journal.id,
                 value=Decimal("10.00"),
             ),
@@ -1378,7 +1381,7 @@ def test_manual_journal_allows_bank_and_untyped_accounts(app_ctx):
                 entity="cacao",
                 account=free.code,
                 date=free_journal.date,
-                transaction="journal_entry",
+                transaction=free_journal.__tablename__,
                 transaction_id=free_journal.id,
                 value=Decimal("-10.00"),
             ),

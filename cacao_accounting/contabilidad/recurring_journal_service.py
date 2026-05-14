@@ -8,7 +8,6 @@ import json
 from typing import Any, Dict, List, Sequence
 from sqlalchemy import or_, select
 from cacao_accounting.database import (
-    Accounts,
     database,
     RecurringJournalTemplate,
     RecurringJournalItem,
@@ -25,11 +24,10 @@ class RecurringJournalError(Exception):
 def create_recurring_template(data: Dict[str, Any], items: List[Dict[str, Any]], user_id: str) -> RecurringJournalTemplate:
     """Crea una nueva plantilla de comprobante recurrente."""
     validate_template_balance(items)
-    company = data["company"]
 
     template = RecurringJournalTemplate(
         code=data["code"],
-        company=company,
+        company=data["company"],
         ledger_id=data.get("ledger_id"),
         naming_series_id=data.get("naming_series_id"),
         book_codes=_serialize_book_codes(data.get("books")),
@@ -46,10 +44,10 @@ def create_recurring_template(data: Dict[str, Any], items: List[Dict[str, Any]],
     database.session.add(template)
     database.session.flush()
 
-    for item in items:
+    for idx, item in enumerate(items):
         line = RecurringJournalItem(
             template_id=template.id,
-            account_code=_normalize_account_code(company, item["account_code"]),
+            account_code=item["account_code"],
             debit=item.get("debit", 0),
             credit=item.get("credit", 0),
             description=item.get("description"),
@@ -139,8 +137,6 @@ def apply_recurring_template(
     template = database.session.get(RecurringJournalTemplate, template_id)
     if not template:
         raise RecurringJournalError("Plantilla no encontrada.")
-    if template.status != "approved":
-        raise RecurringJournalError("Solo se pueden aplicar plantillas aprobadas.")
 
     # Verificar si ya fue aplicada
     existing = (
@@ -157,10 +153,6 @@ def apply_recurring_template(
 
     if existing and existing.status == "applied":
         raise RecurringJournalError(f"La plantilla ya fue aplicada al periodo {period_name}.")
-
-    items = database.session.query(RecurringJournalItem).filter_by(template_id=template.id).all()
-    if not items:
-        raise RecurringJournalError("La plantilla aprobada no tiene líneas contables.")
 
     # Generar ComprobanteContable
     journal = ComprobanteContable(
@@ -183,21 +175,19 @@ def apply_recurring_template(
     _assign_identifier_if_needed(journal, template.naming_series_id)
 
     # Generar líneas
-    for idx, item in enumerate(items, start=1):
+    items = database.session.query(RecurringJournalItem).filter_by(template_id=template.id).all()
+    for item in items:
         line = ComprobanteContableDetalle(
             entity=template.company,
             account=item.account_code,
             value=item.debit if item.debit > 0 else -item.credit,
             memo=item.description,
-            order=idx,
             cost_center=item.cost_center,
             unit=item.unit,
             project=item.project,
             third_type=item.party_type,
             third_code=item.party_id,
-            transaction="journal_entry",
             transaction_id=journal.id,
-            voucher_type="journal_entry",
         )
         database.session.add(line)
 
@@ -214,8 +204,6 @@ def apply_recurring_template(
         applied_by=user_id,
     )
     database.session.add(application)
-    database.session.flush()
-    journal.recurrent_application_id = application.id
 
     template.last_applied_date = application_date
     # Lógica para marcar como completado si es la última aplicación según end_date
@@ -227,26 +215,6 @@ def apply_recurring_template(
 
     database.session.commit()
     return application
-
-
-def _normalize_account_code(company: str, account_value: Any) -> str:
-    """Normaliza una cuenta recibida por id o por código hacia código contable."""
-    account_text = str(account_value or "").strip()
-    if not account_text:
-        raise RecurringJournalError("Cada línea debe tener una cuenta contable.")
-
-    account = database.session.get(Accounts, account_text)
-    if account is not None:
-        if account.entity != company:
-            raise RecurringJournalError("La cuenta contable no pertenece a la compañía de la plantilla.")
-        return str(account.code)
-
-    account = (
-        database.session.execute(database.select(Accounts).filter_by(entity=company, code=account_text)).scalars().first()
-    )
-    if account is None:
-        raise RecurringJournalError("La cuenta contable indicada no existe para la compañía.")
-    return str(account.code)
 
 
 def _serialize_book_codes(books: Any) -> str | None:

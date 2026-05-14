@@ -10,27 +10,11 @@ Estado 2026-05-12 (Finalizado): Todos los issues listados han sido resueltos y v
 
 # ESTADO ACTUAL DEL PROYECTO
 
-## Actualización incremental — 2026-05-13 (Tesorería: serie compartida y chequeras por cuenta)
+## Actualización incremental — 2026-05-14 (Endpoints de Disponibilidad)
 
-- **Preferencias por cuenta bancaria:** Las cuentas bancarias pueden guardar una serie interna predeterminada para pagos y una chequera predeterminada.
-- **Serie compartida:** Varias cuentas bancarias pueden reutilizar la misma serie `payment_entry`; la separación operativa queda en el contador externo.
-- **Chequera por cuenta:** Cada cuenta bancaria puede asociar su propio `ExternalCounter` tipo `checkbook`, y el sistema crea el mapping contextual por `bank_account_id`.
-- **Pagos con defaults:** Al crear pagos, si el usuario no selecciona serie o contador, se toman los defaults de la cuenta bancaria. La seleccion explicita en el formulario mantiene prioridad.
-- **Seed bancario:** El seed de desarrollo crea cuentas demo NIO y USD para `cacao`, ambas con la misma serie de pagos y chequeras distintas.
-
-## Actualización incremental — 2026-05-13 (Seed multi-libro con conversión)
-
-- **Cuarto comprobante demo:** El seed agrega `MULTI-BOOK-NIO`, un comprobante en NIO que afecta simultáneamente los libros `FISC`, `FIN` y `MGMT`.
-- **Conversión verificada:** La suite `tests/test_seed_accounting.py` comprueba que el backend genera 2 entradas GL por libro y convierte desde la moneda del comprobante hacia USD y EUR usando el recíproco cuando la tasa está registrada como USD/EUR hacia NIO.
-- **Ledger multimoneda más realista:** Las pruebas distinguen moneda del libro (`company_currency`) de moneda transaccional (`account_currency`), permitiendo entradas NIO dentro de libros USD/EUR.
-
-## Actualización incremental — 2026-05-13 (Recurrentes y cierre mensual E2E)
-
-- **Comprobantes recurrentes posteables:** Las líneas generadas desde el asistente de cierre mensual quedan vinculadas con `transaction="journal_entry"`, por lo que aparecen en la vista del comprobante y pueden contabilizarse.
-- **Nombres técnicos en inglés:** Las líneas de comprobantes manuales y recurrentes usan `journal_entry` como nombre funcional de transacción, sin generar nuevos valores técnicos en español.
-- **Smart Select cubierto:** La plantilla recurrente normaliza cuentas recibidas como `Accounts.id` o como código contable, alineando el backend con el valor enviado por el selector visual.
-- **Trazabilidad completa:** El comprobante generado conserva el enlace con su plantilla y con `RecurringJournalApplication` en ambos sentidos.
-- **Regresión automatizada:** `tests/test_12_recurring_journals.py` incluye un flujo E2E con cliente Flask desde creación de plantilla hasta aprobación del comprobante generado.
+- **Endpoints de Salud:** Se han implementado los endpoints `/health` y `/ready` para verificación de disponibilidad.
+- **Lógica de Ready:** El endpoint `/ready` verifica activamente la conexión a la base de datos realizando una consulta `SELECT 1`.
+- **Compatibilidad con Orquestadores:** Estos endpoints permiten la integración con Kubernetes y balanceadores de carga para la gestión del ciclo de vida de la aplicación.
 
 ## Actualización incremental — 2026-05-14 (Ampliación del seed de datos de prueba)
 

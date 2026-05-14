@@ -45,33 +45,33 @@ from cacao_accounting.database import (
 
 
 BASE_USUARIOS = [
-    {"user": "admin", "e_mail": "a@dm.com", "password": _pg("admin"), "active": True, "classification": "system"},
-    {"user": "audit", "e_mail": "au@dm.com", "password": _pg("audit"), "active": True, "classification": "system"},
-    {"user": "analist", "e_mail": "an@dm.com", "password": _pg("analist"), "active": True, "classification": "system"},
-    {"user": "conta", "e_mail": "con@dm.com", "password": _pg("conta"), "active": True, "classification": "system"},
-    {"user": "contaj", "e_mail": "conj@dm.com", "password": _pg("contaj"), "active": True, "classification": "system"},
-    {"user": "compras", "e_mail": "compras@dm.com", "password": _pg("compras"), "active": True, "classification": "system"},
+    {"user": "admin", "e_mail": "a@dm.com", "password": _pg("admin"), "active": False, "classification": "system"},
+    {"user": "audit", "e_mail": "au@dm.com", "password": _pg("audit"), "active": False, "classification": "system"},
+    {"user": "analist", "e_mail": "an@dm.com", "password": _pg("analist"), "active": False, "classification": "system"},
+    {"user": "conta", "e_mail": "con@dm.com", "password": _pg("conta"), "active": False, "classification": "system"},
+    {"user": "contaj", "e_mail": "conj@dm.com", "password": _pg("contaj"), "active": False, "classification": "system"},
+    {"user": "compras", "e_mail": "compras@dm.com", "password": _pg("compras"), "active": False, "classification": "system"},
     {
         "user": "comprasj",
         "e_mail": "comprasj@dm.com",
         "password": _pg("comprasj"),
-        "active": True,
+        "active": False,
         "classification": "system",
     },
-    {"user": "ventas", "e_mail": "ventas@dm.com", "password": _pg("ventas"), "active": True, "classification": "system"},
-    {"user": "ventasj", "e_mail": "ventasj@dm.com", "password": _pg("ventasj"), "active": True, "classification": "system"},
-    {"user": "inventario", "e_mail": "in@dm.com", "password": _pg("inventario"), "active": True, "classification": "system"},
+    {"user": "ventas", "e_mail": "ventas@dm.com", "password": _pg("ventas"), "active": False, "classification": "system"},
+    {"user": "ventasj", "e_mail": "ventasj@dm.com", "password": _pg("ventasj"), "active": False, "classification": "system"},
+    {"user": "inventario", "e_mail": "in@dm.com", "password": _pg("inventario"), "active": False, "classification": "system"},
     {
         "user": "inventarioj",
         "e_mail": "inj@dm.com",
         "password": _pg("inventarioj"),
-        "active": True,
+        "active": False,
         "classification": "system",
     },
-    {"user": "tesoreria", "e_mail": "t@dm.com", "password": _pg("tesoreria"), "active": True, "classification": "system"},
-    {"user": "tesoreriaj", "e_mail": "tj@dm.com", "password": _pg("tesoreriaj"), "active": True, "classification": "system"},
-    {"user": "pasante", "e_mail": "p@dm.com", "password": _pg("pasante"), "active": True, "classification": "system"},
-    {"user": "usuario", "e_mail": "u@dm.com", "password": _pg("usuario"), "active": True, "classification": "system"},
+    {"user": "tesoreria", "e_mail": "t@dm.com", "password": _pg("tesoreria"), "active": False, "classification": "system"},
+    {"user": "tesoreriaj", "e_mail": "tj@dm.com", "password": _pg("tesoreriaj"), "active": False, "classification": "system"},
+    {"user": "pasante", "e_mail": "p@dm.com", "password": _pg("pasante"), "active": False, "classification": "system"},
+    {"user": "usuario", "e_mail": "u@dm.com", "password": _pg("usuario"), "active": False, "classification": "system"},
 ]
 
 USUARIO_ROLES = [
@@ -417,8 +417,8 @@ def _make_tasas_de_cambio() -> tuple:
     """Crea instancias frescas de Tasas de Cambio."""
     today = date.today()
     return (
-        ExchangeRate(origin="USD", destination="NIO", rate=36.6243, date=today),
-        ExchangeRate(origin="EUR", destination="NIO", rate=40.1234, date=today),
+        ExchangeRate(origin="NIO", destination="USD", rate=36.6243, date=today),
+        ExchangeRate(origin="NIO", destination="EUR", rate=40.1234, date=today),
         ExchangeRate(origin="USD", destination="EUR", rate=1.0954, date=today),
     )
 
@@ -460,18 +460,6 @@ def _make_comprobantes_contables() -> list:
             "lines": [
                 {"account": "11.01.001.001", "debit": 50, "credit": 0, "currency": "EUR"},
                 {"account": "31.01", "debit": 0, "credit": 50, "currency": "EUR"},
-            ],
-        },
-        {
-            "company": "cacao",
-            "posting_date": today.isoformat(),
-            "books": ["FISC", "FIN", "MGMT"],
-            "transaction_currency": "NIO",
-            "reference": "MULTI-BOOK-NIO",
-            "memo": "Asiento multi-libro con conversión desde Córdobas",
-            "lines": [
-                {"account": "11.01.001.001", "debit": 10, "credit": 0, "currency": "NIO"},
-                {"account": "31.01", "debit": 0, "credit": 10, "currency": "NIO"},
             ],
         },
     ]

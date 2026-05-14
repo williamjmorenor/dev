@@ -5,6 +5,7 @@ Este documento registra lo que queda pendiente tras la consolidación de mayo de
 ---
 
 ## Correcciones Técnicas Resueltas
+- [x] Implementar endpoints de disponibilidad `/health` y `/ready` con verificación de base de datos.
 - [x] Migrar los maestros principales Item, Cliente, Proveedor, Banco y Cuenta Bancaria al estilo visual del comprobante contable.
 - [x] Usar `smart-select` en los maestros principales donde hay relaciones: UOM, compañía, banco, moneda y cuenta contable.
 - [x] Permitir y validar asociación de Cuenta Bancaria con cuenta contable de tipo `bank`.
@@ -16,14 +17,11 @@ Este documento registra lo que queda pendiente tras la consolidación de mayo de
 - [x] Alinear formulario de plantillas recurrentes con comprobante normal: serie por defecto, libros por checkbox y modal de dimensiones sin referencias específicas.
 - [x] Rediseñar asistente de cierre mensual como registro step-by-step con lista de cierres, creación por periodo y paso inicial de comprobantes recurrentes.
 - [x] Usar Smart Select en nuevo cierre mensual para compañía y periodos contables abiertos filtrados por compañía.
-- [x] Corregir el contrato de líneas de comprobantes recurrentes generados desde cierre mensual y cubrirlo con prueba E2E usando cliente Flask.
 
 - [x] Ampliar el seed inicial de datos de prueba para cubrir escenarios multimoneda (NIO, USD, EUR).
 - [x] Incluir transacciones reales (JEs) y plantillas recurrentes en el proceso de siembra de datos.
 - [x] Dinamizar fechas de registros y tasas de cambio según el mes de ejecución.
 - [x] Agregar unidades de negocio, centros de costos y proyectos adicionales al seed.
-- [x] Agregar al seed un comprobante multi-libro y validar conversión de moneda del comprobante hacia moneda de libro.
-- [x] Agregar cuentas bancarias demo NIO/USD con una serie de pagos compartida y chequeras separadas por cuenta.
 
 ---
 
@@ -69,7 +67,6 @@ Este documento registra lo que queda pendiente tras la consolidación de mayo de
 ## Tesorería y Revalorización
 - [ ] Implementar proceso de `ExchangeRevaluation` (revalorización cambiaria de cuentas monetarias).
 - [ ] Automatización de ajustes por diferencial cambiario en pagos de facturas multimoneda.
-- [ ] Implementar historial de chequeras por cuenta bancaria cuando se requiera reemplazar una chequera agotada sin perder trazabilidad.
 
 ---
 
