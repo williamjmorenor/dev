@@ -13,4 +13,9 @@ Rol: Gestión del flujo **Order to Cash (O2C)**.
 - **Maestros:** `TaxTemplate`, `PriceList`, `ItemPrice`.
 
 ## Flujo Operativo
-Cotización → Orden de Venta (SO) → Nota de Entrega (Delivery) → Factura (Invoice) → Pago.
+Cotización → Orden de Venta (SO) → Nota de Entrega (Delivery) → Factura (Invoice) → Devolucion → Nota de Debito / Credito → Pago.
+
+### Flujo configurable
+
+- Permitir Factura sin Orden de Venta.
+- Permtir Factura sin Recepción.
