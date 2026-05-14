@@ -3,8 +3,8 @@ Rol: Núcleo central del sistema, implementa **Records to Reports (R2R)**.
 
 ## Principios de Diseño
 - `gl_entry` es la única fuente de verdad financiera.
-- Multi-ledger: Se genera un asiento por cada libro (`Book`) activo.
-- Correcciones siempre vía reversión o ajuste; prohibido borrar.
+- Multi-ledger: Se genera un asiento por cada libro (`Book`) activo para transacciones operativas (Compras, Inventario, Ventas, Bancos) solo comprobante contable puede definir libros de contabilidad.
+- Correcciones siempre vía reversión o ajuste; prohibido borrar, mandatorio "append only ledger".
 - `posting_date` es la fecha oficial para efectos contables.
 
 ## Modelos Principales
