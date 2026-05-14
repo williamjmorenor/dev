@@ -10,7 +10,7 @@
         preferences: config.initialPreferences || { columns: [] },
         messages: config.messages || {},
         header: config.initialHeader || {},
-        lines: (config.initialLines || []).map(line => this.normalizeLine(line)),
+        lines: [],
         sourceItems: [],
         loadingSource: false,
         activeIndex: null,
@@ -19,10 +19,14 @@
 
         normalizeLine: function (line) {
           var base = this.newLine();
-          return Object.assign({}, base, line || { uid: window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(7) });
+          var normalized = Object.assign({}, base, line || { uid: window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(7) });
+          this.calcAmount(normalized);
+          return normalized;
         },
 
         init: function () {
+          const self = this;
+          this.lines = (config.initialLines || []).map(line => self.normalizeLine(line));
           if (this.lines.length === 0) {
             this.addMultipleRows(config.defaultRows || 2);
           }

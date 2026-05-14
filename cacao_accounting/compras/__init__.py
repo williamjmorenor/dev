@@ -1,3 +1,4 @@
+from flask_login import current_user
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
 
@@ -35,7 +36,7 @@ from cacao_accounting.database import (
     PurchaseRequest,
     PurchaseRequestItem,
     SupplierQuotation,
-    SupplierQuotationItem,
+    SupplierQuotationItem, SalesOrder, Warehouse,
     UOM,
     database,
 )
@@ -134,6 +135,7 @@ def compras_solicitud_compra_nueva():
 
     formulario = FormularioSolicitudCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -172,12 +174,18 @@ def compras_solicitud_compra_nueva():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_request"),
+    }
     return render_template(
         "compras/solicitud_compra_nueva.html",
         form=formulario,
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -194,6 +202,38 @@ def compras_solicitud_compra(request_id: str):
     return render_template("compras/solicitud_compra.html", registro=registro, items=items, titulo=titulo)
 
 
+@compras.route("/purchase-request/<request_id>/submit", methods=["POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_solicitud_compra_submit(request_id: str):
+    """Aprueba una solicitud de compra."""
+    registro = database.session.get(PurchaseRequest, request_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 0:
+        abort(400)
+    registro.docstatus = 1
+    database.session.commit()
+    flash("Solicitud de compra aprobada.", "success")
+    return redirect(url_for("compras.compras_solicitud_compra", request_id=request_id))
+
+
+@compras.route("/purchase-request/<request_id>/cancel", methods=["POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_solicitud_compra_cancel(request_id: str):
+    """Cancela una solicitud de compra."""
+    registro = database.session.get(PurchaseRequest, request_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 1:
+        abort(400)
+    registro.docstatus = 2
+    database.session.commit()
+    flash("Solicitud de compra cancelada.", "warning")
+    return redirect(url_for("compras.compras_solicitud_compra", request_id=request_id))
+@modulo_activo("purchases")
+@login_required
 @compras.route("/supplier-quotation/list")
 @modulo_activo("purchases")
 @login_required
@@ -219,6 +259,7 @@ def compras_cotizacion_proveedor_nueva():
 
     formulario = FormularioCotizacionProveedor()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -266,6 +307,11 @@ def compras_cotizacion_proveedor_nueva():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "purchases.supplier_quotation"),
+    }
     return render_template(
         "compras/cotizacion_proveedor_nueva.html",
         form=formulario,
@@ -274,6 +320,7 @@ def compras_cotizacion_proveedor_nueva():
         from_rfq_id=from_rfq_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -496,6 +543,7 @@ def compras_proveedor_nuevo():
     formulario = FormularioProveedor()
     titulo = "Nuevo Proveedor - " + APPNAME
     company_choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (company_choices[0][0] if company_choices else None)
     company_settings = build_party_company_settings("supplier", selected_company) if selected_company else None
     if request.method == "POST":
@@ -778,6 +826,7 @@ def compras_orden_compra_nuevo():
 
     formulario = FormularioOrdenCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -824,12 +873,18 @@ def compras_orden_compra_nuevo():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_order"),
+    }
     return render_template(
         "compras/orden_compra_nuevo.html",
         form=formulario,
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -871,6 +926,7 @@ def compras_solicitud_cotizacion_nueva():
 
     formulario = FormularioSolicitudCotizacion()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -915,12 +971,18 @@ def compras_solicitud_cotizacion_nueva():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_quotation"),
+    }
     return render_template(
         "compras/solicitud_cotizacion_nuevo.html",
         form=formulario,
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -977,8 +1039,6 @@ def compras_orden_compra_cancel(order_id: str):
     database.session.commit()
     flash("Orden de compra cancelada.", "warning")
     return redirect(url_for("compras.compras_orden_compra", order_id=order_id))
-
-
 @compras.route("/purchase-receipt/new", methods=["GET", "POST"])
 @modulo_activo("purchases")
 @login_required
@@ -986,7 +1046,7 @@ def compras_recepcion_nuevo():
     """Formulario para crear una recepción de compra."""
     from cacao_accounting.compras.forms import FormularioRecepcionCompra
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
-    from cacao_accounting.database import Warehouse
+    from cacao_accounting.form_preferences import get_column_preferences
 
     formulario = FormularioRecepcionCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
@@ -1028,24 +1088,20 @@ def compras_recepcion_nuevo():
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_purchase_receipt_items(recepcion.id)
+            recepcion.total = total
+            recepcion.grand_total = total
+            database.session.commit()
+            flash("Recepción de compra creada correctamente.", "success")
+            return redirect(url_for("compras.compras_recepcion", receipt_id=recepcion.id))
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
-            return render_template(
-                "compras/recepcion_nuevo.html",
-                form=formulario,
-                titulo=titulo,
-                orden_origen=orden_origen,
-                from_order_id=from_order_id,
-                items_disponibles=items_disponibles,
-                uoms_disponibles=uoms_disponibles,
-                bodegas_disponibles=bodegas_disponibles,
-            )
-        recepcion.total = total
-        recepcion.grand_total = total
-        database.session.commit()
-        flash("Recepción de compra creada correctamente.", "success")
-        return redirect(url_for("compras.compras_recepcion", receipt_id=recepcion.id))
+
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_receipt"),
+    }
     return render_template(
         "compras/recepcion_nuevo.html",
         form=formulario,
@@ -1055,9 +1111,8 @@ def compras_recepcion_nuevo():
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
         bodegas_disponibles=bodegas_disponibles,
+        transaction_config=transaction_config,
     )
-
-
 @compras.route("/purchase-receipt/<receipt_id>")
 @modulo_activo("purchases")
 @login_required
@@ -1127,6 +1182,7 @@ def compras_factura_compra_nuevo():
 
     formulario = FormularioFacturaCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    from cacao_accounting.form_preferences import get_column_preferences
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -1191,29 +1247,11 @@ def compras_factura_compra_nuevo():
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
-            return render_template(
-                "compras/factura_compra_nuevo.html",
-                form=formulario,
-                titulo=titulo,
-                orden_origen=orden_origen,
-                recepcion_origen=recepcion_origen,
-                factura_origen=factura_origen,
-                from_order_id=from_order_id,
-                from_receipt_id=from_receipt_id,
-                from_invoice_id=from_invoice_id,
-                document_type=document_type,
-                items_disponibles=items_disponibles,
-                uoms_disponibles=uoms_disponibles,
-            )
-        factura.total = total
-        factura.base_total = total
-        factura.grand_total = total
-        factura.base_grand_total = total
-        factura.outstanding_amount = total
-        factura.base_outstanding_amount = total
-        database.session.commit()
-        flash("Factura de compra creada correctamente.", "success")
-        return redirect(url_for("compras.compras_factura_compra", invoice_id=factura.id))
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_invoice"),
+    }
     return render_template(
         "compras/factura_compra_nuevo.html",
         form=formulario,
@@ -1227,8 +1265,8 @@ def compras_factura_compra_nuevo():
         document_type=document_type,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
-
 
 @compras.route("/purchase-invoice/<invoice_id>")
 @modulo_activo("purchases")
@@ -1292,3 +1330,58 @@ def compras_factura_compra_cancel(invoice_id: str):
         return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
     flash(_("Factura de compra cancelada con reverso contable."), "warning")
     return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
+
+@compras.route("/purchase-quotation/<quotation_id>/submit", methods=["POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_solicitud_cotizacion_submit(quotation_id: str):
+    """Aprueba una solicitud de cotización."""
+    registro = database.session.get(PurchaseQuotation, quotation_id)
+    if not registro or registro.docstatus != 0:
+        abort(404 if not registro else 400)
+    registro.docstatus = 1
+    database.session.commit()
+    flash("Solicitud de cotización aprobada.", "success")
+    return redirect(url_for("compras.compras_solicitud_cotizacion", quotation_id=quotation_id))
+
+
+@compras.route("/purchase-quotation/<quotation_id>/cancel", methods=["POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_solicitud_cotizacion_cancel(quotation_id: str):
+    """Cancela una solicitud de cotización."""
+    registro = database.session.get(PurchaseQuotation, quotation_id)
+    if not registro or registro.docstatus != 1:
+        abort(404 if not registro else 400)
+    registro.docstatus = 2
+    database.session.commit()
+    flash("Solicitud de cotización cancelada.", "warning")
+    return redirect(url_for("compras.compras_solicitud_cotizacion", quotation_id=quotation_id))
+
+
+@compras.route("/supplier-quotation/<quotation_id>/submit", methods=["POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_cotizacion_proveedor_submit(quotation_id: str):
+    """Aprueba una cotización de proveedor."""
+    registro = database.session.get(SupplierQuotation, quotation_id)
+    if not registro or registro.docstatus != 0:
+        abort(404 if not registro else 400)
+    registro.docstatus = 1
+    database.session.commit()
+    flash("Cotización de proveedor aprobada.", "success")
+    return redirect(url_for("compras.compras_cotizacion_proveedor", quotation_id=quotation_id))
+
+
+@compras.route("/supplier-quotation/<quotation_id>/cancel", methods=["POST"])
+@modulo_activo("purchases")
+@login_required
+def compras_cotizacion_proveedor_cancel(quotation_id: str):
+    """Cancela una cotización de proveedor."""
+    registro = database.session.get(SupplierQuotation, quotation_id)
+    if not registro or registro.docstatus != 1:
+        abort(404 if not registro else 400)
+    registro.docstatus = 2
+    database.session.commit()
+    flash("Cotización de proveedor cancelada.", "warning")
+    return redirect(url_for("compras.compras_cotizacion_proveedor", quotation_id=quotation_id))

@@ -176,7 +176,7 @@ def apply_advance_to_invoice(
 def _state_quantities(
     source_type: str,
     source_id: str,
-    source_item_id: str,
+    source_item_id: str | None,
     target_type: str | None,
 ) -> tuple[Decimal, Decimal]:
     """Obtiene cantidades canceladas/cerradas para una linea si existe estado cacheado."""
@@ -250,7 +250,7 @@ def get_document_flow_items(target_type: str, source_values: list[str]) -> list[
     return items
 
 
-def pending_qty(source_type: str, source_id: str, source_item_id: str, target_type: str) -> Decimal:
+def pending_qty(source_type: str, source_id: str, source_item_id: str | None, target_type: str) -> Decimal:
     """Calcula la cantidad pendiente para una linea origen hacia un target."""
     source_item = get_document_item(source_type, source_item_id)
     if not source_item:
@@ -270,7 +270,7 @@ def _assert_same_company(source_type: str, source_id: str, target_type: str, tar
         raise DocumentFlowError("El documento origen y destino pertenecen a companias distintas.", 409)
 
 
-def _update_source_cache(source_type: str, source_id: str, source_item_id: str, target_type: str) -> None:
+def _update_source_cache(source_type: str, source_id: str, source_item_id: str | None, target_type: str) -> None:
     """Actualiza campos cache de consumo cuando existen en la linea origen."""
     source_key = normalize_doctype(source_type)
     target_key = normalize_doctype(target_type)
@@ -302,10 +302,10 @@ def create_document_relation(
     *,
     source_type: str,
     source_id: str,
-    source_item_id: str,
+    source_item_id: str | None,
     target_type: str,
     target_id: str,
-    target_item_id: str,
+    target_item_id: str | None,
     qty: Any,
     uom: str | None = None,
     rate: Any = None,
@@ -318,22 +318,29 @@ def create_document_relation(
         raise DocumentFlowError(f"Relacion no permitida: {source_key} -> {target_key}", 400)
 
     source_spec = get_document_type(source_key)
-    source_item = get_document_item(source_key, source_item_id)
-    target_item = get_document_item(target_key, target_item_id)
-    if not source_item or not target_item:
-        raise DocumentFlowError("Linea origen o destino no encontrada.", 404)
+    source_item = get_document_item(source_key, source_item_id) if source_item_id else None
+    target_item = get_document_item(target_key, target_item_id) if target_item_id else None
 
-    real_source_id = get_item_parent_id(source_spec, source_item)
-    if real_source_id != source_id:
-        raise DocumentFlowError("La linea origen no pertenece al documento indicado.", 409)
+    if source_item_id and not source_item:
+        raise DocumentFlowError("Linea origen no encontrada.", 404)
+    if target_item_id and not target_item:
+        raise DocumentFlowError("Linea destino no encontrada.", 404)
+
+    if source_item:
+        real_source_id = get_item_parent_id(source_spec, source_item)
+        if real_source_id != source_id:
+            raise DocumentFlowError("La linea origen no pertenece al documento indicado.", 409)
+
     _assert_same_company(source_key, source_id, target_key, target_id)
 
     qty_decimal = decimal_or_zero(qty)
     if qty_decimal <= 0:
         raise DocumentFlowError("La cantidad relacionada debe ser mayor que cero.", 409)
-    available = pending_qty(source_key, source_id, source_item_id, target_key)
-    if qty_decimal > available:
-        raise DocumentFlowError("La cantidad relacionada excede el pendiente disponible.", 409)
+
+    if source_item_id:
+        available = pending_qty(source_key, source_id, source_item_id, target_key)
+        if qty_decimal > available:
+             raise DocumentFlowError("La cantidad relacionada excede el pendiente disponible.", 409)
 
     flow = get_flow(source_key, target_key)
     relation = DocumentRelation(
@@ -396,7 +403,7 @@ def close_line_balance(
     *,
     source_type: str,
     source_id: str,
-    source_item_id: str,
+    source_item_id: str | None,
     target_type: str,
     qty: Any | None = None,
     reason: str = "",

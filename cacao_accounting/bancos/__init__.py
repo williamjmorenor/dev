@@ -1,3 +1,5 @@
+from flask_login import current_user
+from cacao_accounting.form_preferences import get_column_preferences
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
 
@@ -878,6 +880,11 @@ def bancos_pago_nuevo():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "banking.payment_entry"),
+    }
     return render_template(
         "bancos/pago_nuevo.html",
         form=formulario,
@@ -887,6 +894,7 @@ def bancos_pago_nuevo():
         factura_compra_origen=factura_compra_origen,
         factura_venta_origen=factura_venta_origen,
         facturas_origen=facturas_origen,
+        transaction_config=transaction_config,
     )
 
 

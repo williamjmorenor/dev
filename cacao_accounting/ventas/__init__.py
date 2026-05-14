@@ -1,3 +1,5 @@
+from flask_login import current_user
+from cacao_accounting.form_preferences import get_column_preferences
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
 
@@ -150,12 +152,18 @@ def ventas_pedido_venta_nuevo():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "sales.sales_request"),
+    }
     return render_template(
         "ventas/solicitud_venta_nuevo.html",
         form=formulario,
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -623,6 +631,11 @@ def ventas_orden_venta_nuevo():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "sales.sales_order"),
+    }
     return render_template(
         "ventas/orden_venta_nuevo.html",
         form=formulario,
@@ -633,6 +646,7 @@ def ventas_orden_venta_nuevo():
         from_quotation_id=from_quotation_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -723,6 +737,11 @@ def ventas_cotizacion_nueva():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "sales.sales_quotation"),
+    }
     return render_template(
         "ventas/cotizacion_nuevo.html",
         form=formulario,
@@ -731,6 +750,7 @@ def ventas_cotizacion_nueva():
         from_request_id=from_request_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -811,8 +831,6 @@ def ventas_orden_venta_cancel(order_id: str):
     database.session.commit()
     flash("Orden de venta cancelada.", "warning")
     return redirect(url_for("ventas.ventas_orden_venta", order_id=order_id))
-
-
 @ventas.route("/delivery-note/new", methods=["GET", "POST"])
 @modulo_activo("sales")
 @login_required
@@ -821,6 +839,7 @@ def ventas_entrega_nuevo():
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
     from cacao_accounting.database import Warehouse
     from cacao_accounting.ventas.forms import FormularioEntregaVenta
+    from cacao_accounting.form_preferences import get_column_preferences
 
     formulario = FormularioEntregaVenta()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
@@ -862,24 +881,20 @@ def ventas_entrega_nuevo():
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_delivery_note_items(entrega.id)
+            entrega.total = total
+            entrega.grand_total = total
+            database.session.commit()
+            flash("Nota de entrega creada correctamente.", "success")
+            return redirect(url_for("ventas.ventas_entrega", note_id=entrega.id))
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
-            return render_template(
-                "ventas/entrega_nuevo.html",
-                form=formulario,
-                titulo=titulo,
-                orden_origen=orden_origen,
-                from_order_id=from_order_id,
-                items_disponibles=items_disponibles,
-                uoms_disponibles=uoms_disponibles,
-                bodegas_disponibles=bodegas_disponibles,
-            )
-        entrega.total = total
-        entrega.grand_total = total
-        database.session.commit()
-        flash("Nota de entrega creada correctamente.", "success")
-        return redirect(url_for("ventas.ventas_entrega", note_id=entrega.id))
+
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "sales.delivery_note"),
+    }
     return render_template(
         "ventas/entrega_nuevo.html",
         form=formulario,
@@ -889,9 +904,8 @@ def ventas_entrega_nuevo():
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
         bodegas_disponibles=bodegas_disponibles,
+        transaction_config=transaction_config,
     )
-
-
 @ventas.route("/delivery-note/<note_id>")
 @modulo_activo("sales")
 @login_required
@@ -1016,30 +1030,11 @@ def ventas_factura_venta_nuevo():
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
-            return render_template(
-                "ventas/factura_venta_nuevo.html",
-                form=formulario,
-                titulo=titulo,
-                orden_origen=orden_origen,
-                entrega_origen=entrega_origen,
-                factura_origen=factura_origen,
-                from_order_id=from_order_id,
-                from_note_id=from_note_id,
-                from_invoice_id=from_invoice_id,
-                from_return_id=from_return_id,
-                document_type=document_type,
-                items_disponibles=items_disponibles,
-                uoms_disponibles=uoms_disponibles,
-            )
-        factura.total = total
-        factura.base_total = total
-        factura.grand_total = total
-        factura.base_grand_total = total
-        factura.outstanding_amount = total
-        factura.base_outstanding_amount = total
-        database.session.commit()
-        flash("Factura de venta creada correctamente.", "success")
-        return redirect(url_for("ventas.ventas_factura_venta", invoice_id=factura.id))
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "sales.sales_invoice"),
+    }
     return render_template(
         "ventas/factura_venta_nuevo.html",
         form=formulario,
@@ -1054,8 +1049,8 @@ def ventas_factura_venta_nuevo():
         document_type=document_type,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
-
 
 @ventas.route("/sales-invoice/<invoice_id>")
 @modulo_activo("sales")

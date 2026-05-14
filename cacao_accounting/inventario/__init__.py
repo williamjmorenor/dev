@@ -1,3 +1,5 @@
+from flask_login import current_user
+from cacao_accounting.form_preferences import get_column_preferences
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
 
@@ -505,6 +507,11 @@ def inventario_entrada_nuevo():
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+    transaction_config = {
+        "items": items_disponibles if "items_disponibles" in locals() else [],
+        "uoms": uoms_disponibles if "uoms_disponibles" in locals() else [],
+        "columns": get_column_preferences(current_user.id, "inventory.stock_entry"),
+    }
     return render_template(
         "inventario/entrada_nuevo.html",
         form=formulario,
@@ -513,6 +520,7 @@ def inventario_entrada_nuevo():
         uoms_disponibles=uoms_disponibles,
         source_api_url=source_api_url,
         source_label=source_label,
+        transaction_config=transaction_config,
     )
 
 
