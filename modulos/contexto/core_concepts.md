@@ -2,10 +2,13 @@
 
 ## 1. Accounting Core & GL
 - **GLEntry:** Single source of truth. Linked via `voucher_type` and `voucher_id`.
-- **Multi-Ledger:** Every transaction impacts all active books (`Book`).
+- **Multi-Ledger:** Every transaction impacts all active books (`Book`) only manual jounal entries can set books books for a record. 
 - **Multi-Currency:** Support for base and original currencies. `exchange_rate` mandatory.
 - **Immutability:** No hard deletes. Corrections via reversal documents or adjust entries.
 - **Posting Date:** Official accounting date (not creation date).
+- **Accounting Period Clossing:** Closed Accounting Period means only manual journal entries with `is_closing=True` allowed.
+- **Fiscal Year Clossing:** Closed Fiscal Year means no records allowed.
+- **Append Only Ledgers:** Append only ledger, never delete or remove records from the ledger.
 
 ## 2. Analytical Dimensions
 - **Structure:** `DimensionType`, `DimensionValue`, and `GLEntryDimension`.
@@ -13,11 +16,12 @@
 - **Flexibility:** Support for 0..N custom dimensions per GL entry.
 
 ## 3. Inventory Framework
-- **Source of Truth:** `StockLedgerEntry` (existence and cost).
+- **Source of Truth:** `StockLedgerEntry` (existence and cost) must reconcilie in values with the `GLEntry`.
 - **Performance:** `StockBin` (snapshot of current balance).
 - **Valuation:** FIFO and Moving Average. `StockValuationLayer` tracks unit costs.
 - **Immutable Flags:** Once used in transactions, `default_uom`, `has_batch`, and `has_serial_no` are immutable.
-- **Service Items:** Items with `type="service"` never impact inventory.
+- **Service Items:** Items with `type="service"` never impact inventory, `is_stock_item=False` do not impact inventory but can have `default_uom`, `has_batch`, and `has_serial_no`.
+- **Accounting Info:** If a record do not impact inventory must provide full accounting details: Account, Cost Center, Unit, Project, those fields can be set in every line as aditional info using the modal pattern, apply for the full Source to Pay and Order to Cash bussines process.
 
 ## 4. Document Flow & Lifecycle
 - **States:** 0 (Draft), 1 (Submitted), 2 (Cancelled).
@@ -32,7 +36,7 @@
 
 ## 6. Series & Identifiers
 - **Structure:** `NamingSeries` (logic) + `Sequence` (physical counter).
-- **Resolution:** Tokens (`*YYYY*`, `*MM*`, etc.) resolved using `posting_date`.
+- **Resolution:** Tokens (`*YYYY*`, `*MM*`, etc.) resolved using `posting_date`, must resolve to English tokens.
 - **Audit:** All generated IDs recorded in `GeneratedIdentifierLog`.
 
 ## 7. Account Mapping & Tax Structure
@@ -42,7 +46,7 @@
 
 ## 8. Third-Party Accounting (AR/AP)
 - **Model:** AR/AP are projections of GL, not separate subledgers.
-- **Linkage:** Require `party_type` and `party_id` for receivable/payable accounts.
+- **Linkage:** Require `party_type` and `party_id` for receivable/payable accounts always.
 - **Allocation:** Support for partial payments and many-to-many matching via `PaymentReference`.
 
 ## 9. Advanced Domains
