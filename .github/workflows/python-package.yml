@@ -41,6 +41,7 @@ jobs:
           python -m flake8 cacao_accounting/
           python -m ruff check cacao_accounting/
           python -m mypy cacao_accounting/
+          python -m ruff check cacao_accounting/
       - name: Test with pytest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
