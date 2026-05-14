@@ -12,7 +12,7 @@ from flask_login import login_required
 from cacao_accounting.database import Item, StockEntry, StockEntryItem, UOM, Warehouse, database
 from cacao_accounting.database.helpers import get_active_naming_series
 from cacao_accounting.contabilidad.posting import PostingError, cancel_document, submit_document
-from cacao_accounting.document_flow import revert_relations_for_target
+from cacao_accounting.document_flow import create_document_relation, revert_relations_for_target
 from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
 from cacao_accounting.decorators import modulo_activo
@@ -385,6 +385,36 @@ def _line_amount(index: int) -> Decimal:
     return _form_decimal(f"qty_{index}", "1") * _form_decimal(f"rate_{index}", "0")
 
 
+def _create_line_relation(
+    index: int,
+    target_type: str,
+    target_id: str,
+    target_item_id: str,
+    qty: Decimal,
+    uom: str | None,
+    rate: Decimal,
+    amount: Decimal,
+) -> None:
+    """Crea relacion documental para una linea importada desde un origen."""
+    source_type = request.form.get(f"source_type_{index}")
+    source_id = request.form.get(f"source_id_{index}")
+    source_item_id = request.form.get(f"source_item_id_{index}")
+    if not (source_type and source_id and source_item_id):
+        return
+    create_document_relation(
+        source_type=source_type,
+        source_id=source_id,
+        source_item_id=source_item_id,
+        target_type=target_type,
+        target_id=target_id,
+        target_item_id=target_item_id,
+        qty=qty,
+        uom=uom,
+        rate=rate,
+        amount=amount,
+    )
+
+
 def _save_stock_entry_items(entry: StockEntry) -> Decimal:
     """Guarda lineas de un movimiento de inventario."""
     i = 0
@@ -395,17 +425,20 @@ def _save_stock_entry_items(entry: StockEntry) -> Decimal:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             line = StockEntryItem(
                 stock_entry_id=entry.id,
                 item_code=item_code,
                 source_warehouse=entry.from_warehouse,
                 target_warehouse=entry.to_warehouse,
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 basic_rate=rate,
                 amount=amount,
             )
             database.session.add(line)
+            database.session.flush()
+            _create_line_relation(i, "stock_entry", entry.id, line.id, qty, uom, rate, amount)
             total += amount
         i += 1
     return total

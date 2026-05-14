@@ -51,6 +51,7 @@ from cacao_accounting.database import (
 )
 from cacao_accounting.database.helpers import get_active_naming_series
 from cacao_accounting.contabilidad.posting import PostingError, cancel_document, post_bank_transaction, submit_document
+from cacao_accounting.document_flow import create_document_relation
 from cacao_accounting.document_flow.service import compute_outstanding_amount, refresh_outstanding_amount_cache
 from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
@@ -734,6 +735,19 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
             allocation_date=payment.posting_date,
         )
         database.session.add(reference)
+        database.session.flush()
+        create_document_relation(
+            source_type=reference_type,
+            source_id=reference_id,
+            source_item_id=None,
+            target_type="payment_entry",
+            target_id=payment.id,
+            target_item_id=reference.id,
+            qty=Decimal("1"),
+            uom=None,
+            rate=allocated,
+            amount=allocated,
+        )
         invoice.outstanding_amount = outstanding - allocated
         invoice.base_outstanding_amount = invoice.outstanding_amount
         total_allocated += allocated

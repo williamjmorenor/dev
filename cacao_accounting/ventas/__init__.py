@@ -172,6 +172,38 @@ def ventas_pedido_venta(request_id: str):
     return render_template("ventas/solicitud_venta.html", registro=registro, items=items, titulo=titulo)
 
 
+@ventas.route("/sales-request/<request_id>/submit", methods=["POST"])
+@modulo_activo("sales")
+@login_required
+def ventas_pedido_venta_submit(request_id: str):
+    """Aprueba un pedido de venta."""
+    registro = database.session.get(SalesRequest, request_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 0:
+        abort(400)
+    registro.docstatus = 1
+    database.session.commit()
+    flash("Pedido de venta aprobado.", "success")
+    return redirect(url_for("ventas.ventas_pedido_venta", request_id=request_id))
+
+
+@ventas.route("/sales-request/<request_id>/cancel", methods=["POST"])
+@modulo_activo("sales")
+@login_required
+def ventas_pedido_venta_cancel(request_id: str):
+    """Cancela un pedido de venta."""
+    registro = database.session.get(SalesRequest, request_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 1:
+        abort(400)
+    registro.docstatus = 2
+    database.session.commit()
+    flash("Pedido de venta cancelado.", "warning")
+    return redirect(url_for("ventas.ventas_pedido_venta", request_id=request_id))
+
+
 @ventas.route("/delivery-note/list")
 @modulo_activo("sales")
 @login_required
@@ -392,16 +424,19 @@ def _save_sales_order_items(order_id: str) -> tuple[Decimal, Decimal]:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = SalesOrderItem(
                 sales_order_id=order_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "sales_order", order_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -419,16 +454,19 @@ def _save_sales_request_items(request_id: str) -> tuple[Decimal, Decimal]:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = SalesRequestItem(
                 sales_request_id=request_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "sales_request", request_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -446,16 +484,19 @@ def _save_sales_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = SalesQuotationItem(
                 sales_quotation_id=quotation_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "sales_quotation", quotation_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -704,6 +745,39 @@ def ventas_cotizacion(quotation_id: str):
     items = database.session.execute(database.select(SalesQuotationItem).filter_by(sales_quotation_id=quotation_id)).all()
     titulo = (registro.document_no or quotation_id) + " - " + APPNAME
     return render_template("ventas/cotizacion.html", registro=registro, items=items, titulo=titulo)
+
+
+@ventas.route("/sales-quotation/<quotation_id>/submit", methods=["POST"])
+@modulo_activo("sales")
+@login_required
+def ventas_cotizacion_submit(quotation_id: str):
+    """Aprueba una cotización de venta."""
+    registro = database.session.get(SalesQuotation, quotation_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 0:
+        abort(400)
+    registro.docstatus = 1
+    database.session.commit()
+    flash("Cotización de venta aprobada.", "success")
+    return redirect(url_for("ventas.ventas_cotizacion", quotation_id=quotation_id))
+
+
+@ventas.route("/sales-quotation/<quotation_id>/cancel", methods=["POST"])
+@modulo_activo("sales")
+@login_required
+def ventas_cotizacion_cancel(quotation_id: str):
+    """Cancela una cotización de venta."""
+    registro = database.session.get(SalesQuotation, quotation_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 1:
+        abort(400)
+    registro.docstatus = 2
+    revert_relations_for_target("sales_quotation", quotation_id)
+    database.session.commit()
+    flash("Cotización de venta cancelada.", "warning")
+    return redirect(url_for("ventas.ventas_cotizacion", quotation_id=quotation_id))
 
 
 @ventas.route("/sales-order/<order_id>/submit", methods=["POST"])
