@@ -9,6 +9,7 @@ Las siguientes instrucciones son relevantes para el diseño de interfaces:
 - `.github/instructions/accounting-python.instructions.md`
 - `.github/instructions/transaction-forms-html.instructions.md`
 - `.github/instructions/search-select-fields.instructions.md`
+- `.github/instructions/reports-html.instructions.md`
 
 
 Incluye siempre dentro del contexto de cada sesión los siguientes archivos:
