@@ -650,14 +650,14 @@ def _create_payment_target(payload: dict[str, Any]) -> dict[str, Any]:
         external_context={"bank_account_id": payment.bank_account_id},
     )
     total = Decimal("0")
-    seen_references: set[tuple[str, str]] = set()
+    processed_reference_keys: set[tuple[str, str]] = set()
     for selected in payload.get("lines") or []:
         reference_type = normalize_doctype(str(selected.get("source_document_type") or selected.get("source_type") or ""))
         reference_id = str(selected.get("source_document_id") or selected.get("source_id") or "")
         reference_key = (reference_type, reference_id)
-        if reference_key in seen_references:
+        if reference_key in processed_reference_keys:
             raise DocumentFlowError("No se puede repetir la misma factura en un solo pago.", 409)
-        seen_references.add(reference_key)
+        processed_reference_keys.add(reference_key)
         invoice = get_document(reference_type, reference_id)
         if not invoice:
             raise DocumentFlowError("Factura origen no encontrada.", 404)

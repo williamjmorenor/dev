@@ -704,18 +704,18 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
     """Guarda referencias de pago y actualiza saldos vivos de facturas."""
     total_allocated = Decimal("0")
     i = 0
-    seen_references: set[tuple[str, str]] = set()
+    processed_reference_keys: set[tuple[str, str]] = set()
     while request.form.get(f"reference_id_{i}"):
         reference_type = request.form.get(f"reference_type_{i}", "")
         reference_id = request.form.get(f"reference_id_{i}", "")
         allocated = _form_decimal(f"allocated_amount_{i}", "0")
         reference_key = (reference_type, reference_id)
-        if reference_key in seen_references:
+        if reference_key in processed_reference_keys:
             abort(409)
-        seen_references.add(reference_key)
+        processed_reference_keys.add(reference_key)
         if allocated < 0:
             abort(409)
-        if allocated <= 0:
+        if allocated == 0:
             i += 1
             continue
         if reference_type == "purchase_invoice":
