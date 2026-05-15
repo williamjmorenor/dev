@@ -99,15 +99,15 @@
         rate: 'Precio / Costo Unitario',
         amount: 'Precio / Costo Total',
       }, config.messages || {});
-      var initialPreferences = config.initialPreferences;
-      if (!initialPreferences || !Array.isArray(initialPreferences.columns)) {
-        initialPreferences = { columns: config.columns || [] };
+      var effectivePreferences = config.initialPreferences;
+      if (!effectivePreferences || !Array.isArray(effectivePreferences.columns)) {
+        effectivePreferences = { columns: config.columns || [] };
       }
 
       return {
         formKey: config.formKey || '',
         viewKey: config.viewKey || 'draft',
-        preferences: { columns: normalizeColumns(initialPreferences.columns, messages) },
+        preferences: { columns: normalizeColumns(effectivePreferences.columns, messages) },
         messages: messages,
         header: config.initialHeader || {},
         availableItems: normalizeItems(config.items),
@@ -198,7 +198,9 @@
             line.allowed_uoms = normalizeAllowedUoms(line.allowed_uoms, line.uom);
             return;
           }
-          if (!keepCustomName || !line.item_name) line.item_name = item.name || line.item_name;
+          if (!keepCustomName || !line.item_name) {
+            line.item_name = item.name || line.item_name;
+          }
           line.allowed_uoms = normalizeAllowedUoms(item.allowed_uoms, item.default_uom);
           if (line.allowed_uoms.length && line.allowed_uoms.indexOf(line.uom) === -1) {
             line.uom = line.allowed_uoms[0];
