@@ -12,7 +12,7 @@ from decimal import Decimal
 # Librerias de terceros
 # ---------------------------------------------------------------------------------------
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
@@ -145,6 +145,11 @@ def compras_solicitud_compra_nueva():
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Solicitud de Compra - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_request"),
+    }
     if request.method == "POST":
         try:
             solicitud = PurchaseRequest(
@@ -179,6 +184,7 @@ def compras_solicitud_compra_nueva():
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -583,7 +589,6 @@ def compras_proveedor_nuevo():
         company_choices=company_choices,
         selected_company=selected_company,
         company_settings=company_settings,
-            transaction_config=transaction_config,
     )
 
 
@@ -882,7 +887,7 @@ def compras_orden_compra_nuevo():
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
-            transaction_config=transaction_config,
+        transaction_config=transaction_config,
     )
 
 
@@ -1064,6 +1069,11 @@ def compras_recepcion_nuevo():
         {"code": w[0].code, "name": w[0].name} for w in database.session.execute(database.select(Warehouse)).all()
     ]
     titulo = "Nueva Recepción de Compra - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_receipt"),
+    }
     if request.method == "POST":
         try:
             recepcion = PurchaseReceipt(
@@ -1083,30 +1093,14 @@ def compras_recepcion_nuevo():
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_purchase_receipt_items(recepcion.id)
+            recepcion.total = total
+            recepcion.grand_total = total
+            database.session.commit()
+            flash("Recepción de compra creada correctamente.", "success")
+            return redirect(url_for("compras.compras_recepcion", receipt_id=recepcion.id))
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
-    transaction_config = {
-        "items": items_disponibles,
-        "uoms": uoms_disponibles,
-        "columns": get_column_preferences(current_user.id, "purchases.purchase_receipt"),
-    }
-            return render_template(
-                "compras/recepcion_nuevo.html",
-                form=formulario,
-                titulo=titulo,
-                orden_origen=orden_origen,
-                from_order_id=from_order_id,
-                items_disponibles=items_disponibles,
-                uoms_disponibles=uoms_disponibles,
-                bodegas_disponibles=bodegas_disponibles,
-                    transaction_config=transaction_config,
-    )
-        recepcion.total = total
-        recepcion.grand_total = total
-        database.session.commit()
-        flash("Recepción de compra creada correctamente.", "success")
-        return redirect(url_for("compras.compras_recepcion", receipt_id=recepcion.id))
     return render_template(
         "compras/recepcion_nuevo.html",
         form=formulario,
@@ -1116,6 +1110,7 @@ def compras_recepcion_nuevo():
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
         bodegas_disponibles=bodegas_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -1221,6 +1216,11 @@ def compras_factura_compra_nuevo():
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = f"Nueva {document_title} - {APPNAME}"
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_invoice"),
+    }
     if request.method == "POST":
         try:
             document_type = request.form.get("document_type") or PURCHASE_INVOICE
@@ -1250,38 +1250,18 @@ def compras_factura_compra_nuevo():
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_purchase_invoice_items(factura.id)
+            factura.total = total
+            factura.base_total = total
+            factura.grand_total = total
+            factura.base_grand_total = total
+            factura.outstanding_amount = total
+            factura.base_outstanding_amount = total
+            database.session.commit()
+            flash("Factura de compra creada correctamente.", "success")
+            return redirect(url_for("compras.compras_factura_compra", invoice_id=factura.id))
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
-    transaction_config = {
-        "items": items_disponibles,
-        "uoms": uoms_disponibles,
-        "columns": get_column_preferences(current_user.id, "purchases.purchase_invoice"),
-    }
-            return render_template(
-                "compras/factura_compra_nuevo.html",
-                form=formulario,
-                titulo=titulo,
-                orden_origen=orden_origen,
-                recepcion_origen=recepcion_origen,
-                factura_origen=factura_origen,
-                from_order_id=from_order_id,
-                from_receipt_id=from_receipt_id,
-                from_invoice_id=from_invoice_id,
-                document_type=document_type,
-                items_disponibles=items_disponibles,
-                uoms_disponibles=uoms_disponibles,
-                    transaction_config=transaction_config,
-    )
-        factura.total = total
-        factura.base_total = total
-        factura.grand_total = total
-        factura.base_grand_total = total
-        factura.outstanding_amount = total
-        factura.base_outstanding_amount = total
-        database.session.commit()
-        flash("Factura de compra creada correctamente.", "success")
-        return redirect(url_for("compras.compras_factura_compra", invoice_id=factura.id))
     return render_template(
         "compras/factura_compra_nuevo.html",
         form=formulario,
@@ -1295,6 +1275,7 @@ def compras_factura_compra_nuevo():
         document_type=document_type,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 

@@ -359,8 +359,9 @@ def create_document_relation(
         status="active",
     )
     save_relation(relation)
-    recompute_line_flow_state(source_key, source_id, source_item_id, target_key, relation.company)
-    _update_source_cache(source_key, source_id, source_item_id, target_key)
+    if source_item_id:
+        recompute_line_flow_state(source_key, source_id, source_item_id, target_key, relation.company)
+        _update_source_cache(source_key, source_id, source_item_id, target_key)
     return relation
 
 

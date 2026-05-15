@@ -2,6 +2,7 @@
 {% block contenido %}
 {% import "macros.html" as macros %}
 {% import "transaction_form_macros.html" as tf_macros %}
+<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra_nuevo.html"></div>
 <form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
   {{ form.csrf_token }}
   {{ tf_macros.transaction_form_header("Factura de Compra") }}

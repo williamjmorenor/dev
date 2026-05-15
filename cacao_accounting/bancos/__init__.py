@@ -16,7 +16,7 @@ from typing import cast
 # ---------------------------------------------------------------------------------------
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
@@ -772,122 +772,74 @@ def _refresh_payment_reference_document(reference_type: str, reference_id: str) 
 @bancos.route("/payment/new", methods=["GET", "POST"])
 @modulo_activo("cash")
 @login_required
-def bancos_pago_nuevo(        transaction_config=transaction_config,
-    ):
+def bancos_pago_nuevo():
     """Formulario para crear un nuevo pago."""
     from cacao_accounting.bancos.forms import FormularioPago
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
     from cacao_accounting.database import ExternalCounter, Party
+    from cacao_accounting.form_preferences import get_column_preferences
 
-    formulario = FormularioPago(        transaction_config=transaction_config,
-    )
-    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial(        transaction_config=transaction_config,
-    )
-    selected_company = request.values.get("company"        transaction_config=transaction_config,
-    ) or (
+    formulario = FormularioPago()
+    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
-            transaction_config=transaction_config,
     )
-    formulario.naming_series.choices = _series_choices("payment_entry", selected_company        transaction_config=transaction_config,
-    )
-    formulario.bank_account_id.choices = [("", ""        transaction_config=transaction_config,
-    )] + [
-        (str(b[0].id        transaction_config=transaction_config,
-    ), f"{b[0].account_name} {b[0].account_no or ''}".strip(        transaction_config=transaction_config,
-    )        transaction_config=transaction_config,
-    )
-        for b in database.session.execute(database.select(BankAccount        transaction_config=transaction_config,
-    ).filter_by(is_active=True        transaction_config=transaction_config,
-    )        transaction_config=transaction_config,
-    ).all(        transaction_config=transaction_config,
-    )
+    formulario.naming_series.choices = _series_choices("payment_entry", selected_company)
+    formulario.bank_account_id.choices = [("", "")] + [
+        (str(b[0].id), f"{b[0].account_name} {b[0].account_no or ''}".strip())
+        for b in database.session.execute(database.select(BankAccount).filter_by(is_active=True)).all()
     ]
-    formulario.party_id.choices = [("", ""        transaction_config=transaction_config,
-    )] + [
-        (str(p[0].id        transaction_config=transaction_config,
-    ), p[0].name        transaction_config=transaction_config,
-    ) for p in database.session.execute(database.select(Party        transaction_config=transaction_config,
-    )        transaction_config=transaction_config,
-    ).all(        transaction_config=transaction_config,
-    )
+    formulario.party_id.choices = [("", "")] + [
+        (str(p[0].id), p[0].name) for p in database.session.execute(database.select(Party)).all()
     ]
     # Contadores externos activos para la compania seleccionada
-    counters_query = database.select(ExternalCounter        transaction_config=transaction_config,
-    ).filter_by(is_active=True        transaction_config=transaction_config,
-    )
+    counters_query = database.select(ExternalCounter).filter_by(is_active=True)
     if selected_company:
-        counters_query = counters_query.filter_by(company=selected_company        transaction_config=transaction_config,
-    )
-    active_counters = database.session.execute(counters_query        transaction_config=transaction_config,
-    ).scalars(        transaction_config=transaction_config,
-    ).all(        transaction_config=transaction_config,
-    )
-    formulario.external_counter_id.choices = [("", "— Sin contador externo —"        transaction_config=transaction_config,
-    )] + [
-        (str(c.id        transaction_config=transaction_config,
-    ), f"{c.name} (siguiente: {c.next_suggested_formatted}        transaction_config=transaction_config,
-    )"        transaction_config=transaction_config,
-    ) for c in active_counters
+        counters_query = counters_query.filter_by(company=selected_company)
+    active_counters = database.session.execute(counters_query).scalars().all()
+    formulario.external_counter_id.choices = [("", "— Sin contador externo —")] + [
+        (str(c.id), f"{c.name} (siguiente: {c.next_suggested_formatted})") for c in active_counters
     ]
 
-    from_purchase_invoice_ids = request.values.getlist("from_purchase_invoice"        transaction_config=transaction_config,
-    )
-    from_sales_invoice_ids = request.values.getlist("from_sales_invoice"        transaction_config=transaction_config,
-    )
-    facturas_origen = _payment_source_rows(from_purchase_invoice_ids, from_sales_invoice_ids        transaction_config=transaction_config,
-    )
+    from_purchase_invoice_ids = request.values.getlist("from_purchase_invoice")
+    from_sales_invoice_ids = request.values.getlist("from_sales_invoice")
+    facturas_origen = _payment_source_rows(from_purchase_invoice_ids, from_sales_invoice_ids)
     if request.method == "GET" and facturas_origen:
         first = facturas_origen[0]["document"]
         formulario.company.data = first.company
-        formulario.party_id.data = getattr(first, "supplier_id", None        transaction_config=transaction_config,
-    ) or getattr(first, "customer_id", None        transaction_config=transaction_config,
-    )
+        formulario.party_id.data = getattr(first, "supplier_id", None) or getattr(first, "customer_id", None)
         formulario.party_type.data = "supplier" if facturas_origen[0]["reference_type"] == "purchase_invoice" else "customer"
         formulario.payment_type.data = "pay" if facturas_origen[0]["reference_type"] == "purchase_invoice" else "receive"
         formulario.paid_amount.data = str(
-            sum((_invoice_outstanding(row["document"]        transaction_config=transaction_config,
-    ) for row in facturas_origen        transaction_config=transaction_config,
-    ), Decimal("0"        transaction_config=transaction_config,
-    )        transaction_config=transaction_config,
-    )
-                transaction_config=transaction_config,
-    )
+            sum((_invoice_outstanding(row["document"]) for row in facturas_origen), Decimal("0"))
+        )
     factura_compra_origen = (
-        database.session.get(PurchaseInvoice, from_purchase_invoice_ids[0]        transaction_config=transaction_config,
-    ) if from_purchase_invoice_ids else None
-            transaction_config=transaction_config,
+        database.session.get(PurchaseInvoice, from_purchase_invoice_ids[0]) if from_purchase_invoice_ids else None
     )
-    factura_venta_origen = database.session.get(SalesInvoice, from_sales_invoice_ids[0]        transaction_config=transaction_config,
-    ) if from_sales_invoice_ids else None
+    factura_venta_origen = database.session.get(SalesInvoice, from_sales_invoice_ids[0]) if from_sales_invoice_ids else None
     titulo = "Nuevo Pago - " + APPNAME
+    transaction_config = {
+        "items": [],
+        "uoms": [],
+        "columns": get_column_preferences(getattr(current_user, "id", None), "banking.payment_entry"),
+    }
     if request.method == "POST":
         try:
-            amount = _form_decimal("paid_amount", "0"        transaction_config=transaction_config,
-    )
-            payment_type = request.form.get("payment_type"        transaction_config=transaction_config,
-    ) or "receive"
-            if payment_type == "internal_transfer" and (from_purchase_invoice_ids or from_sales_invoice_ids        transaction_config=transaction_config,
-    ):
-                abort(409        transaction_config=transaction_config,
-    )
+            amount = _form_decimal("paid_amount", "0")
+            payment_type = request.form.get("payment_type") or "receive"
+            if payment_type == "internal_transfer" and (from_purchase_invoice_ids or from_sales_invoice_ids):
+                abort(409)
             if from_purchase_invoice_ids and from_sales_invoice_ids:
-                abort(409        transaction_config=transaction_config,
-    )
+                abort(409)
             payment = PaymentEntry(
                 payment_type=payment_type,
-                company=request.form.get("company"        transaction_config=transaction_config,
-    ) or None,
-                bank_account_id=request.form.get("bank_account_id"        transaction_config=transaction_config,
-    ) or None,
-                party_type=request.form.get("party_type"        transaction_config=transaction_config,
-    ) or None,
-                party_id=request.form.get("party_id"        transaction_config=transaction_config,
-    ) or None,
-                remarks=request.form.get("remarks"        transaction_config=transaction_config,
-    ),
+                company=request.form.get("company") or None,
+                bank_account_id=request.form.get("bank_account_id") or None,
+                party_type=request.form.get("party_type") or None,
+                party_id=request.form.get("party_id") or None,
+                remarks=request.form.get("remarks"),
                 docstatus=0,
-                    transaction_config=transaction_config,
-    )
+            )
             if payment_type == "pay":
                 payment.paid_amount = amount
                 payment.base_paid_amount = amount
@@ -897,16 +849,11 @@ def bancos_pago_nuevo(        transaction_config=transaction_config,
             else:
                 payment.paid_amount = amount
                 payment.received_amount = amount
-            database.session.add(payment        transaction_config=transaction_config,
-    )
-            database.session.flush(        transaction_config=transaction_config,
-    )
-            default_series_id, default_counter_id = _payment_numbering_defaults(payment.bank_account_id        transaction_config=transaction_config,
-    )
-            naming_series_id = request.form.get("naming_series"        transaction_config=transaction_config,
-    ) or default_series_id
-            external_counter_id = request.form.get("external_counter_id"        transaction_config=transaction_config,
-    ) or default_counter_id
+            database.session.add(payment)
+            database.session.flush()
+            default_series_id, default_counter_id = _payment_numbering_defaults(payment.bank_account_id)
+            naming_series_id = request.form.get("naming_series") or default_series_id
+            external_counter_id = request.form.get("external_counter_id") or default_counter_id
             # Contexto para seleccion contextual del contador externo
             ext_context = {
                 "payment_type": payment_type,
@@ -915,21 +862,15 @@ def bancos_pago_nuevo(        transaction_config=transaction_config,
             assign_document_identifier(
                 document=payment,
                 entity_type="payment_entry",
-                posting_date_raw=request.form.get("posting_date"        transaction_config=transaction_config,
-    ),
+                posting_date_raw=request.form.get("posting_date"),
                 naming_series_id=naming_series_id,
                 external_counter_id=external_counter_id,
-                external_number=request.form.get("external_number"        transaction_config=transaction_config,
-    ) or None,
+                external_number=request.form.get("external_number") or None,
                 external_context=ext_context,
-                    transaction_config=transaction_config,
-    )
-            allocated = _save_payment_references(payment        transaction_config=transaction_config,
-    )
+            )
+            allocated = _save_payment_references(payment)
             if allocated and amount != allocated:
-                raise ValueError(_("El monto del pago debe coincidir con el monto asignado a referencias."        transaction_config=transaction_config,
-    )        transaction_config=transaction_config,
-    )
+                raise ValueError(_("El monto del pago debe coincidir con el monto asignado a referencias."))
             if amount == 0 and allocated:
                 if payment_type == "pay":
                     payment.paid_amount = allocated
@@ -937,27 +878,12 @@ def bancos_pago_nuevo(        transaction_config=transaction_config,
                 else:
                     payment.received_amount = allocated
                     payment.base_received_amount = allocated
-            database.session.commit(        transaction_config=transaction_config,
-    )
-            flash("Pago creado correctamente.", "success"        transaction_config=transaction_config,
-    )
-            return redirect(url_for("bancos.bancos_pago", payment_id=payment.id        transaction_config=transaction_config,
-    )        transaction_config=transaction_config,
-    )
+            database.session.commit()
+            flash("Pago creado correctamente.", "success")
+            return redirect(url_for("bancos.bancos_pago", payment_id=payment.id))
         except IdentifierConfigurationError as exc:
-            database.session.rollback(        transaction_config=transaction_config,
-    )
-            flash(str(exc        transaction_config=transaction_config,
-    ), "danger"        transaction_config=transaction_config,
-    )
-        transaction_config = {
-        "items": items_disponibles if "items_disponibles" in locals(        transaction_config=transaction_config,
-    ) else [],
-        "uoms": uoms_disponibles if "uoms_disponibles" in locals(        transaction_config=transaction_config,
-    ) else [],
-        "columns": get_column_preferences(current_user.id, "banking.payment_entry"        transaction_config=transaction_config,
-    ),
-    }
+            database.session.rollback()
+            flash(str(exc), "danger")
     return render_template(
         "bancos/pago_nuevo.html",
         form=formulario,
@@ -967,7 +893,7 @@ def bancos_pago_nuevo(        transaction_config=transaction_config,
         factura_compra_origen=factura_compra_origen,
         factura_venta_origen=factura_venta_origen,
         facturas_origen=facturas_origen,
-            transaction_config=transaction_config,
+        transaction_config=transaction_config,
     )
 
 
