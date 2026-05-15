@@ -116,10 +116,10 @@
               this.lines.push(Object.assign(this.newLine(), {
                 item_code: i.item_code,
                 item_name: i.item_name,
-                qty: i.pending_qty || i.qty,
+                qty: i.qty,
                 uom: i.uom,
                 rate: i.rate,
-                amount: (i.pending_qty || i.qty) * i.rate,
+                amount: i.qty * i.rate,
                 source_type: i.source_type || '',
                 source_id: i.source_id || '',
                 source_item_id: i.source_item_id || ''

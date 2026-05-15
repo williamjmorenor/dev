@@ -65,8 +65,15 @@ PURCHASE_DEBIT_NOTE = "purchase_debit_note"
 PURCHASE_CREDIT_NOTE = "purchase_credit_note"
 PURCHASE_RETURN = "purchase_return"
 
+FACTURA_DE_COMPRA = "Factura de Compra"
+COMPRAS_FACTURA_COMPRA_DEVOLUCION_LISTA_HTML = "compras/factura_compra_devolucion_lista.html"
+COMPRAS_COMPRAS_FACTURA_COMPRA_NUEVO = "compras.compras_factura_compra_nuevo"
+COMPRAS_COMPRAS_ORDEN_COMPRA = "compras.compras_orden_compra"
+COMPRAS_COMPRAS_RECEPCION = "compras.compras_recepcion"
+COMPRAS_COMPRAS_FACTURA_COMPRA = "compras.compras_factura_compra"
+
 DOCUMENT_TYPE_LABELS: dict[str, str] = {
-    PURCHASE_INVOICE: "Factura de Compra",
+    PURCHASE_INVOICE: FACTURA_DE_COMPRA,
     PURCHASE_DEBIT_NOTE: "Nota de Débito de Compra",
     PURCHASE_CREDIT_NOTE: "Nota de Crédito de Compra",
     PURCHASE_RETURN: "Devolución de Compra",
@@ -404,7 +411,7 @@ def compras_factura_compra_nota_debito_lista():
     )
     titulo = "Listado de Notas de Débito de Compra - " + APPNAME
     return render_template(
-        "compras/factura_compra_devolucion_lista.html",
+        COMPRAS_FACTURA_COMPRA_DEVOLUCION_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         page_heading="Listado de Notas de Débito de Compra",
@@ -427,7 +434,7 @@ def compras_factura_compra_nota_credito_lista():
     )
     titulo = "Listado de Notas de Crédito de Compra - " + APPNAME
     return render_template(
-        "compras/factura_compra_devolucion_lista.html",
+        COMPRAS_FACTURA_COMPRA_DEVOLUCION_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         page_heading="Listado de Notas de Crédito de Compra",
@@ -450,7 +457,7 @@ def compras_factura_compra_devolucion_lista():
     )
     titulo = "Listado de Devoluciones de Compra - " + APPNAME
     return render_template(
-        "compras/factura_compra_devolucion_lista.html",
+        COMPRAS_FACTURA_COMPRA_DEVOLUCION_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         page_heading="Listado de Devoluciones de Compra",
@@ -465,7 +472,7 @@ def compras_factura_compra_devolucion_lista():
 @login_required
 def compras_factura_compra_nota_debito_nueva():
     """Alias explicito para crear nota de débito de compra."""
-    return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_DEBIT_NOTE))
+    return redirect(url_for(COMPRAS_COMPRAS_FACTURA_COMPRA_NUEVO, document_type=PURCHASE_DEBIT_NOTE))
 
 
 @compras.route("/purchase-invoice/credit-note/new", methods=["GET", "POST"])
@@ -473,7 +480,7 @@ def compras_factura_compra_nota_debito_nueva():
 @login_required
 def compras_factura_compra_nota_credito_nueva():
     """Alias explicito para crear nota de crédito de compra."""
-    return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_CREDIT_NOTE))
+    return redirect(url_for(COMPRAS_COMPRAS_FACTURA_COMPRA_NUEVO, document_type=PURCHASE_CREDIT_NOTE))
 
 
 @compras.route("/purchase-invoice/return/new", methods=["GET", "POST"])
@@ -481,7 +488,7 @@ def compras_factura_compra_nota_credito_nueva():
 @login_required
 def compras_factura_compra_devolucion_nueva():
     """Alias explicito para crear devolución de compra."""
-    return redirect(url_for("compras.compras_factura_compra_nuevo", document_type=PURCHASE_RETURN))
+    return redirect(url_for(COMPRAS_COMPRAS_FACTURA_COMPRA_NUEVO, document_type=PURCHASE_RETURN))
 
 
 @compras.route("/supplier/list")
@@ -835,6 +842,8 @@ def compras_orden_compra_nuevo():
         for i in database.session.execute(database.select(Item)).all()
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
+    from_request_id = request.args.get("from_request") or request.form.get("from_request")
+    solicitud_origen = database.session.get(PurchaseRequest, from_request_id) if from_request_id else None
     titulo = "Nueva Orden de Compra - " + APPNAME
     if request.method == "POST":
         try:
@@ -864,7 +873,7 @@ def compras_orden_compra_nuevo():
             orden.base_total = total
             database.session.commit()
             flash("Orden de compra creada correctamente.", "success")
-            return redirect(url_for("compras.compras_orden_compra", order_id=orden.id))
+            return redirect(url_for(COMPRAS_COMPRAS_ORDEN_COMPRA, order_id=orden.id))
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
@@ -877,6 +886,8 @@ def compras_orden_compra_nuevo():
         "compras/orden_compra_nuevo.html",
         form=formulario,
         titulo=titulo,
+        from_request_id=from_request_id,
+        solicitud_origen=solicitud_origen,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
         transaction_config=transaction_config,
@@ -1010,7 +1021,7 @@ def compras_orden_compra_submit(order_id: str):
     registro.docstatus = 1
     database.session.commit()
     flash("Orden de compra aprobada.", "success")
-    return redirect(url_for("compras.compras_orden_compra", order_id=order_id))
+    return redirect(url_for(COMPRAS_COMPRAS_ORDEN_COMPRA, order_id=order_id))
 
 
 @compras.route("/purchase-order/<order_id>/cancel", methods=["POST"])
@@ -1027,7 +1038,7 @@ def compras_orden_compra_cancel(order_id: str):
     revert_relations_for_target("purchase_order", order_id)
     database.session.commit()
     flash("Orden de compra cancelada.", "warning")
-    return redirect(url_for("compras.compras_orden_compra", order_id=order_id))
+    return redirect(url_for(COMPRAS_COMPRAS_ORDEN_COMPRA, order_id=order_id))
 
 
 @compras.route("/purchase-receipt/new", methods=["GET", "POST"])
@@ -1090,7 +1101,7 @@ def compras_recepcion_nuevo():
             recepcion.grand_total = total
             database.session.commit()
             flash("Recepción de compra creada correctamente.", "success")
-            return redirect(url_for("compras.compras_recepcion", receipt_id=recepcion.id))
+            return redirect(url_for(COMPRAS_COMPRAS_RECEPCION, receipt_id=recepcion.id))
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
@@ -1141,7 +1152,7 @@ def compras_recepcion_submit(receipt_id: str):
     except PostingError as exc:
         database.session.rollback()
         flash(str(exc), "danger")
-    return redirect(url_for("compras.compras_recepcion", receipt_id=receipt_id))
+    return redirect(url_for(COMPRAS_COMPRAS_RECEPCION, receipt_id=receipt_id))
 
 
 @compras.route("/purchase-receipt/<receipt_id>/cancel", methods=["POST"])
@@ -1163,7 +1174,7 @@ def compras_recepcion_cancel(receipt_id: str):
     except PostingError as exc:
         database.session.rollback()
         flash(str(exc), "danger")
-    return redirect(url_for("compras.compras_recepcion", receipt_id=receipt_id))
+    return redirect(url_for(COMPRAS_COMPRAS_RECEPCION, receipt_id=receipt_id))
 
 
 @compras.route("/purchase-invoice/new", methods=["GET", "POST"])
@@ -1203,7 +1214,7 @@ def compras_factura_compra_nuevo():
     orden_origen = database.session.get(PurchaseOrder, from_order_id) if from_order_id else None
     recepcion_origen = database.session.get(PurchaseReceipt, from_receipt_id) if from_receipt_id else None
     factura_origen = database.session.get(PurchaseInvoice, from_invoice_id) if from_invoice_id else None
-    document_title = DOCUMENT_TYPE_LABELS.get(document_type, "Factura de Compra")
+    document_title = DOCUMENT_TYPE_LABELS.get(document_type, FACTURA_DE_COMPRA)
     items_disponibles = [
         {"code": i[0].code, "name": i[0].name, "uom": i[0].default_uom}
         for i in database.session.execute(database.select(Item)).all()
@@ -1252,7 +1263,7 @@ def compras_factura_compra_nuevo():
             factura.base_outstanding_amount = total
             database.session.commit()
             flash("Factura de compra creada correctamente.", "success")
-            return redirect(url_for("compras.compras_factura_compra", invoice_id=factura.id))
+            return redirect(url_for(COMPRAS_COMPRAS_FACTURA_COMPRA, invoice_id=factura.id))
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
@@ -1283,7 +1294,7 @@ def compras_factura_compra(invoice_id):
         abort(404)
     items = database.session.execute(database.select(PurchaseInvoiceItem).filter_by(purchase_invoice_id=invoice_id)).all()
     titulo = (registro.document_no or invoice_id) + " - " + APPNAME
-    document_type_label = DOCUMENT_TYPE_LABELS.get(registro.document_type, "Factura de Compra")
+    document_type_label = DOCUMENT_TYPE_LABELS.get(registro.document_type, FACTURA_DE_COMPRA)
     return render_template(
         "compras/factura_compra.html",
         registro=registro,
@@ -1309,9 +1320,9 @@ def compras_factura_compra_submit(invoice_id: str):
     except PostingError as exc:
         database.session.rollback()
         flash(_(str(exc)), "danger")
-        return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
+        return redirect(url_for(COMPRAS_COMPRAS_FACTURA_COMPRA, invoice_id=invoice_id))
     flash(_("Factura de compra aprobada y contabilizada."), "success")
-    return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
+    return redirect(url_for(COMPRAS_COMPRAS_FACTURA_COMPRA, invoice_id=invoice_id))
 
 
 @compras.route("/purchase-invoice/<invoice_id>/cancel", methods=["POST"])
@@ -1332,6 +1343,6 @@ def compras_factura_compra_cancel(invoice_id: str):
     except PostingError as exc:
         database.session.rollback()
         flash(_(str(exc)), "danger")
-        return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
+        return redirect(url_for(COMPRAS_COMPRAS_FACTURA_COMPRA, invoice_id=invoice_id))
     flash(_("Factura de compra cancelada con reverso contable."), "warning")
-    return redirect(url_for("compras.compras_factura_compra", invoice_id=invoice_id))
+    return redirect(url_for(COMPRAS_COMPRAS_FACTURA_COMPRA, invoice_id=invoice_id))
