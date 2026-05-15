@@ -1,0 +1,3093 @@
+diff --git a/ESTADO_ACTUAL.md b/ESTADO_ACTUAL.md
+index c3b723fe..07ec7080 100644
+--- a/ESTADO_ACTUAL.md
++++ b/ESTADO_ACTUAL.md
+@@ -1,30 +1,7 @@
+-# ESTADO ACTUAL DEL PROYECTO (Resumen)
++# ESTADO ACTUAL - 2026-05-14
+ 
+-## Capacidades del Núcleo
+-- **R2R:** Transacciones → Mayor General (`gl_entry`) → Reportes. `GLEntry` es la única fuente de verdad.
+-- **S2P:** Flujo completo desde orden de compra hasta pago y conciliación.
+-- **O2C:** Flujo desde orden de venta hasta cobro.
+-- **Inventario:** Movimientos físicos, valoración (FIFO/MA), lotes y series. `StockLedgerEntry` como fuente de verdad.
+-- **Multi-X:** Soporte nativo para Multi-compañía, Multi-libro (Multi-ledger) y Multimoneda real.
+-- **Trazabilidad:** Flujo documental transversal (`Doc Flow`) y series auditables.
+-
+-## Estado por Módulo
+-| Módulo | Base de Datos | CRUD | Posting/Servicios | Reportes |
+-|---|---|---|---|---|
+-| Contabilidad | ✅ Completo | ✅ Unificado | ✅ JE Manual, Recurrentes, Cierre | 🟡 Financieros MVP |
+-| Compras | ✅ Completo | 🟡 Parcial | ✅ GL + Impuestos + Conciliación | 🟡 Operativos MVP |
+-| Ventas | ✅ Completo | 🟡 Parcial | ✅ GL + Impuestos + COGS | 🟡 Operativos MVP |
+-| Bancos | ✅ Completo | 🟡 Parcial | ✅ Pagos y Reconciliación MVP | 🟡 Operativos MVP |
+-| Inventario | ✅ Completo | 🟡 Parcial | ✅ FIFO/MA operativo | 🟡 Kardex MVP |
+-| Doc Flow | ✅ Completo | ✅ API OK | ✅ Relaciones activas | N/A |
+-
+-## Hitos Recientes (Mayo 2026)
+-- **Unificación UI:** Todos los maestros y formularios contables siguen el "Voucher Pattern".
+-- **Contabilidad:** Comprobantes recurrentes y asistente de cierre mensual operativos.
+-- **Infraestructura:** Endpoints `/health` y `/ready` implementados.
+-- **Datos:** Seed robusto con escenarios multimoneda y transacciones reales.
+-- **Validación:** Suite de 590 tests pasando.
+-
+-## Nota de Integración (2026-05-14)
+-- Se integró documentación condensada desde `1965ac44a352de5af34d604b81400a2bc8aed74a` como base vigente.
+-- Del commit `bef4029e25000512539a27164f8915cf3b4b2acc` se conservan únicamente `/health`, `/ready` y la prueba `tests/test_health_checks.py`.
++- **Core:** Python 3.12, Flask, Alpine.js.
++- **Contabilidad:** Multi-libro, multimoneda, Comprobantes Recurrentes y Cierre Mensual funcionales.
++- **Módulos Operativos:** Compras (S2P completo), Ventas, Inventario y Bancos estandarizados con el "Voucher Pattern".
++- **UX:** Librerías reutilizables `smart-select.js` y `transaction-form.js`.
++- **Calidad:** 607 tests pasando. Estándares Black, Ruff, Flake8 y Mypy aplicados.
+diff --git a/PENDIENTE.md b/PENDIENTE.md
+index e22ba077..7675c260 100644
+--- a/PENDIENTE.md
++++ b/PENDIENTE.md
+@@ -1,37 +1,6 @@
+-# PENDIENTE — Cacao Accounting (Backlog Priorizado)
++# PENDIENTE
+ 
+-## Core y Posting
+-- [ ] Resolver política formal de renumeración de `document_no` tras cambios en borradores.
+-- [ ] Implementar soporte completo para `GLEntryDimension` (dimensiones personalizadas) en posting.
+-
+-## AR/AP y Terceros
+-- [ ] Implementar modelo `PartyGroup` y su CRUD.
+-- [ ] Completar edición/visualización por compañía para Cliente y Proveedor en nuevo patrón.
+-- [ ] Gestión de múltiples direcciones y contactos para terceros.
+-- [ ] Conciliación masiva de facturas contra pagos (interfaz dedicada).
+-- [ ] Buckets configurables por compañía en reportes de Aging.
+-
+-## Inventario y Valoración
+-- [ ] Implementar "Stock Reconciliation" para ajuste de valuación (actualmente solo cantidad).
+-- [ ] Prorrateo de cargos capitalizables (fletes/seguros) en `StockValuationLayer`.
+-
+-## Administración y Seguridad
+-- [ ] Matriz explícita de autorización Usuario ↔ Compañía/Libro.
+-- [ ] Implementar Workflow de aprobación configurable (estados y transiciones).
+-- [ ] Activar `AuditLog` automático para cambios en documentos operativos.
+-
+-## Multi-Ledger y Revalorización
+-- [ ] Implementar `LedgerMappingRule` para diferencias automáticas entre libros.
+-- [ ] Implementar proceso de `ExchangeRevaluation` (revalorización cambiaria de cuentas monetarias).
+-- [ ] UI para gestión de `DimensionType` y `DimensionValue`.
+-
+-## UI/UX y Reportes
+-- [ ] Filtros de búsqueda en listados de Compras, Ventas y Bancos.
+-- [ ] Migrar formularios operativos restantes al Smart Select Framework.
+-- [ ] Implementar árbol gráfico de trazabilidad (Diagrama de Flujo).
+-- [ ] Drill-down universal en el 100% de los reportes operativos.
+-- [ ] Exportación consistente a Excel con formato financiero en todos los reportes.
+-
+-## Nota de Integración (2026-05-14)
+-- [x] Integración selectiva desde `ia/main` completada: base documental de `1965ac44a352de5af34d604b81400a2bc8aed74a` y endpoints/prueba de salud desde `bef4029e25000512539a27164f8915cf3b4b2acc`.
+-- [ ] Verificar en CI la integración selectiva completa sobre `main`.
++- **Reportes:** Implementar más reportes operativos usando el nuevo framework.
++- **Localización:** Ampliar catálogos impositivos para otros países.
++- **Automatización:** Webhooks para integración con sistemas externos.
++- **E2E:** Ampliar cobertura de pruebas Playwright en el nuevo flujo estandarizado.
+diff --git a/SESSIONS.md b/SESSIONS.md
+index 882c90e9..324f635f 100644
+--- a/SESSIONS.md
++++ b/SESSIONS.md
+@@ -58,3 +58,10 @@
+ ## 2026-05-14 (Integración selectiva desde ia/main)
+ - **Base documental:** Se consolidó la documentación desde `1965ac44a352de5af34d604b81400a2bc8aed74a`.
+ - **Código conservado de `bef4029e25000512539a27164f8915cf3b4b2acc`:** solo `/health`, `/ready` y `tests/test_health_checks.py`.
++
++## 2026-05-14 (Estandarización UI/UX de Módulos Operativos y Flujo S2P)
++- **Flujo S2P:** Finalizada la implementación del flujo Source to Pay con rutas de aprobación para Solicitudes, Cotizaciones y Órdenes de Compra.
++- **Estandarización UI:** Creada librería `transaction-form.js` para manejo genérico de grillas transaccionales, similar a `smart-select.js`.
++- **Refactorización Global:** Migrados todos los formularios de Compras, Ventas, Inventario y Bancos al patrón de diseño de Comprobantes Contables (Voucher Pattern).
++- **Relaciones Documentales:** Implementado el patrón "Actualizar Elementos" para importar líneas desde documentos origen con trazabilidad completa.
++- **Integridad:** Corregidos problemas de importación y dependencias de modelos; suite completa de 607 pruebas pasando satisfactoriamente.
+diff --git a/cacao_accounting/bancos/__init__.py b/cacao_accounting/bancos/__init__.py
+index 3887d5c3..9b494a23 100644
+--- a/cacao_accounting/bancos/__init__.py
++++ b/cacao_accounting/bancos/__init__.py
+@@ -16,7 +16,7 @@
+ # ---------------------------------------------------------------------------------------
+ from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+ from flask.typing import ResponseReturnValue
+-from flask_login import login_required
++from flask_login import current_user, login_required
+ 
+ # ---------------------------------------------------------------------------------------
+ # Recursos locales
+@@ -51,6 +51,7 @@
+ )
+ from cacao_accounting.database.helpers import get_active_naming_series
+ from cacao_accounting.contabilidad.posting import PostingError, cancel_document, post_bank_transaction, submit_document
++from cacao_accounting.document_flow import create_document_relation
+ from cacao_accounting.document_flow.service import compute_outstanding_amount, refresh_outstanding_amount_cache
+ from cacao_accounting.document_flow.status import _
+ from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
+@@ -734,6 +735,19 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
+             allocation_date=payment.posting_date,
+         )
+         database.session.add(reference)
++        database.session.flush()
++        create_document_relation(
++            source_type=reference_type,
++            source_id=reference_id,
++            source_item_id=None,
++            target_type="payment_entry",
++            target_id=payment.id,
++            target_item_id=reference.id,
++            qty=Decimal("1"),
++            uom=None,
++            rate=allocated,
++            amount=allocated,
++        )
+         invoice.outstanding_amount = outstanding - allocated
+         invoice.base_outstanding_amount = invoice.outstanding_amount
+         total_allocated += allocated
+@@ -763,6 +777,7 @@ def bancos_pago_nuevo():
+     from cacao_accounting.bancos.forms import FormularioPago
+     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+     from cacao_accounting.database import ExternalCounter, Party
++    from cacao_accounting.form_preferences import get_column_preferences
+ 
+     formulario = FormularioPago()
+     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+@@ -803,6 +818,11 @@ def bancos_pago_nuevo():
+     )
+     factura_venta_origen = database.session.get(SalesInvoice, from_sales_invoice_ids[0]) if from_sales_invoice_ids else None
+     titulo = "Nuevo Pago - " + APPNAME
++    transaction_config = {
++        "items": [],
++        "uoms": [],
++        "columns": get_column_preferences(getattr(current_user, "id", None), "banking.payment_entry"),
++    }
+     if request.method == "POST":
+         try:
+             amount = _form_decimal("paid_amount", "0")
+@@ -873,6 +893,7 @@ def bancos_pago_nuevo():
+         factura_compra_origen=factura_compra_origen,
+         factura_venta_origen=factura_venta_origen,
+         facturas_origen=facturas_origen,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+diff --git a/cacao_accounting/bancos/templates/bancos/pago.html b/cacao_accounting/bancos/templates/bancos/pago.html
+index 24ea502f..8d909ecf 100644
+--- a/cacao_accounting/bancos/templates/bancos/pago.html
++++ b/cacao_accounting/bancos/templates/bancos/pago.html
+@@ -1,54 +1,31 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/pago.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/pago.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('bancos.bancos_') }}" class="link-dark">Bancos</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('bancos.bancos_pago_lista') }}" class="link-dark">Pagos</a></li>
++    <li class="breadcrumb-item"><a href="{{ url_for('bancos.bancos_') }}" class="link-dark">Caja y Bancos</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-cash-stack"></i> {{ registro.document_no or registro.id }}
+-      {{ macros.document_status_for("payment_entry", registro, detail=True) }}
+-    </h5>
+-    <div class="d-flex gap-2">
+-      {% if registro.docstatus == 0 %}
+-      <form method="post" action="{{ url_for('bancos.bancos_pago_submit', payment_id=registro.id) }}">
+-        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i>Aprobar</button>
+-      </form>
+-      {% elif registro.docstatus == 1 %}
+-      <form method="post" action="{{ url_for('bancos.bancos_pago_cancel', payment_id=registro.id) }}">
+-        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Cancelar</button>
+-      </form>
+-      {% endif %}
+-    </div>
+-  </div>
+-  <dl class="row p-3">
+-    <dt class="col-sm-3">Número de Documento</dt>
+-    <dd class="col-sm-9">{{ registro.document_no or "" }}</dd>
+-    <dt class="col-sm-3">Compañía</dt>
+-    <dd class="col-sm-9">{{ registro.company or "" }}</dd>
+-    <dt class="col-sm-3">Fecha</dt>
+-    <dd class="col-sm-9">{{ registro.posting_date or "" }}</dd>
+-    <dt class="col-sm-3">Estado</dt>
+-    <dd class="col-sm-9">{{ macros.document_status_for("payment_entry", registro, detail=True) }}</dd>
+-    {% if registro.external_number %}
+-    <dt class="col-sm-3">Número Externo</dt>
+-    <dd class="col-sm-9"><span class="badge bg-secondary">{{ registro.external_number }}</span></dd>
+-    {% endif %}
+-  </dl>
+-</div>
+-
++{% set buttons %}
++      {{ macros.workflow_buttons(
++            registro.docstatus,
++            url_for('bancos.bancos_pago_submit', payment_id=registro.id),
++            url_for('bancos.bancos_pago_cancel', payment_id=registro.id)) }}
++{% endset %}
++{{ dv_macros.detail_header("Registro de Pago", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Tipo de Pago'), registro.payment_type),
++    (_('Compañía'), registro.company),
++    (_('Tercero'), registro.party_name or registro.party_id),
++    (_('Fecha'), registro.posting_date),
++    (_('Monto Pagado'), registro.paid_amount),
++    (_('Monto Recibido'), registro.received_amount),
++    (_('Observaciones'), registro.remarks)
++]) }}
+ {{ macros.document_flow_trace("payment_entry", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/bancos/templates/bancos/pago_nuevo.html b/cacao_accounting/bancos/templates/bancos/pago_nuevo.html
+index 0d584f4c..270b1155 100644
+--- a/cacao_accounting/bancos/templates/bancos/pago_nuevo.html
++++ b/cacao_accounting/bancos/templates/bancos/pago_nuevo.html
+@@ -1,138 +1,22 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
++{% import "transaction_form_macros.html" as tf_macros %}
+ <div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/bancos/templates/bancos/pago_nuevo.html"></div>
+-{%- endif -%}
+-
+-<nav aria-label="breadcrumb">
+-  <ol class="breadcrumb lh-sm">
+-    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('bancos.bancos_') }}" class="link-dark">Bancos</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('bancos.bancos_pago_lista') }}" class="link-dark">Pagos</a></li>
+-    <li class="breadcrumb-item active" aria-current="page">Nuevo Pago</li>
+-  </ol>
+-</nav>
+-
+-<div class="ca-card" style="max-width:860px;">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title"><i class="bi bi-plus-circle"></i> Nuevo Pago
+-      {% if factura_compra_origen %}<small class="text-muted ms-2">desde Factura {{ factura_compra_origen.document_no or factura_compra_origen.id }}</small>{% endif %}
+-      {% if factura_venta_origen %}<small class="text-muted ms-2">desde Factura {{ factura_venta_origen.document_no or factura_venta_origen.id }}</small>{% endif %}
+-    </h5>
+-    <div class="d-flex gap-2">
+-      <button class="btn btn-primary btn-sm" form="form-main" type="submit"><i class="bi bi-floppy me-1"></i>Guardar</button>
+-      <a href="{{ url_for('bancos.bancos_pago_lista') }}" class="btn btn-secondary btn-sm">Cancelar</a>
+-    </div>
+-  </div>
+-  <form method="post" id="form-main">
+-    {{ form.csrf_token }}
+-    {% for invoice_id in from_purchase_invoice_ids %}
+-      <input type="hidden" name="from_purchase_invoice" value="{{ invoice_id }}">
+-    {% endfor %}
+-    {% for invoice_id in from_sales_invoice_ids %}
+-      <input type="hidden" name="from_sales_invoice" value="{{ invoice_id }}">
+-    {% endfor %}
++<form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
++  {{ form.csrf_token }}
++  {{ tf_macros.transaction_form_header("Registro de Pago") }}
++  <div class="ca-card">
+     <div class="row g-3 p-3">
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.payment_type.label(class="form-label") }}
+-          {{ form.payment_type(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.company.label(class="form-label") }}
+-          {{ form.company(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.naming_series.label(class="form-label") }}
+-          {{ form.naming_series(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.posting_date.label(class="form-label") }}
+-          {{ form.posting_date(class="form-control", type="date") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.bank_account_id.label(class="form-label") }}
+-          {{ form.bank_account_id(class="form-select") }}
+-        </div>
++        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
++        <div class="mb-3">{{ form.party_id.label(class="form-label") }}{{ form.party_id(class="form-select") }}</div>
+       </div>
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.party_type.label(class="form-label") }}
+-          {{ form.party_type(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.party_id.label(class="form-label") }}
+-          {{ form.party_id(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.paid_amount.label(class="form-label") }}
+-          {{ form.paid_amount(class="form-control") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.remarks.label(class="form-label") }}
+-          {{ form.remarks(class="form-control", rows=3) }}
+-        </div>
+-      </div>
+-    </div>
+-    {# Sección de contador externo — cheque, número fiscal, recibo preimpreso #}
+-    <div class="p-3 border-top">
+-      <h6 class="text-muted mb-3"><i class="bi bi-123"></i> Numeración Externa (opcional)</h6>
+-      <div class="row g-3">
+-        <div class="col-md-6">
+-          <div class="mb-3">
+-            {{ form.external_counter_id.label(class="form-label") }}
+-            {{ form.external_counter_id(class="form-select", id="external_counter_id") }}
+-            <div class="form-text">Chequera, numeración fiscal o recibo preimpreso.</div>
+-          </div>
+-        </div>
+-        <div class="col-md-6">
+-          <div class="mb-3">
+-            {{ form.external_number.label(class="form-label") }}
+-            {{ form.external_number(class="form-control", id="external_number",
+-               placeholder="Dejar vacío para usar el siguiente sugerido") }}
+-            <div class="form-text">Si se omite, el sistema usa el siguiente número disponible del contador.</div>
+-          </div>
+-        </div>
++        <div class="mb-3">{{ form.bank_account_id.label(class="form-label") }}{{ form.bank_account_id(class="form-select") }}</div>
++        <div class="mb-3">{{ form.paid_amount.label(class="form-label") }}{{ form.paid_amount(class="form-control") }}</div>
+       </div>
+     </div>
+-    {% if facturas_origen %}
+-    <div class="p-3">
+-      <h6 class="text-muted mb-2"><i class="bi bi-link-45deg"></i> Documentos a Pagar</h6>
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Facturas origen del pago</caption>
+-        <thead>
+-          <tr>
+-            <th scope="col">Documento</th>
+-            <th scope="col">Tipo</th>
+-            <th scope="col">Total</th>
+-            <th scope="col">Saldo</th>
+-            <th scope="col">Aplicar</th>
+-          </tr>
+-        </thead>
+-        <tbody>
+-          {% for origen in facturas_origen %}
+-          <tr>
+-            <td>
+-              <a href="{{ origen.url }}">{{ origen.document.document_no or origen.document.id }}</a>
+-              <input type="hidden" name="reference_type_{{ loop.index0 }}" value="{{ origen.reference_type }}">
+-              <input type="hidden" name="reference_id_{{ loop.index0 }}" value="{{ origen.document.id }}">
+-            </td>
+-            <td>{{ origen.label }}</td>
+-            <td>{{ origen.document.grand_total or "" }}</td>
+-            <td>{{ origen.document.outstanding_amount or "" }}</td>
+-            <td style="max-width:160px;">
+-              <input class="form-control form-control-sm" name="allocated_amount_{{ loop.index0 }}"
+-                     value="{{ origen.document.outstanding_amount or origen.document.grand_total or 0 }}">
+-            </td>
+-          </tr>
+-          {% endfor %}
+-        </tbody>
+-      </table>
+-    </div>
+-    {% endif %}
+-  </form>
+-</div>
+-
++  </div>
++</form>
+ {% endblock %}
+diff --git a/cacao_accounting/compras/__init__.py b/cacao_accounting/compras/__init__.py
+index a0541ebd..ea466c50 100644
+--- a/cacao_accounting/compras/__init__.py
++++ b/cacao_accounting/compras/__init__.py
+@@ -12,7 +12,7 @@
+ # Librerias de terceros
+ # ---------------------------------------------------------------------------------------
+ from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+-from flask_login import login_required
++from flask_login import current_user, login_required
+ 
+ # ---------------------------------------------------------------------------------------
+ # Recursos locales
+@@ -134,6 +134,8 @@ def compras_solicitud_compra_nueva():
+ 
+     formulario = FormularioSolicitudCompra()
+     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
++    from cacao_accounting.form_preferences import get_column_preferences
++
+     selected_company = request.values.get("company") or (
+         formulario.company.choices[0][0] if formulario.company.choices else None
+     )
+@@ -144,6 +146,11 @@ def compras_solicitud_compra_nueva():
+     ]
+     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
+     titulo = "Nueva Solicitud de Compra - " + APPNAME
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "purchases.purchase_request"),
++    }
+     if request.method == "POST":
+         try:
+             solicitud = PurchaseRequest(
+@@ -178,6 +185,7 @@ def compras_solicitud_compra_nueva():
+         titulo=titulo,
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+@@ -194,6 +202,38 @@ def compras_solicitud_compra(request_id: str):
+     return render_template("compras/solicitud_compra.html", registro=registro, items=items, titulo=titulo)
+ 
+ 
++@compras.route("/purchase-request/<request_id>/submit", methods=["POST"])
++@modulo_activo("purchases")
++@login_required
++def compras_solicitud_compra_submit(request_id: str):
++    """Aprueba una solicitud de compra."""
++    registro = database.session.get(PurchaseRequest, request_id)
++    if not registro:
++        abort(404)
++    if registro.docstatus != 0:
++        abort(400)
++    registro.docstatus = 1
++    database.session.commit()
++    flash("Solicitud de compra aprobada.", "success")
++    return redirect(url_for("compras.compras_solicitud_compra", request_id=request_id))
++
++
++@compras.route("/purchase-request/<request_id>/cancel", methods=["POST"])
++@modulo_activo("purchases")
++@login_required
++def compras_solicitud_compra_cancel(request_id: str):
++    """Cancela una solicitud de compra."""
++    registro = database.session.get(PurchaseRequest, request_id)
++    if not registro:
++        abort(404)
++    if registro.docstatus != 1:
++        abort(400)
++    registro.docstatus = 2
++    database.session.commit()
++    flash("Solicitud de compra cancelada.", "warning")
++    return redirect(url_for("compras.compras_solicitud_compra", request_id=request_id))
++
++
+ @compras.route("/supplier-quotation/list")
+ @modulo_activo("purchases")
+ @login_required
+@@ -219,6 +259,7 @@ def compras_cotizacion_proveedor_nueva():
+ 
+     formulario = FormularioCotizacionProveedor()
+     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
++
+     selected_company = request.values.get("company") or (
+         formulario.company.choices[0][0] if formulario.company.choices else None
+     )
+@@ -496,6 +537,7 @@ def compras_proveedor_nuevo():
+     formulario = FormularioProveedor()
+     titulo = "Nuevo Proveedor - " + APPNAME
+     company_choices = obtener_lista_entidades_por_id_razonsocial()
++
+     selected_company = request.values.get("company") or (company_choices[0][0] if company_choices else None)
+     company_settings = build_party_company_settings("supplier", selected_company) if selected_company else None
+     if request.method == "POST":
+@@ -778,6 +820,8 @@ def compras_orden_compra_nuevo():
+ 
+     formulario = FormularioOrdenCompra()
+     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
++    from cacao_accounting.form_preferences import get_column_preferences
++
+     selected_company = request.values.get("company") or (
+         formulario.company.choices[0][0] if formulario.company.choices else None
+     )
+@@ -824,12 +868,18 @@ def compras_orden_compra_nuevo():
+         except IdentifierConfigurationError as exc:
+             database.session.rollback()
+             flash(str(exc), "danger")
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "purchases.purchase_order"),
++    }
+     return render_template(
+         "compras/orden_compra_nuevo.html",
+         form=formulario,
+         titulo=titulo,
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+@@ -871,6 +921,7 @@ def compras_solicitud_cotizacion_nueva():
+ 
+     formulario = FormularioSolicitudCotizacion()
+     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
++
+     selected_company = request.values.get("company") or (
+         formulario.company.choices[0][0] if formulario.company.choices else None
+     )
+@@ -990,6 +1041,8 @@ def compras_recepcion_nuevo():
+ 
+     formulario = FormularioRecepcionCompra()
+     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
++    from cacao_accounting.form_preferences import get_column_preferences
++
+     selected_company = request.values.get("company") or (
+         formulario.company.choices[0][0] if formulario.company.choices else None
+     )
+@@ -1009,6 +1062,11 @@ def compras_recepcion_nuevo():
+         {"code": w[0].code, "name": w[0].name} for w in database.session.execute(database.select(Warehouse)).all()
+     ]
+     titulo = "Nueva Recepción de Compra - " + APPNAME
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "purchases.purchase_receipt"),
++    }
+     if request.method == "POST":
+         try:
+             recepcion = PurchaseReceipt(
+@@ -1028,24 +1086,14 @@ def compras_recepcion_nuevo():
+                 naming_series_id=request.form.get("naming_series") or None,
+             )
+             _total_qty, total = _save_purchase_receipt_items(recepcion.id)
++            recepcion.total = total
++            recepcion.grand_total = total
++            database.session.commit()
++            flash("Recepción de compra creada correctamente.", "success")
++            return redirect(url_for("compras.compras_recepcion", receipt_id=recepcion.id))
+         except (DocumentFlowError, IdentifierConfigurationError) as exc:
+             database.session.rollback()
+             flash(str(exc), "danger")
+-            return render_template(
+-                "compras/recepcion_nuevo.html",
+-                form=formulario,
+-                titulo=titulo,
+-                orden_origen=orden_origen,
+-                from_order_id=from_order_id,
+-                items_disponibles=items_disponibles,
+-                uoms_disponibles=uoms_disponibles,
+-                bodegas_disponibles=bodegas_disponibles,
+-            )
+-        recepcion.total = total
+-        recepcion.grand_total = total
+-        database.session.commit()
+-        flash("Recepción de compra creada correctamente.", "success")
+-        return redirect(url_for("compras.compras_recepcion", receipt_id=recepcion.id))
+     return render_template(
+         "compras/recepcion_nuevo.html",
+         form=formulario,
+@@ -1055,6 +1103,7 @@ def compras_recepcion_nuevo():
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
+         bodegas_disponibles=bodegas_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+@@ -1127,6 +1176,8 @@ def compras_factura_compra_nuevo():
+ 
+     formulario = FormularioFacturaCompra()
+     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
++    from cacao_accounting.form_preferences import get_column_preferences
++
+     selected_company = request.values.get("company") or (
+         formulario.company.choices[0][0] if formulario.company.choices else None
+     )
+@@ -1159,6 +1210,11 @@ def compras_factura_compra_nuevo():
+     ]
+     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
+     titulo = f"Nueva {document_title} - {APPNAME}"
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "purchases.purchase_invoice"),
++    }
+     if request.method == "POST":
+         try:
+             document_type = request.form.get("document_type") or PURCHASE_INVOICE
+@@ -1188,32 +1244,18 @@ def compras_factura_compra_nuevo():
+                 naming_series_id=request.form.get("naming_series") or None,
+             )
+             _total_qty, total = _save_purchase_invoice_items(factura.id)
++            factura.total = total
++            factura.base_total = total
++            factura.grand_total = total
++            factura.base_grand_total = total
++            factura.outstanding_amount = total
++            factura.base_outstanding_amount = total
++            database.session.commit()
++            flash("Factura de compra creada correctamente.", "success")
++            return redirect(url_for("compras.compras_factura_compra", invoice_id=factura.id))
+         except (DocumentFlowError, IdentifierConfigurationError) as exc:
+             database.session.rollback()
+             flash(str(exc), "danger")
+-            return render_template(
+-                "compras/factura_compra_nuevo.html",
+-                form=formulario,
+-                titulo=titulo,
+-                orden_origen=orden_origen,
+-                recepcion_origen=recepcion_origen,
+-                factura_origen=factura_origen,
+-                from_order_id=from_order_id,
+-                from_receipt_id=from_receipt_id,
+-                from_invoice_id=from_invoice_id,
+-                document_type=document_type,
+-                items_disponibles=items_disponibles,
+-                uoms_disponibles=uoms_disponibles,
+-            )
+-        factura.total = total
+-        factura.base_total = total
+-        factura.grand_total = total
+-        factura.base_grand_total = total
+-        factura.outstanding_amount = total
+-        factura.base_outstanding_amount = total
+-        database.session.commit()
+-        flash("Factura de compra creada correctamente.", "success")
+-        return redirect(url_for("compras.compras_factura_compra", invoice_id=factura.id))
+     return render_template(
+         "compras/factura_compra_nuevo.html",
+         form=formulario,
+@@ -1227,6 +1269,7 @@ def compras_factura_compra_nuevo():
+         document_type=document_type,
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+diff --git a/cacao_accounting/compras/templates/compras/cotizacion_proveedor.html b/cacao_accounting/compras/templates/compras/cotizacion_proveedor.html
+index ad4db311..85f962c5 100644
+--- a/cacao_accounting/compras/templates/compras/cotizacion_proveedor.html
++++ b/cacao_accounting/compras/templates/compras/cotizacion_proveedor.html
+@@ -1,50 +1,34 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/cotizacion_proveedor.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/cotizacion_proveedor.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_') }}" class="link-dark">Compras</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_cotizacion_proveedor_lista') }}" class="link-dark">Cotizaciones de Proveedor</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card" style="max-width:860px;">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-file-earmark-text"></i> Cotización de Proveedor
+-      {{ macros.document_status_for("supplier_quotation", registro, detail=True) }}
+-    </h5>
+-  </div>
+-  <div class="row g-3 p-3">
+-    <div class="col-md-6">
+-      <div><strong>Proveedor</strong></div>
+-      <div>{{ registro.supplier_name or registro.supplier_id or "-" }}</div>
+-      <div class="mt-3"><strong>Fecha</strong></div>
+-      <div>{{ registro.posting_date or "-" }}</div>
+-    </div>
+-    <div class="col-md-6">
+-      <div><strong>Total</strong></div>
+-      <div>{{ registro.grand_total or "0" }}</div>
+-      <div class="mt-3"><strong>Notas</strong></div>
+-      <div>{{ registro.remarks or "-" }}</div>
+-    </div>
+-  </div>
+-</div>
+-
+-<div class="mt-3 ca-card">
+-  <div class="ca-card-header">
+-    <h6 class="ca-card-title">Líneas</h6>
+-  </div>
+-  {{ macros.lineas_tabla_lectura(items) }}
+-</div>
+-
++{% set buttons %}
++      {{ macros.workflow_buttons(
++            registro.docstatus,
++            url_for('compras.compras_cotizacion_proveedor_submit', quotation_id=registro.id),
++            url_for('compras.compras_cotizacion_proveedor_cancel', quotation_id=registro.id)) }}
++      {% if registro.docstatus == 1 %}
++        {{ macros.crear_dropdown([
++              ("Orden de Compra", url_for('compras.compras_orden_compra_nuevo', from_supplier_quotation=registro.id))
++           ]) }}
++      {% endif %}
++{% endset %}
++{{ dv_macros.detail_header("Cotización de Proveedor", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Proveedor'), registro.supplier_name),
++    (_('Fecha'), registro.posting_date),
++    (_('Total'), registro.grand_total),
++    (_('Observaciones'), registro.remarks)
++]) }}
++{{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("supplier_quotation", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/compras/templates/compras/factura_compra_nuevo.html b/cacao_accounting/compras/templates/compras/factura_compra_nuevo.html
+index 58746f33..07e98d4b 100644
+--- a/cacao_accounting/compras/templates/compras/factura_compra_nuevo.html
++++ b/cacao_accounting/compras/templates/compras/factura_compra_nuevo.html
+@@ -1,101 +1,23 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
++{% import "transaction_form_macros.html" as tf_macros %}
+ <div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra_nuevo.html"></div>
+-{%- endif -%}
+-
+-<nav aria-label="breadcrumb">
+-  <ol class="breadcrumb lh-sm">
+-    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_') }}" class="link-dark">Compras</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_factura_compra_lista') }}" class="link-dark">Facturas de Compra</a></li>
+-    <li class="breadcrumb-item active" aria-current="page">{{ document_type == 'purchase_credit_note' and 'Nueva Nota de Crédito' or document_type == 'purchase_debit_note' and 'Nueva Nota de Débito' or document_type == 'purchase_return' and 'Nueva Devolución' or 'Nueva Factura de Compra' }}</li>
+-  </ol>
+-</nav>
+-
+-<form method="post" id="form-main">
++<form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
+   {{ form.csrf_token }}
+-  {% if from_order_id %}<input type="hidden" name="from_order" value="{{ from_order_id }}">{% endif %}
+-  {% if from_receipt_id %}<input type="hidden" name="from_receipt" value="{{ from_receipt_id }}">{% endif %}
+-  {% if from_invoice_id %}
+-    <input type="hidden" name="from_invoice" value="{{ from_invoice_id }}">
+-  {% endif %}
+-  <input type="hidden" name="document_type" value="{{ document_type or 'purchase_invoice' }}">
+-  {% if form.is_return.data %}
+-    <input type="hidden" name="is_return" value="1">
+-  {% endif %}
+-  <div class="ca-card" style="max-width:860px;">
+-    <div class="ca-card-header">
+-      <h5 class="ca-card-title"><i class="bi bi-plus-circle"></i>
+-        {% if document_type == 'purchase_credit_note' %}
+-          Nueva Nota de Crédito de Compra
+-          {% if factura_origen %}<small class="text-muted ms-2">desde {{ factura_origen.document_no or factura_origen.id }}</small>{% endif %}
+-        {% elif document_type == 'purchase_debit_note' %}
+-          Nueva Nota de Débito de Compra
+-          {% if factura_origen %}<small class="text-muted ms-2">desde {{ factura_origen.document_no or factura_origen.id }}</small>{% endif %}
+-        {% elif document_type == 'purchase_return' %}
+-          Nueva Devolución de Compra
+-          {% if recepcion_origen %}<small class="text-muted ms-2">desde {{ recepcion_origen.document_no or recepcion_origen.id }}</small>{% endif %}
+-        {% else %}
+-          Nueva Factura de Compra
+-          {% if orden_origen %}<small class="text-muted ms-2">desde {{ orden_origen.document_no or orden_origen.id }}</small>{% endif %}
+-          {% if recepcion_origen %}<small class="text-muted ms-2">desde {{ recepcion_origen.document_no or recepcion_origen.id }}</small>{% endif %}
+-        {% endif %}
+-      </h5>
+-      <div class="d-flex gap-2">
+-        <button class="btn btn-primary btn-sm" form="form-main" type="submit"><i class="bi bi-floppy me-1"></i>Guardar</button>
+-        <a href="{{ url_for('compras.compras_factura_compra_lista') }}" class="btn btn-secondary btn-sm">Cancelar</a>
+-      </div>
+-    </div>
++  {{ tf_macros.transaction_form_header("Factura de Compra") }}
++  <div class="ca-card">
+     <div class="row g-3 p-3">
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.supplier_id.label(class="form-label") }}
+-          {{ form.supplier_id(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.supplier_invoice_no.label(class="form-label") }}
+-          {{ form.supplier_invoice_no(class="form-control") }}
+-        </div>
++        <div class="mb-3">{{ form.supplier_id.label(class="form-label") }}{{ form.supplier_id(class="form-select") }}</div>
++        <div class="mb-3">{{ form.supplier_invoice_no.label(class="form-label") }}{{ form.supplier_invoice_no(class="form-control") }}</div>
+       </div>
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.company.label(class="form-label") }}
+-          {{ form.company(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.naming_series.label(class="form-label") }}
+-          {{ form.naming_series(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.posting_date.label(class="form-label") }}
+-          {{ form.posting_date(class="form-control", type="date") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.remarks.label(class="form-label") }}
+-          {{ form.remarks(class="form-control", rows=2) }}
+-        </div>
++        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
++        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control", type="date") }}</div>
+       </div>
+     </div>
+   </div>
+-
+-  {% if from_return_id %}
+-    {{ macros.lineas_items(items_disponibles, uoms_disponibles,
+-         source_api_url="/api/buying/purchase-invoice/" ~ from_return_id ~ "/items?target_type=purchase_invoice",
+-         source_label="Factura de Compra") }}
+-  {% elif from_receipt_id %}
+-    {{ macros.lineas_items(items_disponibles, uoms_disponibles,
+-         source_api_url="/api/buying/purchase-receipt/" ~ from_receipt_id ~ "/items?target_type=purchase_invoice",
+-         source_label="Recepción de Compra") }}
+-  {% elif from_order_id %}
+-    {{ macros.lineas_items(items_disponibles, uoms_disponibles,
+-         source_api_url="/api/buying/purchase-order/" ~ from_order_id ~ "/items?target_type=purchase_invoice",
+-         source_label="Orden de Compra") }}
+-  {% else %}
+-    {{ macros.lineas_items(items_disponibles, uoms_disponibles) }}
+-  {% endif %}
++  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles) }}
+ </form>
+-
+ {% endblock %}
+diff --git a/cacao_accounting/compras/templates/compras/orden_compra_nuevo.html b/cacao_accounting/compras/templates/compras/orden_compra_nuevo.html
+index 3568eee8..c363de7b 100644
+--- a/cacao_accounting/compras/templates/compras/orden_compra_nuevo.html
++++ b/cacao_accounting/compras/templates/compras/orden_compra_nuevo.html
+@@ -1,59 +1,33 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
++{% import "transaction_form_macros.html" as tf_macros %}
+ <div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/orden_compra_nuevo.html"></div>
+-{%- endif -%}
+-
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_') }}" class="link-dark">Compras</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_orden_compra_lista') }}" class="link-dark">Órdenes de Compra</a></li>
+-    <li class="breadcrumb-item active" aria-current="page">Nueva Orden de Compra</li>
++    <li class="breadcrumb-item active" aria-current="page">Nueva Orden</li>
+   </ol>
+ </nav>
+-
+-<form method="post" id="form-main">
++<form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
+   {{ form.csrf_token }}
+-  <div class="ca-card" style="max-width:860px;">
+-    <div class="ca-card-header">
+-      <h5 class="ca-card-title"><i class="bi bi-plus-circle"></i> Nueva Orden de Compra</h5>
+-      <div class="d-flex gap-2">
+-        <button class="btn btn-primary btn-sm" form="form-main" type="submit"><i class="bi bi-floppy me-1"></i>Guardar</button>
+-        <a href="{{ url_for('compras.compras_orden_compra_lista') }}" class="btn btn-secondary btn-sm">Cancelar</a>
+-      </div>
+-    </div>
++  {% if from_request_id %}<input type="hidden" name="from_request" value="{{ from_request_id }}">{% endif %}
++  {% set title = "Orden de Compra" ~ ((" desde " ~ (solicitud_origen.document_no or solicitud_origen.id)) if solicitud_origen else "") %}
++  {{ tf_macros.transaction_form_header(title) }}
++  <div class="ca-card">
+     <div class="row g-3 p-3">
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.supplier_id.label(class="form-label") }}
+-          {{ form.supplier_id(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.company.label(class="form-label") }}
+-          {{ form.company(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.naming_series.label(class="form-label") }}
+-          {{ form.naming_series(class="form-select") }}
+-        </div>
++        <div class="mb-3">{{ form.supplier_id.label(class="form-label") }}{{ form.supplier_id(class="form-select") }}</div>
++        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
+       </div>
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.posting_date.label(class="form-label") }}
+-          {{ form.posting_date(class="form-control", type="date") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.remarks.label(class="form-label") }}
+-          {{ form.remarks(class="form-control", rows=3) }}
+-        </div>
++        <div class="mb-3">{{ form.naming_series.label(class="form-label") }}{{ form.naming_series(class="form-select") }}</div>
++        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control", type="date") }}</div>
+       </div>
+     </div>
+   </div>
+-
+-  {{ macros.lineas_items(items_disponibles, uoms_disponibles) }}
++  {% set source_api_url = "/api/document-flow/pending-lines?source_type=purchase_request&target_type=purchase_order&source_id=" ~ from_request_id if from_request_id else None %}
++  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles, source_api_url=source_api_url, source_label="Solicitud de Compra") }}
+ </form>
+-
+ {% endblock %}
+diff --git a/cacao_accounting/compras/templates/compras/solicitud_compra.html b/cacao_accounting/compras/templates/compras/solicitud_compra.html
+index dfac4b85..d051078a 100644
+--- a/cacao_accounting/compras/templates/compras/solicitud_compra.html
++++ b/cacao_accounting/compras/templates/compras/solicitud_compra.html
+@@ -1,11 +1,8 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/solicitud_compra.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/solicitud_compra.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+@@ -14,37 +11,28 @@
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card" style="max-width:860px;">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-file-earmark-text"></i> Solicitud de Compra
+-      {{ macros.document_status_for("purchase_request", registro, detail=True) }}
+-    </h5>
+-  </div>
+-  <div class="row g-3 p-3">
+-    <div class="col-md-6">
+-      <div><strong>Solicitado por</strong></div>
+-      <div>{{ registro.requested_by or "-" }}</div>
+-      <div class="mt-3"><strong>Departamento</strong></div>
+-      <div>{{ registro.department or "-" }}</div>
+-    </div>
+-    <div class="col-md-6">
+-      <div><strong>Fecha</strong></div>
+-      <div>{{ registro.posting_date or "-" }}</div>
+-      <div class="mt-3"><strong>Notas</strong></div>
+-      <div>{{ registro.remarks or "-" }}</div>
+-    </div>
+-  </div>
+-</div>
+-
+-<div class="mt-3 ca-card">
+-  <div class="ca-card-header">
+-    <h6 class="ca-card-title">Líneas</h6>
+-  </div>
+-  {{ macros.lineas_tabla_lectura(items) }}
+-</div>
+-
++{% set buttons %}
++      {{ macros.workflow_buttons(
++            registro.docstatus,
++            url_for('compras.compras_solicitud_compra_submit', request_id=registro.id),
++            url_for('compras.compras_solicitud_compra_cancel', request_id=registro.id)) }}
++      {% if registro.docstatus == 1 %}
++        {{ macros.crear_dropdown([
++              ("Solicitud de Cotización", url_for('compras.compras_solicitud_cotizacion_nueva', from_request=registro.id)),
++              ("Orden de Compra", url_for('compras.compras_orden_compra_nuevo', from_request=registro.id))
++           ]) }}
++      {% endif %}
++{% endset %}
++{{ dv_macros.detail_header("Solicitud de Compra", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Compañía'), registro.company),
++    (_('Fecha'), registro.posting_date),
++    (_('Solicitado por'), registro.requested_by),
++    (_('Departamento'), registro.department),
++    (_('Total'), registro.grand_total),
++    (_('Observaciones'), registro.remarks)
++]) }}
++{{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("purchase_request", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/compras/templates/compras/solicitud_compra_nueva.html b/cacao_accounting/compras/templates/compras/solicitud_compra_nueva.html
+index a1ef7745..590e7ce7 100644
+--- a/cacao_accounting/compras/templates/compras/solicitud_compra_nueva.html
++++ b/cacao_accounting/compras/templates/compras/solicitud_compra_nueva.html
+@@ -1,62 +1,34 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/solicitud_compra_nueva.html"></div>
+-{%- endif -%}
+-
++{% import "transaction_form_macros.html" as tf_macros %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_') }}" class="link-dark">Compras</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_solicitud_compra_lista') }}" class="link-dark">Solicitudes de Compra</a></li>
+-    <li class="breadcrumb-item active" aria-current="page">Nueva Solicitud de Compra</li>
++    <li class="breadcrumb-item active" aria-current="page">Nueva Solicitud</li>
+   </ol>
+ </nav>
+-
+-<form method="post" id="form-main">
++<form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
+   {{ form.csrf_token }}
+-  <div class="ca-card" style="max-width:860px;">
+-    <div class="ca-card-header">
+-      <h5 class="ca-card-title"><i class="bi bi-plus-circle"></i> Nueva Solicitud de Compra</h5>
+-      <div class="d-flex gap-2">
+-        <button class="btn btn-primary btn-sm" form="form-main" type="submit"><i class="bi bi-floppy me-1"></i>Guardar</button>
+-        <a href="{{ url_for('compras.compras_solicitud_compra_lista') }}" class="btn btn-secondary btn-sm">Cancelar</a>
+-      </div>
+-    </div>
++  {{ tf_macros.transaction_form_header("Solicitud de Compra") }}
++  <div class="ca-card">
+     <div class="row g-3 p-3">
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.requested_by.label(class="form-label") }}
+-          {{ form.requested_by(class="form-control") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.department.label(class="form-label") }}
+-          {{ form.department(class="form-control") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.company.label(class="form-label") }}
+-          {{ form.company(class="form-select") }}
+-        </div>
++        <div class="mb-3">{{ form.requested_by.label(class="form-label") }}{{ form.requested_by(class="form-control") }}</div>
++        <div class="mb-3">{{ form.department.label(class="form-label") }}{{ form.department(class="form-control") }}</div>
+       </div>
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.naming_series.label(class="form-label") }}
+-          {{ form.naming_series(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.posting_date.label(class="form-label") }}
+-          {{ form.posting_date(class="form-control", type="date") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.remarks.label(class="form-label") }}
+-          {{ form.remarks(class="form-control", rows=3) }}
+-        </div>
++        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
++        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control", type="date") }}</div>
+       </div>
+     </div>
+   </div>
+-  {{ macros.lineas_items(items_disponibles, uoms_disponibles) }}
++  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles) }}
++  <div class="ca-card mt-3 p-3">
++     <label class="form-label">{{ _('Concepto') }}</label>
++     {{ form.remarks(class="form-control", rows=2) }}
++  </div>
+ </form>
+-
+ {% endblock %}
+diff --git a/cacao_accounting/compras/templates/compras/solicitud_cotizacion.html b/cacao_accounting/compras/templates/compras/solicitud_cotizacion.html
+index 8996d8f1..8951d8a7 100644
+--- a/cacao_accounting/compras/templates/compras/solicitud_cotizacion.html
++++ b/cacao_accounting/compras/templates/compras/solicitud_cotizacion.html
+@@ -1,80 +1,34 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/solicitud_cotizacion.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/solicitud_cotizacion.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_') }}" class="link-dark">Compras</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('compras.compras_solicitud_cotizacion_lista') }}" class="link-dark">Solicitudes de Cotización</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card" style="max-width:860px;">
+-  <div class="ca-card-header d-flex align-items-center justify-content-between">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-file-earmark-text"></i> Solicitud de Cotización
+-      {{ macros.document_status_for("purchase_quotation", registro, detail=True) }}
+-    </h5>
+-    <div class="d-flex gap-2">
+-      <a href="{{ url_for('compras.compras_cotizacion_proveedor_nueva', from_rfq=registro.id) }}" class="btn btn-sm btn-primary">
+-        <i class="bi bi-file-earmark-plus me-1"></i>Crear Cotización de Proveedor
+-      </a>
+-      <a href="{{ url_for('compras.compras_comparativo_ofertas', rfq_id=registro.id) }}" class="btn btn-sm btn-outline-secondary">
+-        <i class="bi bi-bar-chart-line me-1"></i>Comparar Ofertas
+-      </a>
+-    </div>
+-  </div>
+-  <div class="row g-3 p-3">
+-    <div class="col-md-6">
+-      <div><strong>Proveedor</strong></div>
+-      <div>{{ registro.supplier_name or "-" }}</div>
+-      <div class="mt-3"><strong>Fecha</strong></div>
+-      <div>{{ registro.posting_date or "-" }}</div>
+-    </div>
+-    <div class="col-md-6">
+-      <div><strong>Total</strong></div>
+-      <div>{{ registro.grand_total or "0" }}</div>
+-      <div class="mt-3"><strong>Notas</strong></div>
+-      <div>{{ registro.remarks or "-" }}</div>
+-    </div>
+-  </div>
+-</div>
+-
+-<div class="mt-3 ca-card">
+-  <div class="ca-card-header">
+-    <h6 class="ca-card-title">Líneas</h6>
+-  </div>
+-  <table class="ca-table">
+-    <caption style="display: none;">Líneas de la cotización.</caption>
+-    <thead>
+-      <tr>
+-        <th scope="col">Item</th>
+-        <th scope="col">Cantidad</th>
+-        <th scope="col">UOM</th>
+-        <th scope="col">Precio</th>
+-        <th scope="col">Total</th>
+-      </tr>
+-    </thead>
+-    <tbody>
+-      {% for item in items -%}
+-      <tr>
+-        <td>{{ item.item_name or item.item_code }}</td>
+-        <td>{{ item.qty }}</td>
+-        <td>{{ item.uom or "" }}</td>
+-        <td>{{ item.rate or "" }}</td>
+-        <td>{{ item.amount or "" }}</td>
+-      </tr>
+-      {%- endfor %}
+-    </tbody>
+-  </table>
+-</div>
+-
++{% set buttons %}
++      {{ macros.workflow_buttons(
++            registro.docstatus,
++            url_for('compras.compras_solicitud_cotizacion_submit', quotation_id=registro.id),
++            url_for('compras.compras_solicitud_cotizacion_cancel', quotation_id=registro.id)) }}
++      {% if registro.docstatus == 1 %}
++        {{ macros.crear_dropdown([
++              ("Cotización de Proveedor", url_for('compras.compras_cotizacion_proveedor_nueva', from_rfq=registro.id)),
++              ("Comparar Ofertas", url_for('compras.compras_comparativo_ofertas', rfq_id=registro.id))
++           ]) }}
++      {% endif %}
++{% endset %}
++{{ dv_macros.detail_header("Solicitud de Cotización", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Fecha'), registro.posting_date),
++    (_('Total'), registro.grand_total),
++    (_('Observaciones'), registro.remarks)
++]) }}
++{{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("purchase_quotation", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/document_flow/repository.py b/cacao_accounting/document_flow/repository.py
+index 7f9df09b..acae3c32 100644
+--- a/cacao_accounting/document_flow/repository.py
++++ b/cacao_accounting/document_flow/repository.py
+@@ -40,7 +40,7 @@ def get_document_items(doctype: str, document_id: str) -> list[Any]:
+     )
+ 
+ 
+-def get_document_item(doctype: str, item_id: str) -> Any | None:
++def get_document_item(doctype: str, item_id: str | None) -> Any | None:
+     """Obtiene una linea por tipo documental."""
+     spec = get_document_type(doctype)
+     return database.session.get(spec.item_model, item_id)
+@@ -54,7 +54,7 @@ def get_item_parent_id(spec: DocumentType, item: Any) -> str:
+ def iter_active_relations_for_source(
+     source_type: str,
+     source_id: str,
+-    source_item_id: str,
++    source_item_id: str | None | None,
+     target_type: str | None = None,
+ ) -> list[DocumentRelation]:
+     """Devuelve relaciones cuyo target no esta cancelado."""
+@@ -81,7 +81,7 @@ def iter_active_relations_for_source(
+ def consumed_qty_for_source(
+     source_type: str,
+     source_id: str,
+-    source_item_id: str,
++    source_item_id: str | None | None,
+     target_type: str | None = None,
+ ) -> Decimal:
+     """Suma la cantidad consumida por relaciones activas."""
+@@ -103,7 +103,7 @@ def save_relation(relation: DocumentRelation) -> DocumentRelation:
+ def get_line_flow_state(
+     source_type: str,
+     source_id: str,
+-    source_item_id: str,
++    source_item_id: str | None | None,
+     target_type: str,
+ ) -> DocumentLineFlowState | None:
+     """Obtiene el estado cacheado de una linea fuente para un destino."""
+@@ -120,7 +120,7 @@ def get_line_flow_state(
+ def recompute_line_flow_state(
+     source_type: str,
+     source_id: str,
+-    source_item_id: str,
++    source_item_id: str | None | None,
+     target_type: str,
+     company: str | None = None,
+ ) -> DocumentLineFlowState:
+diff --git a/cacao_accounting/document_flow/service.py b/cacao_accounting/document_flow/service.py
+index f639ce34..42943265 100644
+--- a/cacao_accounting/document_flow/service.py
++++ b/cacao_accounting/document_flow/service.py
+@@ -176,7 +176,7 @@ def apply_advance_to_invoice(
+ def _state_quantities(
+     source_type: str,
+     source_id: str,
+-    source_item_id: str,
++    source_item_id: str | None | None,
+     target_type: str | None,
+ ) -> tuple[Decimal, Decimal]:
+     """Obtiene cantidades canceladas/cerradas para una linea si existe estado cacheado."""
+@@ -250,7 +250,7 @@ def get_document_flow_items(target_type: str, source_values: list[str]) -> list[
+     return items
+ 
+ 
+-def pending_qty(source_type: str, source_id: str, source_item_id: str, target_type: str) -> Decimal:
++def pending_qty(source_type: str, source_id: str, source_item_id: str | None | None, target_type: str) -> Decimal:
+     """Calcula la cantidad pendiente para una linea origen hacia un target."""
+     source_item = get_document_item(source_type, source_item_id)
+     if not source_item:
+@@ -270,7 +270,7 @@ def _assert_same_company(source_type: str, source_id: str, target_type: str, tar
+         raise DocumentFlowError("El documento origen y destino pertenecen a companias distintas.", 409)
+ 
+ 
+-def _update_source_cache(source_type: str, source_id: str, source_item_id: str, target_type: str) -> None:
++def _update_source_cache(source_type: str, source_id: str, source_item_id: str | None | None, target_type: str) -> None:
+     """Actualiza campos cache de consumo cuando existen en la linea origen."""
+     source_key = normalize_doctype(source_type)
+     target_key = normalize_doctype(target_type)
+@@ -302,10 +302,10 @@ def create_document_relation(
+     *,
+     source_type: str,
+     source_id: str,
+-    source_item_id: str,
++    source_item_id: str | None,
+     target_type: str,
+     target_id: str,
+-    target_item_id: str,
++    target_item_id: str | None,
+     qty: Any,
+     uom: str | None = None,
+     rate: Any = None,
+@@ -318,22 +318,29 @@ def create_document_relation(
+         raise DocumentFlowError(f"Relacion no permitida: {source_key} -> {target_key}", 400)
+ 
+     source_spec = get_document_type(source_key)
+-    source_item = get_document_item(source_key, source_item_id)
+-    target_item = get_document_item(target_key, target_item_id)
+-    if not source_item or not target_item:
+-        raise DocumentFlowError("Linea origen o destino no encontrada.", 404)
++    source_item = get_document_item(source_key, source_item_id) if source_item_id else None
++    target_item = get_document_item(target_key, target_item_id) if target_item_id else None
++
++    if source_item_id and not source_item:
++        raise DocumentFlowError("Linea origen no encontrada.", 404)
++    if target_item_id and not target_item:
++        raise DocumentFlowError("Linea destino no encontrada.", 404)
++
++    if source_item:
++        real_source_id = get_item_parent_id(source_spec, source_item)
++        if real_source_id != source_id:
++            raise DocumentFlowError("La linea origen no pertenece al documento indicado.", 409)
+ 
+-    real_source_id = get_item_parent_id(source_spec, source_item)
+-    if real_source_id != source_id:
+-        raise DocumentFlowError("La linea origen no pertenece al documento indicado.", 409)
+     _assert_same_company(source_key, source_id, target_key, target_id)
+ 
+     qty_decimal = decimal_or_zero(qty)
+     if qty_decimal <= 0:
+         raise DocumentFlowError("La cantidad relacionada debe ser mayor que cero.", 409)
+-    available = pending_qty(source_key, source_id, source_item_id, target_key)
+-    if qty_decimal > available:
+-        raise DocumentFlowError("La cantidad relacionada excede el pendiente disponible.", 409)
++
++    if source_item_id:
++        available = pending_qty(source_key, source_id, source_item_id, target_key)
++        if qty_decimal > available:
++            raise DocumentFlowError("La cantidad relacionada excede el pendiente disponible.", 409)
+ 
+     flow = get_flow(source_key, target_key)
+     relation = DocumentRelation(
+@@ -352,8 +359,9 @@ def create_document_relation(
+         status="active",
+     )
+     save_relation(relation)
+-    recompute_line_flow_state(source_key, source_id, source_item_id, target_key, relation.company)
+-    _update_source_cache(source_key, source_id, source_item_id, target_key)
++    if source_item_id:
++        recompute_line_flow_state(source_key, source_id, source_item_id, target_key, relation.company)
++        _update_source_cache(source_key, source_id, source_item_id, target_key)
+     return relation
+ 
+ 
+@@ -396,7 +404,7 @@ def close_line_balance(
+     *,
+     source_type: str,
+     source_id: str,
+-    source_item_id: str,
++    source_item_id: str | None | None,
+     target_type: str,
+     qty: Any | None = None,
+     reason: str = "",
+diff --git a/cacao_accounting/form_preferences.py b/cacao_accounting/form_preferences.py
+index 1af71cff..d193dd7b 100644
+--- a/cacao_accounting/form_preferences.py
++++ b/cacao_accounting/form_preferences.py
+@@ -142,3 +142,9 @@ def _normalize_width(value: Any) -> int:
+     except (TypeError, ValueError):
+         width = 1
+     return min(max(width, 1), 4)
++
++
++def get_column_preferences(user_id: str | None, form_key: str, view_key: str = DEFAULT_VIEW_KEY) -> list[dict[str, Any]]:
++    """Obtiene solo la lista de columnas de la preferencia del usuario."""
++    pref = get_form_preference(user_id, form_key, view_key)  # type: ignore[arg-type]
++    return pref.get("columns") or []
+diff --git a/cacao_accounting/inventario/__init__.py b/cacao_accounting/inventario/__init__.py
+index 3d44a5bc..5c41776f 100644
+--- a/cacao_accounting/inventario/__init__.py
++++ b/cacao_accounting/inventario/__init__.py
+@@ -7,12 +7,12 @@
+ from decimal import Decimal
+ 
+ from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+-from flask_login import login_required
++from flask_login import current_user, login_required
+ 
+ from cacao_accounting.database import Item, StockEntry, StockEntryItem, UOM, Warehouse, database
+ from cacao_accounting.database.helpers import get_active_naming_series
+ from cacao_accounting.contabilidad.posting import PostingError, cancel_document, submit_document
+-from cacao_accounting.document_flow import revert_relations_for_target
++from cacao_accounting.document_flow import create_document_relation, revert_relations_for_target
+ from cacao_accounting.document_flow.status import _
+ from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
+ from cacao_accounting.decorators import modulo_activo
+@@ -385,6 +385,36 @@ def _line_amount(index: int) -> Decimal:
+     return _form_decimal(f"qty_{index}", "1") * _form_decimal(f"rate_{index}", "0")
+ 
+ 
++def _create_line_relation(
++    index: int,
++    target_type: str,
++    target_id: str,
++    target_item_id: str,
++    qty: Decimal,
++    uom: str | None,
++    rate: Decimal,
++    amount: Decimal,
++) -> None:
++    """Crea relacion documental para una linea importada desde un origen."""
++    source_type = request.form.get(f"source_type_{index}")
++    source_id = request.form.get(f"source_id_{index}")
++    source_item_id = request.form.get(f"source_item_id_{index}")
++    if not (source_type and source_id and source_item_id):
++        return
++    create_document_relation(
++        source_type=source_type,
++        source_id=source_id,
++        source_item_id=source_item_id,
++        target_type=target_type,
++        target_id=target_id,
++        target_item_id=target_item_id,
++        qty=qty,
++        uom=uom,
++        rate=rate,
++        amount=amount,
++    )
++
++
+ def _save_stock_entry_items(entry: StockEntry) -> Decimal:
+     """Guarda lineas de un movimiento de inventario."""
+     i = 0
+@@ -395,17 +425,20 @@ def _save_stock_entry_items(entry: StockEntry) -> Decimal:
+             qty = _form_decimal(f"qty_{i}", "1")
+             rate = _form_decimal(f"rate_{i}", "0")
+             amount = _line_amount(i)
++            uom = request.form.get(f"uom_{i}") or None
+             line = StockEntryItem(
+                 stock_entry_id=entry.id,
+                 item_code=item_code,
+                 source_warehouse=entry.from_warehouse,
+                 target_warehouse=entry.to_warehouse,
+                 qty=qty,
+-                uom=request.form.get(f"uom_{i}") or None,
++                uom=uom,
+                 basic_rate=rate,
+                 amount=amount,
+             )
+             database.session.add(line)
++            database.session.flush()
++            _create_line_relation(i, "stock_entry", entry.id, line.id, qty, uom, rate, amount)
+             total += amount
+         i += 1
+     return total
+@@ -424,6 +457,7 @@ def _save_stock_entry_items(entry: StockEntry) -> Decimal:
+ def inventario_entrada_nuevo():
+     """Formulario para crear una entrada de almacén."""
+     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
++    from cacao_accounting.form_preferences import get_column_preferences
+     from cacao_accounting.inventario.forms import FormularioEntradaAlmacen
+ 
+     formulario = FormularioEntradaAlmacen()
+@@ -445,7 +479,12 @@ def inventario_entrada_nuevo():
+     purpose = request.args.get("purpose") or _infer_stock_entry_purpose(request.path)
+     formulario.purpose.data = purpose or formulario.purpose.data
+     source_api_url, source_label = _source_context(request.args.get("source_type"), request.args.get("source_id"))
+-    titulo = _stock_entry_title(purpose)
++    titulo = _stock_entry_title(_infer_stock_entry_purpose(request.path))
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "inventory.stock_entry"),
++    }
+     if request.method == "POST":
+         try:
+             entry = StockEntry(
+@@ -480,6 +519,7 @@ def inventario_entrada_nuevo():
+         uoms_disponibles=uoms_disponibles,
+         source_api_url=source_api_url,
+         source_label=source_label,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+diff --git a/cacao_accounting/inventario/templates/inventario/entrada.html b/cacao_accounting/inventario/templates/inventario/entrada.html
+index 28a05ddb..6254e8b2 100644
+--- a/cacao_accounting/inventario/templates/inventario/entrada.html
++++ b/cacao_accounting/inventario/templates/inventario/entrada.html
+@@ -1,83 +1,30 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/entrada.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/entrada.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('inventario.inventario_') }}" class="link-dark">Inventario</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('inventario.inventario_entrada_lista') }}" class="link-dark">Entradas de Almacén</a></li>
++    <li class="breadcrumb-item"><a href="{{ url_for('inventario.inventario_') }}" class="link-dark">Inventarios</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-archive"></i> {{ registro.document_no or registro.id }}
+-      {{ macros.document_status_for("stock_entry", registro, detail=True) }}
+-    </h5>
+-    <div class="d-flex gap-2">
++{% set buttons %}
+       {{ macros.workflow_buttons(
+-          registro.docstatus,
+-          url_for('inventario.inventario_entrada_submit', entry_id=registro.id),
+-          url_for('inventario.inventario_entrada_cancel', entry_id=registro.id)
+-      ) }}
+-    </div>
+-  </div>
+-  <dl class="row p-3">
+-    <dt class="col-sm-3">Número de Documento</dt>
+-    <dd class="col-sm-9">{{ registro.document_no or "" }}</dd>
+-    <dt class="col-sm-3">Compañía</dt>
+-    <dd class="col-sm-9">{{ registro.company or "" }}</dd>
+-    <dt class="col-sm-3">Fecha</dt>
+-    <dd class="col-sm-9">{{ registro.posting_date or "" }}</dd>
+-    <dt class="col-sm-3">Estado</dt>
+-    <dd class="col-sm-9">{{ macros.document_status_for("stock_entry", registro, detail=True) }}</dd>
+-  </dl>
+-</div>
+-
+-<div class="ca-card mt-3">
+-  <div class="ca-card-header">
+-    <h6 class="ca-card-title mb-0"><i class="bi bi-table me-1"></i>Productos / Servicios</h6>
+-  </div>
+-  <div class="table-responsive p-2">
+-    <table class="ca-table">
+-      <caption class="visually-hidden">Líneas de entrada de almacén</caption>
+-      <thead>
+-        <tr>
+-          <th scope="col">Código</th>
+-          <th scope="col">Cantidad</th>
+-          <th scope="col">UOM</th>
+-          <th scope="col">Origen</th>
+-          <th scope="col">Destino</th>
+-          <th scope="col">Costo</th>
+-          <th scope="col">Monto</th>
+-        </tr>
+-      </thead>
+-      <tbody>
+-        {% for fila in items %}
+-        <tr>
+-          <td>{{ fila[0].item_code }}</td>
+-          <td>{{ fila[0].qty }}</td>
+-          <td>{{ fila[0].uom or "" }}</td>
+-          <td>{{ fila[0].source_warehouse or "" }}</td>
+-          <td>{{ fila[0].target_warehouse or "" }}</td>
+-          <td>{{ fila[0].basic_rate or "" }}</td>
+-          <td>{{ fila[0].amount or "" }}</td>
+-        </tr>
+-        {% else %}
+-        <tr><td colspan="7" class="text-center text-muted py-3">Sin líneas registradas.</td></tr>
+-        {% endfor %}
+-      </tbody>
+-    </table>
+-  </div>
+-</div>
+-
++            registro.docstatus,
++            url_for('inventario.inventario_entrada_submit', entry_id=registro.id),
++            url_for('inventario.inventario_entrada_cancel', entry_id=registro.id)) }}
++{% endset %}
++{{ dv_macros.detail_header("Movimiento de Inventario", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Propósito'), registro.purpose),
++    (_('Compañía'), registro.company),
++    (_('Fecha'), registro.posting_date),
++    (_('Monto Total'), registro.total_amount),
++    (_('Observaciones'), registro.remarks)
++]) }}
++{{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("stock_entry", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/inventario/templates/inventario/entrada_nuevo.html b/cacao_accounting/inventario/templates/inventario/entrada_nuevo.html
+index e373c564..801f2d67 100644
+--- a/cacao_accounting/inventario/templates/inventario/entrada_nuevo.html
++++ b/cacao_accounting/inventario/templates/inventario/entrada_nuevo.html
+@@ -1,62 +1,23 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
++{% import "transaction_form_macros.html" as tf_macros %}
+ <div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/entrada_nuevo.html"></div>
+-{%- endif -%}
+-
+-<nav aria-label="breadcrumb">
+-  <ol class="breadcrumb lh-sm">
+-    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('inventario.inventario_') }}" class="link-dark">Inventario</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('inventario.inventario_entrada_lista') }}" class="link-dark">Entradas de Almacén</a></li>
+-    <li class="breadcrumb-item active" aria-current="page">Nueva Entrada de Almacén</li>
+-  </ol>
+-</nav>
+-
+-<form method="post" id="form-main">
++<form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
+   {{ form.csrf_token }}
+-  <div class="ca-card" style="max-width:860px;">
+-    <div class="ca-card-header">
+-      <h5 class="ca-card-title"><i class="bi bi-plus-circle"></i> Nueva Entrada de Almacén</h5>
+-      <div class="d-flex gap-2">
+-        <button class="btn btn-primary btn-sm" form="form-main" type="submit"><i class="bi bi-floppy me-1"></i>Guardar</button>
+-        <a href="{{ url_for('inventario.inventario_entrada_lista') }}" class="btn btn-secondary btn-sm">Cancelar</a>
++  {{ tf_macros.transaction_form_header("Movimiento de Inventario") }}
++  <div class="ca-card">
++    <div class="row g-3 p-3">
++      <div class="col-md-6">
++        <div class="mb-3">{{ form.purpose.label(class="form-label") }}{{ form.purpose(class="form-select") }}</div>
++        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
+       </div>
+-    </div>
+-    <div class="p-3">
+-      <div class="mb-3">
+-        {{ form.purpose.label(class="form-label") }}
+-        {{ form.purpose(class="form-select") }}
+-      </div>
+-      <div class="mb-3">
+-        {{ form.company.label(class="form-label") }}
+-        {{ form.company(class="form-select") }}
+-      </div>
+-      <div class="mb-3">
+-        {{ form.naming_series.label(class="form-label") }}
+-        {{ form.naming_series(class="form-select") }}
+-      </div>
+-      <div class="mb-3">
+-        {{ form.posting_date.label(class="form-label") }}
+-        {{ form.posting_date(class="form-control", type="date") }}
+-      </div>
+-      <div class="mb-3">
+-        {{ form.from_warehouse.label(class="form-label") }}
+-        {{ form.from_warehouse(class="form-select") }}
+-      </div>
+-      <div class="mb-3">
+-        {{ form.to_warehouse.label(class="form-label") }}
+-        {{ form.to_warehouse(class="form-select") }}
+-      </div>
+-      <div class="mb-3">
+-        {{ form.remarks.label(class="form-label") }}
+-        {{ form.remarks(class="form-control", rows=3) }}
++      <div class="col-md-6">
++        <div class="mb-3">{{ form.from_warehouse.label(class="form-label") }}{{ form.from_warehouse(class="form-select") }}</div>
++        <div class="mb-3">{{ form.to_warehouse.label(class="form-label") }}{{ form.to_warehouse(class="form-select") }}</div>
+       </div>
+     </div>
+   </div>
+-  {{ macros.lineas_items(items_disponibles, uoms_disponibles, source_api_url=source_api_url, source_label=source_label) }}
++  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles) }}
+ </form>
+-
+ {% endblock %}
+diff --git a/cacao_accounting/static/js/transaction-form.js b/cacao_accounting/static/js/transaction-form.js
+new file mode 100644
+index 00000000..d742fc5b
+--- /dev/null
++++ b/cacao_accounting/static/js/transaction-form.js
+@@ -0,0 +1,178 @@
++// SPDX-License-Identifier: Apache-2.0
++// SPDX-FileCopyrightText: 2025 - 2026 William Jose MORENO Reyes
++
++(function () {
++  document.addEventListener('alpine:init', function () {
++    Alpine.data('transactionForm', function (config) {
++      return {
++        formKey: config.formKey,
++        viewKey: config.viewKey,
++        preferences: config.initialPreferences || { columns: [] },
++        messages: config.messages || {},
++        header: config.initialHeader || {},
++        lines: (config.initialLines || []).map(line => this.normalizeLine(line)),
++        sourceItems: [],
++        loadingSource: false,
++        activeIndex: null,
++        modalLine: null,
++        payload: '',
++
++        normalizeLine: function (line) {
++          var base = this.newLine();
++          return Object.assign({}, base, line || { uid: window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(7) });
++        },
++
++        init: function () {
++          if (this.lines.length === 0) {
++            this.addMultipleRows(config.defaultRows || 2);
++          }
++        },
++
++        get visibleColumns() {
++          return (this.preferences.columns || []).filter(c => c.visible);
++        },
++
++        newLine: function () {
++          var uid = window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(7);
++          return Object.assign({
++            uid: uid,
++            item_code: '',
++            item_name: '',
++            qty: 1,
++            uom: '',
++            rate: 0,
++            amount: 0,
++            source_type: '',
++            source_id: '',
++            source_item_id: ''
++          }, config.linePrototype || {});
++        },
++
++        addRow: function () {
++          this.lines.push(this.newLine());
++        },
++
++        addMultipleRows: function (count) {
++          for (var i = 0; i < count; i++) this.addRow();
++        },
++
++        insertRow: function (index) {
++          this.lines.splice(index, 0, this.newLine());
++        },
++
++        duplicateRow: function (index) {
++          var copy = Object.assign({}, this.lines[index]);
++          copy.uid = window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(7);
++          this.lines.splice(index + 1, 0, copy);
++        },
++
++        removeRow: function (index) {
++          if (this.lines.length === 1) {
++            this.lines[index] = this.newLine();
++            return;
++          }
++          this.lines.splice(index, 1);
++        },
++
++        calcAmount: function (line) {
++          line.amount = parseFloat(line.qty || 0) * parseFloat(line.rate || 0);
++        },
++
++        openDetails: function (index) {
++          this.activeIndex = index;
++          this.modalLine = Object.assign({}, this.lines[index]);
++          var modalEl = document.getElementById('lineDetailModal');
++          if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
++        },
++
++        saveModalLine: function () {
++          if (this.activeIndex !== null && this.modalLine) {
++            this.lines[this.activeIndex] = Object.assign({}, this.modalLine);
++          }
++          var modalEl = document.getElementById('lineDetailModal');
++          if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
++        },
++
++        fetchSource: function (apiUrl) {
++          this.loadingSource = true;
++          fetch(apiUrl, { credentials: 'same-origin' })
++            .then(r => r.json())
++            .then(data => {
++              this.sourceItems = (data.items || []).map(item => Object.assign({ selected: true }, item));
++              this.loadingSource = false;
++            })
++            .catch(() => { this.loadingSource = false; });
++        },
++
++        applySource: function () {
++          const sel = this.sourceItems.filter(i => i.selected);
++          sel.forEach(i => {
++            const exists = this.lines.some(row =>
++              row.source_type === i.source_type &&
++              row.source_id === i.source_id &&
++              row.source_item_id === i.source_item_id
++            );
++            if (!exists) {
++              this.lines.push(Object.assign(this.newLine(), {
++                item_code: i.item_code,
++                item_name: i.item_name,
++                qty: i.pending_qty || i.qty,
++                uom: i.uom,
++                rate: i.rate,
++                amount: (i.pending_qty || i.qty) * i.rate,
++                source_type: i.source_type || '',
++                source_id: i.source_id || '',
++                source_item_id: i.source_item_id || ''
++              }));
++            }
++          });
++          // Remove completely empty rows if they were there as placeholders
++          this.lines = this.lines.filter(l => l.item_code || l.source_id);
++          if (this.lines.length === 0) this.addRow();
++        },
++
++        moveColumn: function (index, direction) {
++          var target = index + direction;
++          if (target < 0 || target >= this.preferences.columns.length) return;
++          var column = this.preferences.columns.splice(index, 1)[0];
++          this.preferences.columns.splice(target, 0, column);
++        },
++
++        savePreferences: function () {
++          var self = this;
++          var csrfToken = document.querySelector('input[name="csrf_token"]').value;
++          fetch('/api/form-preferences/' + encodeURIComponent(this.formKey) + '/' + encodeURIComponent(this.viewKey), {
++            method: 'PUT',
++            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
++            credentials: 'same-origin',
++            body: JSON.stringify(this.preferences)
++          })
++            .then(r => r.json())
++            .then(payload => {
++              self.preferences = payload;
++              var modalEl = document.getElementById('columnsModal');
++              if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
++            });
++        },
++
++        resetPreferences: function () {
++          var self = this;
++          var csrfToken = document.querySelector('input[name="csrf_token"]').value;
++          fetch('/api/form-preferences/' + encodeURIComponent(this.formKey) + '/' + encodeURIComponent(this.viewKey), {
++            method: 'DELETE',
++            headers: { 'X-CSRFToken': csrfToken },
++            credentials: 'same-origin'
++          })
++            .then(r => r.json())
++            .then(payload => {
++              self.preferences = payload;
++            });
++        },
++
++        formatMoney: function (value) {
++          return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
++        }
++      };
++    });
++  });
++}());
+diff --git a/cacao_accounting/templates/detail_view_macros.html b/cacao_accounting/templates/detail_view_macros.html
+new file mode 100644
+index 00000000..bfb7f843
+--- /dev/null
++++ b/cacao_accounting/templates/detail_view_macros.html
+@@ -0,0 +1,35 @@
++{% macro detail_header(title, status_value, buttons_html='') %}
++{% set status_badge = 'bg-secondary' %}
++{% if status_value == 'submitted' or status_value == 1 %}
++    {% set status_badge = 'bg-success' %}
++{% elif status_value == 'rejected' or status_value == 'cancelled' or status_value == 2 %}
++    {% set status_badge = 'bg-danger' %}
++{% endif %}
++
++<div class="ca-journal-toolbar mb-3">
++  <div>
++    <h4 class="mb-1">{{ title }}</h4>
++    <p class="text-muted mb-0">
++        <span class="badge {{ status_badge }}">{{ status_value }}</span>
++    </p>
++  </div>
++  <div class="d-flex gap-2 flex-wrap">
++    {{ buttons_html | safe }}
++  </div>
++</div>
++{% endmacro %}
++
++{% macro detail_kv_list(items) %}
++<div class="ca-card">
++    <div class="row g-3 p-3">
++        {% for label, value in items %}
++        <div class="col-md-6">
++            <div class="ca-kv-item">
++                <label>{{ label }}</label>
++                <p>{{ value or '-' }}</p>
++            </div>
++        </div>
++        {% endfor %}
++    </div>
++</div>
++{% endmacro %}
+diff --git a/cacao_accounting/templates/macros.html b/cacao_accounting/templates/macros.html
+index 1ffbaae8..4d0adcc6 100644
+--- a/cacao_accounting/templates/macros.html
++++ b/cacao_accounting/templates/macros.html
+@@ -60,6 +60,7 @@
+ <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+ 
+ <script src="{{ url_for('static', filename='js/smart-select.js') }}?v=20260506-2" defer></script>
++<script src="{{ url_for('static', filename='js/transaction-form.js') }}" defer></script>
+ <script src="//unpkg.com/alpinejs" defer></script>
+ 
+ {%- endmacro %}
+diff --git a/cacao_accounting/templates/transaction_form_macros.html b/cacao_accounting/templates/transaction_form_macros.html
+new file mode 100644
+index 00000000..236597fe
+--- /dev/null
++++ b/cacao_accounting/templates/transaction_form_macros.html
+@@ -0,0 +1,193 @@
++{% macro transaction_form_js(config) %}
++<script>
++  window.transactionFormConfig = {{ config | tojson | safe }};
++</script>
++{% endmacro %}
++
++{% macro transaction_form_header(title, status_label='Borrador') %}
++<div class="ca-journal-toolbar mb-3">
++  <div>
++    <h4 class="mb-1">{{ title }}</h4>
++    <p class="text-muted mb-0">{{ status_label }}</p>
++  </div>
++  <div class="d-flex gap-2">
++    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#columnsModal">
++      <i class="bi bi-sliders"></i> {{ _('Columnas') }}
++    </button>
++    <a href="#" class="btn btn-sm btn-outline-danger" onclick="history.back(); return false;">{{ _('Cancelar') }}</a>
++    <button class="btn btn-sm btn-primary" type="submit" form="form-main">
++      <i class="bi bi-save"></i> {{ _('Guardar') }}
++    </button>
++  </div>
++</div>
++{% endmacro %}
++
++{% macro transaction_grid(items_disponibles, uoms_disponibles, source_api_url=None, source_label='') %}
++<section class="border rounded-2 p-3 mt-3">
++    <div class="ca-journal-toolbar mb-3">
++      <h5 class="mb-0">{{ _('Líneas de detalle') }}</h5>
++      <div class="d-flex gap-2">
++        {% if source_api_url %}
++        <button class="btn btn-sm btn-outline-secondary" type="button"
++                data-bs-toggle="modal" data-bs-target="#modalAutofill"
++                @click="fetchSource('{{ source_api_url }}')">
++          <i class="bi bi-arrow-repeat"></i> {{ _('Actualizar Elementos') }}
++        </button>
++        {% endif %}
++        <button class="btn btn-sm btn-outline-primary" type="button" @click="addRow()">{{ _('Añadir fila') }}</button>
++      </div>
++    </div>
++    <div class="ca-journal-grid">
++      <table class="table table-sm table-bordered ca-journal-table">
++        <thead>
++          <tr>
++            <th style="width: 52px;">{{ _('No.') }}</th>
++            <template x-for="column in visibleColumns" :key="column.field">
++              <th :style="'width:' + (column.width * 90) + 'px'" x-text="column.label"></th>
++            </template>
++            <th style="width: 120px;">{{ _('Acciones') }}</th>
++          </tr>
++        </thead>
++        <tbody>
++          <template x-for="(line, index) in lines" :key="line.uid">
++            <tr>
++              <td class="text-center" x-text="index + 1"></td>
++              <template x-for="column in visibleColumns" :key="column.field">
++                <td>
++                  <template x-if="column.field === 'item_code'">
++                    <select :name="'item_code_' + index" x-model="line.item_code" class="form-select form-select-sm">
++                        <option value=""></option>
++                        {% for item in items_disponibles %}
++                        <option value="{{ item.code }}">{{ item.code }} — {{ item.name }}</option>
++                        {% endfor %}
++                    </select>
++                  </template>
++                  <template x-if="column.field === 'qty'">
++                    <input class="form-control form-control-sm text-end" type="number" step="0.0001" min="0"
++                      :name="'qty_' + index" x-model.number="line.qty" @input="calcAmount(line)">
++                  </template>
++                  <template x-if="column.field === 'uom'">
++                     <select :name="'uom_' + index" x-model="line.uom" class="form-select form-select-sm">
++                        <option value=""></option>
++                        {% for uom in uoms_disponibles %}
++                        <option value="{{ uom.code }}">{{ uom.code }}</option>
++                        {% endfor %}
++                    </select>
++                  </template>
++                  <template x-if="column.field === 'rate'">
++                    <input class="form-control form-control-sm text-end" type="number" step="0.0001" min="0"
++                      :name="'rate_' + index" x-model.number="line.rate" @input="calcAmount(line)">
++                  </template>
++                  <template x-if="column.field === 'amount'">
++                    <div class="text-end px-2">
++                        <span x-text="formatMoney(line.amount)"></span>
++                        <input type="hidden" :name="'amount_' + index" :value="line.amount">
++                    </div>
++                  </template>
++                  <template x-if="column.field === 'item_name'">
++                    <input class="form-control form-control-sm" type="text" :name="'item_name_' + index" x-model="line.item_name">
++                  </template>
++                </td>
++              </template>
++              <td>
++                <div class="ca-journal-actions">
++                  <button class="btn btn-sm btn-outline-secondary" type="button" @click="duplicateRow(index)"
++                    title="{{ _('Duplicar') }}"><i class="bi bi-copy"></i></button>
++                  <button class="btn btn-sm btn-outline-danger" type="button" @click="removeRow(index)"
++                    title="{{ _('Eliminar') }}"><i class="bi bi-trash"></i></button>
++                </div>
++              </td>
++              <input type="hidden" :name="'source_type_' + index" x-model="line.source_type">
++              <input type="hidden" :name="'source_id_' + index" x-model="line.source_id">
++              <input type="hidden" :name="'source_item_id_' + index" x-model="line.source_item_id">
++            </tr>
++          </template>
++        </tbody>
++      </table>
++    </div>
++</section>
++
++{% if source_api_url %}
++<div class="modal fade" id="modalAutofill" tabindex="-1" aria-hidden="true">
++    <div class="modal-dialog modal-lg modal-dialog-scrollable">
++      <div class="modal-content">
++        <div class="modal-header">
++          <h5 class="modal-title">
++            <i class="bi bi-table me-2"></i>{{ _('Actualizar Elementos desde') }} {{ source_label }}
++          </h5>
++          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
++        </div>
++        <div class="modal-body">
++          <div x-show="loadingSource" class="text-center py-3">
++            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
++            {{ _('Cargando elementos...') }}
++          </div>
++          <div x-show="!loadingSource">
++            <table class="table table-sm ca-table">
++              <thead>
++                <tr>
++                  <th style="width:5%"><input type="checkbox" @change="sourceItems.forEach(i => i.selected = $event.target.checked)"></th>
++                  <th>{{ _('Código') }}</th>
++                  <th>{{ _('Descripción') }}</th>
++                  <th>{{ _('Pendiente') }}</th>
++                  <th>{{ _('Traer') }}</th>
++                </tr>
++              </thead>
++              <tbody>
++                <template x-for="(si, idx) in sourceItems" :key="idx">
++                  <tr>
++                    <td><input type="checkbox" x-model="si.selected"></td>
++                    <td x-text="si.item_code"></td>
++                    <td x-text="si.item_name"></td>
++                    <td x-text="Number(si.pending_qty || si.qty || 0).toFixed(4)"></td>
++                    <td>
++                      <input type="number" x-model.number="si.qty" min="0.0001"
++                             :max="si.pending_qty || si.qty" step="0.0001"
++                             class="form-control form-control-sm" style="width:90px">
++                    </td>
++                  </tr>
++                </template>
++              </tbody>
++            </table>
++          </div>
++        </div>
++        <div class="modal-footer">
++          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancelar') }}</button>
++          <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="applySource()">
++            <i class="bi bi-arrow-repeat me-1"></i>{{ _('Actualizar') }}
++          </button>
++        </div>
++      </div>
++    </div>
++</div>
++{% endif %}
++
++<div class="modal fade" id="columnsModal" tabindex="-1" aria-hidden="true">
++    <div class="modal-dialog">
++      <div class="modal-content">
++        <div class="modal-header">
++          <h5 class="modal-title">{{ _('Configurar columnas') }}</h5>
++          <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="{{ _('Cerrar') }}"></button>
++        </div>
++        <div class="modal-body">
++          <template x-for="(column, index) in preferences.columns" :key="column.field">
++            <div class="d-flex align-items-center gap-2 mb-2">
++              <input class="form-check-input" type="checkbox" x-model="column.visible">
++              <span class="flex-grow-1" x-text="column.label"></span>
++              <input class="form-control form-control-sm text-end" style="width: 80px;" type="number" min="1" max="4"
++                x-model.number="column.width">
++              <button class="btn btn-sm btn-outline-secondary" type="button" @click="moveColumn(index, -1)"><i
++                  class="bi bi-arrow-up"></i></button>
++              <button class="btn btn-sm btn-outline-secondary" type="button" @click="moveColumn(index, 1)"><i
++                  class="bi bi-arrow-down"></i></button>
++            </div>
++          </template>
++        </div>
++        <div class="modal-footer">
++          <button class="btn btn-outline-secondary" type="button" @click="resetPreferences()">{{ _('Restablecer') }}</button>
++          <button class="btn btn-primary" type="button" @click="savePreferences()">{{ _('Actualizar') }}</button>
++        </div>
++      </div>
++    </div>
++</div>
++{% endmacro %}
+diff --git a/cacao_accounting/ventas/__init__.py b/cacao_accounting/ventas/__init__.py
+index d116bec2..ddb050de 100644
+--- a/cacao_accounting/ventas/__init__.py
++++ b/cacao_accounting/ventas/__init__.py
+@@ -6,7 +6,7 @@
+ from decimal import Decimal
+ 
+ from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+-from flask_login import login_required
++from flask_login import current_user, login_required
+ 
+ from cacao_accounting.database import (
+     DeliveryNote,
+@@ -102,6 +102,7 @@ def ventas_pedido_venta_lista():
+ def ventas_pedido_venta_nuevo():
+     """Formulario para crear un pedido de venta."""
+     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
++    from cacao_accounting.form_preferences import get_column_preferences
+     from cacao_accounting.ventas.forms import FormularioPedidoVenta
+ 
+     formulario = FormularioPedidoVenta()
+@@ -120,6 +121,11 @@ def ventas_pedido_venta_nuevo():
+     ]
+     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
+     titulo = "Nuevo Pedido de Venta - " + APPNAME
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "sales.sales_request"),
++    }
+     if request.method == "POST":
+         try:
+             customer_id = request.form.get("customer_id") or None
+@@ -156,6 +162,7 @@ def ventas_pedido_venta_nuevo():
+         titulo=titulo,
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+@@ -172,6 +179,38 @@ def ventas_pedido_venta(request_id: str):
+     return render_template("ventas/solicitud_venta.html", registro=registro, items=items, titulo=titulo)
+ 
+ 
++@ventas.route("/sales-request/<request_id>/submit", methods=["POST"])
++@modulo_activo("sales")
++@login_required
++def ventas_pedido_venta_submit(request_id: str):
++    """Aprueba un pedido de venta."""
++    registro = database.session.get(SalesRequest, request_id)
++    if not registro:
++        abort(404)
++    if registro.docstatus != 0:
++        abort(400)
++    registro.docstatus = 1
++    database.session.commit()
++    flash("Pedido de venta aprobado.", "success")
++    return redirect(url_for("ventas.ventas_pedido_venta", request_id=request_id))
++
++
++@ventas.route("/sales-request/<request_id>/cancel", methods=["POST"])
++@modulo_activo("sales")
++@login_required
++def ventas_pedido_venta_cancel(request_id: str):
++    """Cancela un pedido de venta."""
++    registro = database.session.get(SalesRequest, request_id)
++    if not registro:
++        abort(404)
++    if registro.docstatus != 1:
++        abort(400)
++    registro.docstatus = 2
++    database.session.commit()
++    flash("Pedido de venta cancelado.", "warning")
++    return redirect(url_for("ventas.ventas_pedido_venta", request_id=request_id))
++
++
+ @ventas.route("/delivery-note/list")
+ @modulo_activo("sales")
+ @login_required
+@@ -392,16 +431,19 @@ def _save_sales_order_items(order_id: str) -> tuple[Decimal, Decimal]:
+             qty = _form_decimal(f"qty_{i}", "1")
+             rate = _form_decimal(f"rate_{i}", "0")
+             amount = _line_amount(i)
++            uom = request.form.get(f"uom_{i}") or None
+             linea = SalesOrderItem(
+                 sales_order_id=order_id,
+                 item_code=item_code,
+                 item_name=request.form.get(f"item_name_{i}", ""),
+                 qty=qty,
+-                uom=request.form.get(f"uom_{i}") or None,
++                uom=uom,
+                 rate=rate,
+                 amount=amount,
+             )
+             database.session.add(linea)
++            database.session.flush()
++            _create_line_relation(i, "sales_order", order_id, linea.id, qty, uom, rate, amount)
+             total_qty += qty
+             total += amount
+         i += 1
+@@ -419,16 +461,19 @@ def _save_sales_request_items(request_id: str) -> tuple[Decimal, Decimal]:
+             qty = _form_decimal(f"qty_{i}", "1")
+             rate = _form_decimal(f"rate_{i}", "0")
+             amount = _line_amount(i)
++            uom = request.form.get(f"uom_{i}") or None
+             linea = SalesRequestItem(
+                 sales_request_id=request_id,
+                 item_code=item_code,
+                 item_name=request.form.get(f"item_name_{i}", ""),
+                 qty=qty,
+-                uom=request.form.get(f"uom_{i}") or None,
++                uom=uom,
+                 rate=rate,
+                 amount=amount,
+             )
+             database.session.add(linea)
++            database.session.flush()
++            _create_line_relation(i, "sales_request", request_id, linea.id, qty, uom, rate, amount)
+             total_qty += qty
+             total += amount
+         i += 1
+@@ -446,16 +491,19 @@ def _save_sales_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]:
+             qty = _form_decimal(f"qty_{i}", "1")
+             rate = _form_decimal(f"rate_{i}", "0")
+             amount = _line_amount(i)
++            uom = request.form.get(f"uom_{i}") or None
+             linea = SalesQuotationItem(
+                 sales_quotation_id=quotation_id,
+                 item_code=item_code,
+                 item_name=request.form.get(f"item_name_{i}", ""),
+                 qty=qty,
+-                uom=request.form.get(f"uom_{i}") or None,
++                uom=uom,
+                 rate=rate,
+                 amount=amount,
+             )
+             database.session.add(linea)
++            database.session.flush()
++            _create_line_relation(i, "sales_quotation", quotation_id, linea.id, qty, uom, rate, amount)
+             total_qty += qty
+             total += amount
+         i += 1
+@@ -529,6 +577,7 @@ def _save_sales_invoice_items(invoice_id: str) -> tuple[Decimal, Decimal]:
+ def ventas_orden_venta_nuevo():
+     """Formulario para crear una orden de venta."""
+     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
++    from cacao_accounting.form_preferences import get_column_preferences
+     from cacao_accounting.ventas.forms import FormularioOrdenVenta
+ 
+     formulario = FormularioOrdenVenta()
+@@ -551,6 +600,11 @@ def ventas_orden_venta_nuevo():
+     ]
+     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
+     titulo = "Nueva Orden de Venta - " + APPNAME
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "sales.sales_order"),
++    }
+     if request.method == "POST":
+         try:
+             customer_id = request.form.get("customer_id") or None
+@@ -592,6 +646,7 @@ def ventas_orden_venta_nuevo():
+         from_quotation_id=from_quotation_id,
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+@@ -631,6 +686,7 @@ def ventas_cotizacion_lista():
+ def ventas_cotizacion_nueva():
+     """Formulario para crear una cotización de venta."""
+     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
++    from cacao_accounting.form_preferences import get_column_preferences
+     from cacao_accounting.ventas.forms import FormularioCotizacionVenta
+ 
+     formulario = FormularioCotizacionVenta()
+@@ -651,6 +707,11 @@ def ventas_cotizacion_nueva():
+     ]
+     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
+     titulo = "Nueva Cotización - " + APPNAME
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "sales.sales_quotation"),
++    }
+     if request.method == "POST":
+         try:
+             customer_id = request.form.get("customer_id") or None
+@@ -690,6 +751,7 @@ def ventas_cotizacion_nueva():
+         from_request_id=from_request_id,
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+@@ -706,6 +768,39 @@ def ventas_cotizacion(quotation_id: str):
+     return render_template("ventas/cotizacion.html", registro=registro, items=items, titulo=titulo)
+ 
+ 
++@ventas.route("/sales-quotation/<quotation_id>/submit", methods=["POST"])
++@modulo_activo("sales")
++@login_required
++def ventas_cotizacion_submit(quotation_id: str):
++    """Aprueba una cotización de venta."""
++    registro = database.session.get(SalesQuotation, quotation_id)
++    if not registro:
++        abort(404)
++    if registro.docstatus != 0:
++        abort(400)
++    registro.docstatus = 1
++    database.session.commit()
++    flash("Cotización de venta aprobada.", "success")
++    return redirect(url_for("ventas.ventas_cotizacion", quotation_id=quotation_id))
++
++
++@ventas.route("/sales-quotation/<quotation_id>/cancel", methods=["POST"])
++@modulo_activo("sales")
++@login_required
++def ventas_cotizacion_cancel(quotation_id: str):
++    """Cancela una cotización de venta."""
++    registro = database.session.get(SalesQuotation, quotation_id)
++    if not registro:
++        abort(404)
++    if registro.docstatus != 1:
++        abort(400)
++    registro.docstatus = 2
++    revert_relations_for_target("sales_quotation", quotation_id)
++    database.session.commit()
++    flash("Cotización de venta cancelada.", "warning")
++    return redirect(url_for("ventas.ventas_cotizacion", quotation_id=quotation_id))
++
++
+ @ventas.route("/sales-order/<order_id>/submit", methods=["POST"])
+ @modulo_activo("sales")
+ @login_required
+@@ -746,6 +841,7 @@ def ventas_entrega_nuevo():
+     """Formulario para crear una nota de entrega."""
+     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+     from cacao_accounting.database import Warehouse
++    from cacao_accounting.form_preferences import get_column_preferences
+     from cacao_accounting.ventas.forms import FormularioEntregaVenta
+ 
+     formulario = FormularioEntregaVenta()
+@@ -769,6 +865,11 @@ def ventas_entrega_nuevo():
+         {"code": w[0].code, "name": w[0].name} for w in database.session.execute(database.select(Warehouse)).all()
+     ]
+     titulo = "Nueva Nota de Entrega - " + APPNAME
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "sales.delivery_note"),
++    }
+     if request.method == "POST":
+         try:
+             entrega = DeliveryNote(
+@@ -788,24 +889,14 @@ def ventas_entrega_nuevo():
+                 naming_series_id=request.form.get("naming_series") or None,
+             )
+             _total_qty, total = _save_delivery_note_items(entrega.id)
++            entrega.total = total
++            entrega.grand_total = total
++            database.session.commit()
++            flash("Nota de entrega creada correctamente.", "success")
++            return redirect(url_for("ventas.ventas_entrega", note_id=entrega.id))
+         except (DocumentFlowError, IdentifierConfigurationError) as exc:
+             database.session.rollback()
+             flash(str(exc), "danger")
+-            return render_template(
+-                "ventas/entrega_nuevo.html",
+-                form=formulario,
+-                titulo=titulo,
+-                orden_origen=orden_origen,
+-                from_order_id=from_order_id,
+-                items_disponibles=items_disponibles,
+-                uoms_disponibles=uoms_disponibles,
+-                bodegas_disponibles=bodegas_disponibles,
+-            )
+-        entrega.total = total
+-        entrega.grand_total = total
+-        database.session.commit()
+-        flash("Nota de entrega creada correctamente.", "success")
+-        return redirect(url_for("ventas.ventas_entrega", note_id=entrega.id))
+     return render_template(
+         "ventas/entrega_nuevo.html",
+         form=formulario,
+@@ -815,6 +906,7 @@ def ventas_entrega_nuevo():
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
+         bodegas_disponibles=bodegas_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+@@ -879,6 +971,7 @@ def ventas_entrega_cancel(note_id: str):
+ def ventas_factura_venta_nuevo():
+     """Formulario para crear una factura de venta."""
+     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
++    from cacao_accounting.form_preferences import get_column_preferences
+     from cacao_accounting.ventas.forms import FormularioFacturaVenta
+ 
+     formulario = FormularioFacturaVenta()
+@@ -911,6 +1004,11 @@ def ventas_factura_venta_nuevo():
+     ]
+     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
+     titulo = "Nueva Factura de Venta - " + APPNAME
++    transaction_config = {
++        "items": items_disponibles,
++        "uoms": uoms_disponibles,
++        "columns": get_column_preferences(current_user.id, "sales.sales_invoice"),
++    }
+     if request.method == "POST":
+         try:
+             document_type = request.form.get("document_type") or "sales_invoice"
+@@ -939,33 +1037,18 @@ def ventas_factura_venta_nuevo():
+                 naming_series_id=request.form.get("naming_series") or None,
+             )
+             _total_qty, total = _save_sales_invoice_items(factura.id)
++            factura.total = total
++            factura.base_total = total
++            factura.grand_total = total
++            factura.base_grand_total = total
++            factura.outstanding_amount = total
++            factura.base_outstanding_amount = total
++            database.session.commit()
++            flash("Factura de venta creada correctamente.", "success")
++            return redirect(url_for("ventas.ventas_factura_venta", invoice_id=factura.id))
+         except (DocumentFlowError, IdentifierConfigurationError) as exc:
+             database.session.rollback()
+             flash(str(exc), "danger")
+-            return render_template(
+-                "ventas/factura_venta_nuevo.html",
+-                form=formulario,
+-                titulo=titulo,
+-                orden_origen=orden_origen,
+-                entrega_origen=entrega_origen,
+-                factura_origen=factura_origen,
+-                from_order_id=from_order_id,
+-                from_note_id=from_note_id,
+-                from_invoice_id=from_invoice_id,
+-                from_return_id=from_return_id,
+-                document_type=document_type,
+-                items_disponibles=items_disponibles,
+-                uoms_disponibles=uoms_disponibles,
+-            )
+-        factura.total = total
+-        factura.base_total = total
+-        factura.grand_total = total
+-        factura.base_grand_total = total
+-        factura.outstanding_amount = total
+-        factura.base_outstanding_amount = total
+-        database.session.commit()
+-        flash("Factura de venta creada correctamente.", "success")
+-        return redirect(url_for("ventas.ventas_factura_venta", invoice_id=factura.id))
+     return render_template(
+         "ventas/factura_venta_nuevo.html",
+         form=formulario,
+@@ -980,6 +1063,7 @@ def ventas_factura_venta_nuevo():
+         document_type=document_type,
+         items_disponibles=items_disponibles,
+         uoms_disponibles=uoms_disponibles,
++        transaction_config=transaction_config,
+     )
+ 
+ 
+diff --git a/cacao_accounting/ventas/templates/ventas/cotizacion.html b/cacao_accounting/ventas/templates/ventas/cotizacion.html
+index f26b1127..8395ed5d 100644
+--- a/cacao_accounting/ventas/templates/ventas/cotizacion.html
++++ b/cacao_accounting/ventas/templates/ventas/cotizacion.html
+@@ -1,72 +1,34 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/cotizacion.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/cotizacion.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_') }}" class="link-dark">Ventas</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_cotizacion_lista') }}" class="link-dark">Cotizaciones</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card" style="max-width:860px;">
+-  <div class="ca-card-header d-flex align-items-center justify-content-between">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-file-earmark-text"></i> Cotización
+-      {{ macros.document_status_for("sales_quotation", registro, detail=True) }}
+-    </h5>
+-  </div>
+-  <div class="row g-3 p-3">
+-    <div class="col-md-6">
+-      <div><strong>Cliente</strong></div>
+-      <div>{{ registro.customer_name or "-" }}</div>
+-      <div class="mt-3"><strong>Fecha</strong></div>
+-      <div>{{ registro.posting_date or "-" }}</div>
+-    </div>
+-    <div class="col-md-6">
+-      <div><strong>Total</strong></div>
+-      <div>{{ registro.grand_total or "0" }}</div>
+-      <div class="mt-3"><strong>Notas</strong></div>
+-      <div>{{ registro.remarks or "-" }}</div>
+-    </div>
+-  </div>
+-</div>
+-
+-<div class="mt-3 ca-card">
+-  <div class="ca-card-header">
+-    <h6 class="ca-card-title">Líneas</h6>
+-  </div>
+-  <table class="ca-table">
+-    <caption style="display: none;">Líneas de la cotización de venta.</caption>
+-    <thead>
+-      <tr>
+-        <th scope="col">Item</th>
+-        <th scope="col">Cantidad</th>
+-        <th scope="col">UOM</th>
+-        <th scope="col">Precio</th>
+-        <th scope="col">Total</th>
+-      </tr>
+-    </thead>
+-    <tbody>
+-      {% for item in items -%}
+-      <tr>
+-        <td>{{ item.item_name or item.item_code }}</td>
+-        <td>{{ item.qty }}</td>
+-        <td>{{ item.uom or "" }}</td>
+-        <td>{{ item.rate or "" }}</td>
+-        <td>{{ item.amount or "" }}</td>
+-      </tr>
+-      {%- endfor %}
+-    </tbody>
+-  </table>
+-</div>
+-
++{% set buttons %}
++      {{ macros.workflow_buttons(
++            registro.docstatus,
++            url_for('ventas.ventas_cotizacion_submit', quotation_id=registro.id),
++            url_for('ventas.ventas_cotizacion_cancel', quotation_id=registro.id)) }}
++      {% if registro.docstatus == 1 %}
++        {{ macros.crear_dropdown([
++              ("Orden de Venta", url_for('ventas.ventas_orden_venta_nuevo', from_quotation=registro.id))
++           ]) }}
++      {% endif %}
++{% endset %}
++{{ dv_macros.detail_header("Cotización de Venta", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Cliente'), registro.customer_name),
++    (_('Fecha'), registro.posting_date),
++    (_('Total'), registro.grand_total),
++    (_('Observaciones'), registro.remarks)
++]) }}
++{{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("sales_quotation", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/ventas/templates/ventas/entrega.html b/cacao_accounting/ventas/templates/ventas/entrega.html
+index 17269f45..a88b24d0 100644
+--- a/cacao_accounting/ventas/templates/ventas/entrega.html
++++ b/cacao_accounting/ventas/templates/ventas/entrega.html
+@@ -1,27 +1,16 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/entrega.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/entrega.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_') }}" class="link-dark">Ventas</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_entrega_lista') }}" class="link-dark">Notas de Entrega</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card" style="max-width:960px;">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-truck"></i> {{ registro.document_no or registro.id }}
+-      {{ macros.document_status_for("delivery_note", registro, detail=True) }}
+-    </h5>
+-    <div class="d-flex gap-2 flex-wrap">
++{% set buttons %}
+       {{ macros.workflow_buttons(
+             registro.docstatus,
+             url_for('ventas.ventas_entrega_submit', note_id=registro.id),
+@@ -31,39 +20,15 @@ <h5 class="ca-card-title">
+               ("Factura de Venta", url_for('ventas.ventas_factura_venta_nuevo', from_note=registro.id))
+            ]) }}
+       {% endif %}
+-    </div>
+-  </div>
+-  <div class="row g-3 p-3">
+-    <div class="col-md-6">
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Datos generales de la entrega</caption>
+-        <thead><tr><th scope="col">Campo</th><th scope="col">Valor</th></tr></thead>
+-        <tbody>
+-          <tr><td style="color:#64748b;">Número de Documento</td><td>{{ registro.document_no or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Compañía</td><td>{{ registro.company or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Fecha</td><td>{{ registro.posting_date or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Estado</td><td>{{ macros.document_status_for("delivery_note", registro, detail=True) }}</td></tr>
+-        </tbody>
+-      </table>
+-    </div>
+-    <div class="col-md-6">
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Datos del cliente</caption>
+-        <thead><tr><th scope="col">Campo</th><th scope="col">Valor</th></tr></thead>
+-        <tbody>
+-          <tr><td style="color:#64748b;">Cliente</td><td>{{ registro.customer_name or registro.customer_id or "" }}</td></tr>
+-          {% if registro.sales_order_id %}
+-          <tr><td style="color:#64748b;">Orden de Venta</td>
+-              <td><a href="{{ url_for('ventas.ventas_orden_venta', order_id=registro.sales_order_id) }}">{{ registro.sales_order_id }}</a></td></tr>
+-          {% endif %}
+-          <tr><td style="color:#64748b;">Observaciones</td><td>{{ registro.remarks or "" }}</td></tr>
+-        </tbody>
+-      </table>
+-    </div>
+-  </div>
+-</div>
+-
++{% endset %}
++{{ dv_macros.detail_header("Nota de Entrega", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Cliente'), registro.customer_name),
++    (_('Fecha'), registro.posting_date),
++    (_('Total'), registro.grand_total),
++    (_('Observaciones'), registro.remarks)
++]) }}
+ {{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("delivery_note", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/ventas/templates/ventas/factura_venta.html b/cacao_accounting/ventas/templates/ventas/factura_venta.html
+index 78574650..f13fc14f 100644
+--- a/cacao_accounting/ventas/templates/ventas/factura_venta.html
++++ b/cacao_accounting/ventas/templates/ventas/factura_venta.html
+@@ -1,75 +1,35 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_') }}" class="link-dark">Ventas</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_factura_venta_lista') }}" class="link-dark">Facturas de Venta</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card" style="max-width:960px;">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-receipt"></i> {{ registro.document_no or registro.id }}
+-      {{ macros.document_status_for("sales_invoice", registro, detail=True) }}
+-    </h5>
+-    <div class="d-flex gap-2 flex-wrap">
++{% set buttons %}
+       {{ macros.workflow_buttons(
+             registro.docstatus,
+             url_for('ventas.ventas_factura_venta_submit', invoice_id=registro.id),
+             url_for('ventas.ventas_factura_venta_cancel', invoice_id=registro.id)) }}
+       {% if registro.docstatus == 1 %}
+         {{ macros.crear_dropdown([
+-              ("Pago", url_for('bancos.bancos_pago_nuevo', from_sales_invoice=registro.id)),
+-              ("Nota de Crédito", url_for('ventas.ventas_factura_venta_nuevo', from_return=registro.id))
++              ("Pago", url_for('bancos.bancos_pago_nuevo', from_sales_invoice=registro.id))
+            ]) }}
+       {% endif %}
+-    </div>
+-  </div>
+-  <div class="row g-3 p-3">
+-    <div class="col-md-6">
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Datos generales de la factura</caption>
+-        <thead><tr><th scope="col">Campo</th><th scope="col">Valor</th></tr></thead>
+-        <tbody>
+-          <tr><td style="color:#64748b;">Número de Documento</td><td>{{ registro.document_no or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Compañía</td><td>{{ registro.company or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Fecha</td><td>{{ registro.posting_date or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Estado</td><td>{{ macros.document_status_for("sales_invoice", registro, detail=True) }}</td></tr>
+-        </tbody>
+-      </table>
+-    </div>
+-    <div class="col-md-6">
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Datos del cliente y montos</caption>
+-        <thead><tr><th scope="col">Campo</th><th scope="col">Valor</th></tr></thead>
+-        <tbody>
+-          <tr><td style="color:#64748b;">Cliente</td><td>{{ registro.customer_name or registro.customer_id or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Total</td><td>{{ registro.grand_total or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Saldo Pendiente</td><td>{{ registro.outstanding_amount or "" }}</td></tr>
+-          {% if registro.sales_order_id %}
+-          <tr><td style="color:#64748b;">Orden de Venta</td>
+-              <td><a href="{{ url_for('ventas.ventas_orden_venta', order_id=registro.sales_order_id) }}">{{ registro.sales_order_id }}</a></td></tr>
+-          {% endif %}
+-          {% if registro.delivery_note_id %}
+-          <tr><td style="color:#64748b;">Nota de Entrega</td>
+-              <td><a href="{{ url_for('ventas.ventas_entrega', note_id=registro.delivery_note_id) }}">{{ registro.delivery_note_id }}</a></td></tr>
+-          {% endif %}
+-        </tbody>
+-      </table>
+-    </div>
+-  </div>
+-</div>
+-
++{% endset %}
++{{ dv_macros.detail_header("Factura de Venta", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Cliente'), registro.customer_name),
++    (_('Fecha'), registro.posting_date),
++    (_('Total'), registro.grand_total),
++    (_('Saldo Pendiente'), registro.outstanding_amount),
++    (_('Observaciones'), registro.remarks)
++]) }}
+ {{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("sales_invoice", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html b/cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html
+index 27880e0a..43ac1e2b 100644
+--- a/cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html
++++ b/cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html
+@@ -1,100 +1,22 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
++{% import "transaction_form_macros.html" as tf_macros %}
+ <div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/factura_venta_nuevo.html"></div>
+-{%- endif -%}
+-
+-<nav aria-label="breadcrumb">
+-  <ol class="breadcrumb lh-sm">
+-    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_') }}" class="link-dark">Ventas</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_factura_venta_lista') }}" class="link-dark">Facturas de Venta</a></li>
+-    <li class="breadcrumb-item active" aria-current="page">Nueva Factura de Venta</li>
+-  </ol>
+-</nav>
+-
+-<form method="post" id="form-main">
++<form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
+   {{ form.csrf_token }}
+-  {% if from_order_id %}<input type="hidden" name="from_order" value="{{ from_order_id }}">{% endif %}
+-  {% if from_note_id %}<input type="hidden" name="from_note" value="{{ from_note_id }}">{% endif %}
+-  {% if from_invoice_id %}<input type="hidden" name="from_invoice" value="{{ from_invoice_id }}">{% endif %}
+-  {% if from_return_id %}
+-    <input type="hidden" name="from_return" value="{{ from_return_id }}">
+-  {% endif %}
+-  <input type="hidden" name="document_type" value="{{ document_type or 'sales_invoice' }}">
+-  {% if document_type == 'sales_invoice' %}
+-    <input type="hidden" name="is_return" value="0">
+-  {% elif document_type == 'sales_credit_note' %}
+-    <input type="hidden" name="is_return" value="1">
+-  {% endif %}
+-  <div class="ca-card" style="max-width:860px;">
+-    <div class="ca-card-header">
+-      <h5 class="ca-card-title"><i class="bi bi-plus-circle"></i>
+-        {% if document_type == 'sales_credit_note' %}
+-          Nueva Nota de Crédito de Venta
+-          {% if factura_origen %}<small class="text-muted ms-2">desde {{ factura_origen.document_no or factura_origen.id }}</small>{% endif %}
+-        {% elif document_type == 'sales_debit_note' %}
+-          Nueva Nota de Débito de Venta
+-          {% if factura_origen %}<small class="text-muted ms-2">desde {{ factura_origen.document_no or factura_origen.id }}</small>{% endif %}
+-        {% else %}
+-          Nueva Factura de Venta
+-          {% if orden_origen %}<small class="text-muted ms-2">desde {{ orden_origen.document_no or orden_origen.id }}</small>{% endif %}
+-          {% if entrega_origen %}<small class="text-muted ms-2">desde {{ entrega_origen.document_no or entrega_origen.id }}</small>{% endif %}
+-          {% if from_invoice_id and not document_type in ['sales_credit_note','sales_debit_note'] %}
+-            <small class="text-muted ms-2">desde {{ factura_origen.document_no or factura_origen.id }}</small>
+-          {% endif %}
+-        {% endif %}
+-      </h5>
+-      <div class="d-flex gap-2">
+-        <button class="btn btn-primary btn-sm" form="form-main" type="submit"><i class="bi bi-floppy me-1"></i>Guardar</button>
+-        <a href="{{ url_for('ventas.ventas_factura_venta_lista') }}" class="btn btn-secondary btn-sm">Cancelar</a>
+-      </div>
+-    </div>
++  {{ tf_macros.transaction_form_header("Factura de Venta") }}
++  <div class="ca-card">
+     <div class="row g-3 p-3">
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.customer_id.label(class="form-label") }}
+-          {{ form.customer_id(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.company.label(class="form-label") }}
+-          {{ form.company(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.naming_series.label(class="form-label") }}
+-          {{ form.naming_series(class="form-select") }}
+-        </div>
++        <div class="mb-3">{{ form.customer_id.label(class="form-label") }}{{ form.customer_id(class="form-select") }}</div>
+       </div>
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.posting_date.label(class="form-label") }}
+-          {{ form.posting_date(class="form-control", type="date") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.remarks.label(class="form-label") }}
+-          {{ form.remarks(class="form-control", rows=3) }}
+-        </div>
++        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
++        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control", type="date") }}</div>
+       </div>
+     </div>
+   </div>
+-
+-  {% if from_return_id %}
+-    {{ macros.lineas_items(items_disponibles, uoms_disponibles,
+-         source_api_url="/api/sales/sales-invoice/" ~ from_return_id ~ "/items?target_type=sales_invoice",
+-         source_label="Factura de Venta") }}
+-  {% elif from_note_id %}
+-    {{ macros.lineas_items(items_disponibles, uoms_disponibles,
+-         source_api_url="/api/sales/delivery-note/" ~ from_note_id ~ "/items?target_type=sales_invoice",
+-         source_label="Nota de Entrega") }}
+-  {% elif from_order_id %}
+-    {{ macros.lineas_items(items_disponibles, uoms_disponibles,
+-         source_api_url="/api/sales/sales-order/" ~ from_order_id ~ "/items?target_type=sales_invoice",
+-         source_label="Orden de Venta") }}
+-  {% else %}
+-    {{ macros.lineas_items(items_disponibles, uoms_disponibles) }}
+-  {% endif %}
++  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles) }}
+ </form>
+-
+ {% endblock %}
+diff --git a/cacao_accounting/ventas/templates/ventas/orden_venta.html b/cacao_accounting/ventas/templates/ventas/orden_venta.html
+index 7c3f5b6d..947a9499 100644
+--- a/cacao_accounting/ventas/templates/ventas/orden_venta.html
++++ b/cacao_accounting/ventas/templates/ventas/orden_venta.html
+@@ -1,27 +1,16 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/orden_venta.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/orden_venta.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_') }}" class="link-dark">Ventas</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_orden_venta_lista') }}" class="link-dark">Órdenes de Venta</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card" style="max-width:960px;">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-cart-check"></i> {{ registro.document_no or registro.id }}
+-      {{ macros.document_status_for("sales_order", registro, detail=True) }}
+-    </h5>
+-    <div class="d-flex gap-2 flex-wrap">
++{% set buttons %}
+       {{ macros.workflow_buttons(
+             registro.docstatus,
+             url_for('ventas.ventas_orden_venta_submit', order_id=registro.id),
+@@ -32,37 +21,15 @@ <h5 class="ca-card-title">
+               ("Factura de Venta", url_for('ventas.ventas_factura_venta_nuevo', from_order=registro.id))
+            ]) }}
+       {% endif %}
+-    </div>
+-  </div>
+-  <div class="row g-3 p-3">
+-    <div class="col-md-6">
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Datos generales de la orden</caption>
+-        <thead><tr><th scope="col">Campo</th><th scope="col">Valor</th></tr></thead>
+-        <tbody>
+-          <tr><td style="color:#64748b;">Número de Documento</td><td>{{ registro.document_no or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Compañía</td><td>{{ registro.company or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Fecha</td><td>{{ registro.posting_date or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Estado</td><td>{{ macros.document_status_for("sales_order", registro, detail=True) }}</td></tr>
+-        </tbody>
+-      </table>
+-    </div>
+-    <div class="col-md-6">
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Datos del cliente</caption>
+-        <thead><tr><th scope="col">Campo</th><th scope="col">Valor</th></tr></thead>
+-        <tbody>
+-          <tr><td style="color:#64748b;">Cliente</td><td>{{ registro.customer_name or registro.customer_id or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Total</td><td>{{ registro.grand_total or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Moneda</td><td>{{ registro.transaction_currency or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Observaciones</td><td>{{ registro.remarks or "" }}</td></tr>
+-        </tbody>
+-      </table>
+-    </div>
+-  </div>
+-</div>
+-
++{% endset %}
++{{ dv_macros.detail_header("Orden de Venta", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Cliente'), registro.customer_name),
++    (_('Fecha'), registro.posting_date),
++    (_('Total'), registro.grand_total),
++    (_('Observaciones'), registro.remarks)
++]) }}
+ {{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("sales_order", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/ventas/templates/ventas/solicitud_venta.html b/cacao_accounting/ventas/templates/ventas/solicitud_venta.html
+index 5af1380d..132f080b 100644
+--- a/cacao_accounting/ventas/templates/ventas/solicitud_venta.html
++++ b/cacao_accounting/ventas/templates/ventas/solicitud_venta.html
+@@ -1,54 +1,34 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/solicitud_venta.html"></div>
+-{%- endif -%}
+-
++{% import "detail_view_macros.html" as dv_macros %}
++{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/solicitud_venta.html"></div>{% endif %}
+ <nav aria-label="breadcrumb">
+   <ol class="breadcrumb lh-sm">
+     <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+     <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_') }}" class="link-dark">Ventas</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_pedido_venta_lista') }}" class="link-dark">Pedidos de Venta</a></li>
+     <li class="breadcrumb-item active" aria-current="page">{{ registro.document_no or registro.id }}</li>
+   </ol>
+ </nav>
+-
+-<div class="ca-card" style="max-width:960px;">
+-  <div class="ca-card-header">
+-    <h5 class="ca-card-title">
+-      <i class="bi bi-cart-plus"></i> {{ registro.document_no or registro.id }}
+-      {{ macros.document_status_for("sales_request", registro, detail=True) }}
+-    </h5>
+-  </div>
+-  <div class="row g-3 p-3">
+-    <div class="col-md-6">
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Datos generales del pedido</caption>
+-        <thead><tr><th scope="col">Campo</th><th scope="col">Valor</th></tr></thead>
+-        <tbody>
+-          <tr><td style="color:#64748b;">Número de Documento</td><td>{{ registro.document_no or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Cliente</td><td>{{ registro.customer_name or registro.customer_id or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Compañía</td><td>{{ registro.company or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Fecha</td><td>{{ registro.posting_date or "" }}</td></tr>
+-        </tbody>
+-      </table>
+-    </div>
+-    <div class="col-md-6">
+-      <table class="ca-table">
+-        <caption class="visually-hidden">Montos y observaciones</caption>
+-        <thead><tr><th scope="col">Campo</th><th scope="col">Valor</th></tr></thead>
+-        <tbody>
+-          <tr><td style="color:#64748b;">Total</td><td>{{ registro.grand_total or "" }}</td></tr>
+-          <tr><td style="color:#64748b;">Observaciones</td><td>{{ registro.remarks or "" }}</td></tr>
+-        </tbody>
+-      </table>
+-    </div>
+-  </div>
+-</div>
+-
++{% set buttons %}
++      {{ macros.workflow_buttons(
++            registro.docstatus,
++            url_for('ventas.ventas_pedido_venta_submit', request_id=registro.id),
++            url_for('ventas.ventas_pedido_venta_cancel', request_id=registro.id)) }}
++      {% if registro.docstatus == 1 %}
++        {{ macros.crear_dropdown([
++              ("Cotización", url_for('ventas.ventas_cotizacion_nueva', from_request=registro.id))
++           ]) }}
++      {% endif %}
++{% endset %}
++{{ dv_macros.detail_header("Pedido de Venta", registro.docstatus, buttons) }}
++{{ dv_macros.detail_kv_list([
++    (_('Número'), registro.document_no),
++    (_('Cliente'), registro.customer_name),
++    (_('Fecha'), registro.posting_date),
++    (_('Total'), registro.grand_total),
++    (_('Observaciones'), registro.remarks)
++]) }}
+ {{ macros.lineas_tabla_lectura(items) }}
+ {{ macros.document_flow_trace("sales_request", registro) }}
+-
+ {% endblock %}
+diff --git a/cacao_accounting/ventas/templates/ventas/solicitud_venta_nuevo.html b/cacao_accounting/ventas/templates/ventas/solicitud_venta_nuevo.html
+index 2bad9901..61ea3742 100644
+--- a/cacao_accounting/ventas/templates/ventas/solicitud_venta_nuevo.html
++++ b/cacao_accounting/ventas/templates/ventas/solicitud_venta_nuevo.html
+@@ -1,59 +1,21 @@
+ {% extends "base.html" %}
+ {% block contenido %}
+ {% import "macros.html" as macros %}
+-
+-{%- if TESTING -%}
+-<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/solicitud_venta_nuevo.html"></div>
+-{%- endif -%}
+-
+-<nav aria-label="breadcrumb">
+-  <ol class="breadcrumb lh-sm">
+-    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> Inicio</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_') }}" class="link-dark">Ventas</a></li>
+-    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_pedido_venta_lista') }}" class="link-dark">Pedidos de Venta</a></li>
+-    <li class="breadcrumb-item active" aria-current="page">Nuevo Pedido de Venta</li>
+-  </ol>
+-</nav>
+-
+-<form method="post" id="form-main">
++{% import "transaction_form_macros.html" as tf_macros %}
++<form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
+   {{ form.csrf_token }}
+-  <div class="ca-card" style="max-width:860px;">
+-    <div class="ca-card-header">
+-      <h5 class="ca-card-title"><i class="bi bi-plus-circle"></i> Nuevo Pedido de Venta</h5>
+-      <div class="d-flex gap-2">
+-        <button class="btn btn-primary btn-sm" form="form-main" type="submit"><i class="bi bi-floppy me-1"></i>Guardar</button>
+-        <a href="{{ url_for('ventas.ventas_pedido_venta_lista') }}" class="btn btn-secondary btn-sm">Cancelar</a>
+-      </div>
+-    </div>
++  {{ tf_macros.transaction_form_header("Pedido de Venta") }}
++  <div class="ca-card">
+     <div class="row g-3 p-3">
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.customer_id.label(class="form-label") }}
+-          {{ form.customer_id(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.company.label(class="form-label") }}
+-          {{ form.company(class="form-select") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.naming_series.label(class="form-label") }}
+-          {{ form.naming_series(class="form-select") }}
+-        </div>
++        <div class="mb-3">{{ form.customer_id.label(class="form-label") }}{{ form.customer_id(class="form-select") }}</div>
+       </div>
+       <div class="col-md-6">
+-        <div class="mb-3">
+-          {{ form.posting_date.label(class="form-label") }}
+-          {{ form.posting_date(class="form-control", type="date") }}
+-        </div>
+-        <div class="mb-3">
+-          {{ form.remarks.label(class="form-label") }}
+-          {{ form.remarks(class="form-control", rows=3) }}
+-        </div>
++        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
++        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control", type="date") }}</div>
+       </div>
+     </div>
+   </div>
+-
+-  {{ macros.lineas_items(items_disponibles, uoms_disponibles) }}
++  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles) }}
+ </form>
+-
+ {% endblock %}
