@@ -574,111 +574,68 @@ def _save_sales_invoice_items(invoice_id: str) -> tuple[Decimal, Decimal]:
 @ventas.route("/sales-order/new", methods=["GET", "POST"])
 @modulo_activo("sales")
 @login_required
-def ventas_orden_venta_nuevo(
-    ):
+def ventas_orden_venta_nuevo():
     """Formulario para crear una orden de venta."""
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.form_preferences import get_column_preferences
     from cacao_accounting.ventas.forms import FormularioOrdenVenta
 
-    formulario = FormularioOrdenVenta(
-    )
-    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial(
-    )
-    selected_company = request.values.get("company"
-    ) or (
+    formulario = FormularioOrdenVenta()
+    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
-    formulario.naming_series.choices = _series_choices("sales_order", selected_company
-    )
-    formulario.customer_id.choices = [("", ""
-    )] + [
-        (str(p[0].id
-    ), p[0].name
-    )
-        for p in database.session.execute(database.select(Party
-    ).filter_by(party_type="customer"
-    )
-    ).all(
-    )
+    formulario.naming_series.choices = _series_choices("sales_order", selected_company)
+    formulario.customer_id.choices = [("", "")] + [
+        (str(p[0].id), p[0].name)
+        for p in database.session.execute(database.select(Party).filter_by(party_type="customer")).all()
     ]
-    from_order_id = request.args.get("from_order"
-    ) or request.form.get("from_order"
-    )
-    from_quotation_id = request.args.get("from_quotation"
-    ) or request.form.get("from_quotation"
-    )
-    orden_origen = database.session.get(SalesOrder, from_order_id
-    ) if from_order_id else None
-    cotizacion_origen = database.session.get(SalesQuotation, from_quotation_id
-    ) if from_quotation_id else None
+    from_order_id = request.args.get("from_order") or request.form.get("from_order")
+    from_quotation_id = request.args.get("from_quotation") or request.form.get("from_quotation")
+    orden_origen = database.session.get(SalesOrder, from_order_id) if from_order_id else None
+    cotizacion_origen = database.session.get(SalesQuotation, from_quotation_id) if from_quotation_id else None
     items_disponibles = [
         {"code": i[0].code, "name": i[0].name, "uom": i[0].default_uom}
-        for i in database.session.execute(database.select(Item
-    )
-    ).all(
-    )
+        for i in database.session.execute(database.select(Item)).all()
     ]
-    uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM
-    )
-    ).all(
-    )]
+    uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Orden de Venta - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "sales.sales_order"),
+    }
     if request.method == "POST":
         try:
-            customer_id = request.form.get("customer_id"
-    ) or None
-            customer = database.session.get(Party, customer_id
-    ) if customer_id else None
+            customer_id = request.form.get("customer_id") or None
+            customer = database.session.get(Party, customer_id) if customer_id else None
             orden = SalesOrder(
                 customer_id=customer_id,
                 customer_name=customer.name if customer else None,
                 sales_quotation_id=from_quotation_id or None,
-                company=request.form.get("company"
-    ) or None,
-                posting_date=request.form.get("posting_date"
-    ) or None,
-                remarks=request.form.get("remarks"
-    ),
+                company=request.form.get("company") or None,
+                posting_date=request.form.get("posting_date") or None,
+                remarks=request.form.get("remarks"),
                 docstatus=0,
-    )
-            database.session.add(orden
-    )
-            database.session.flush(
-    )
+            )
+            database.session.add(orden)
+            database.session.flush()
             assign_document_identifier(
                 document=orden,
                 entity_type="sales_order",
-                posting_date_raw=request.form.get("posting_date"
-    ),
-                naming_series_id=request.form.get("naming_series"
-    ) or None,
-    )
-            _total_qty, total = _save_sales_order_items(orden.id
-    )
+                posting_date_raw=request.form.get("posting_date"),
+                naming_series_id=request.form.get("naming_series") or None,
+            )
+            _total_qty, total = _save_sales_order_items(orden.id)
             orden.total = total
             orden.base_total = total
             orden.grand_total = total
-            database.session.commit(
-    )
-            flash("Orden de venta creada correctamente.", "success"
-    )
-            return redirect(url_for("ventas.ventas_orden_venta", order_id=orden.id
-    )
-    )
+            database.session.commit()
+            flash("Orden de venta creada correctamente.", "success")
+            return redirect(url_for("ventas.ventas_orden_venta", order_id=orden.id))
         except IdentifierConfigurationError as exc:
-            database.session.rollback(
-    )
-            flash(str(exc
-    ), "danger"
-    )
-        transaction_config = {
-        "items": items_disponibles if "items_disponibles" in locals(
-    ) else [],
-        "uoms": uoms_disponibles if "uoms_disponibles" in locals(
-    ) else [],
-        "columns": get_column_preferences(current_user.id, "sales.sales_order"
-    ),
-    }
+            database.session.rollback()
+            flash(str(exc), "danger")
     return render_template(
         "ventas/orden_venta_nuevo.html",
         form=formulario,
@@ -689,6 +646,7 @@ def ventas_orden_venta_nuevo(
         from_quotation_id=from_quotation_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -725,106 +683,66 @@ def ventas_cotizacion_lista():
 @ventas.route("/request-for-quotation/new", methods=["GET", "POST"])
 @modulo_activo("sales")
 @login_required
-def ventas_cotizacion_nueva(
-    ):
+def ventas_cotizacion_nueva():
     """Formulario para crear una cotización de venta."""
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.form_preferences import get_column_preferences
     from cacao_accounting.ventas.forms import FormularioCotizacionVenta
 
-    formulario = FormularioCotizacionVenta(
-    )
-    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial(
-    )
-    selected_company = request.values.get("company"
-    ) or (
+    formulario = FormularioCotizacionVenta()
+    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
+    selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
-    formulario.naming_series.choices = _series_choices("sales_quotation", selected_company
-    )
-    formulario.customer_id.choices = [("", ""
-    )] + [
-        (str(p[0].id
-    ), p[0].name
-    )
-        for p in database.session.execute(database.select(Party
-    ).filter_by(party_type="customer"
-    )
-    ).all(
-    )
+    formulario.naming_series.choices = _series_choices("sales_quotation", selected_company)
+    formulario.customer_id.choices = [("", "")] + [
+        (str(p[0].id), p[0].name)
+        for p in database.session.execute(database.select(Party).filter_by(party_type="customer")).all()
     ]
-    from_request_id = request.args.get("from_request"
-    ) or request.form.get("from_request"
-    )
-    solicitud_origen = database.session.get(SalesRequest, from_request_id
-    ) if from_request_id else None
+    from_request_id = request.args.get("from_request") or request.form.get("from_request")
+    solicitud_origen = database.session.get(SalesRequest, from_request_id) if from_request_id else None
     items_disponibles = [
         {"code": i[0].code, "name": i[0].name, "uom": i[0].default_uom}
-        for i in database.session.execute(database.select(Item
-    )
-    ).all(
-    )
+        for i in database.session.execute(database.select(Item)).all()
     ]
-    uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM
-    )
-    ).all(
-    )]
+    uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Cotización - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "sales.sales_quotation"),
+    }
     if request.method == "POST":
         try:
-            customer_id = request.form.get("customer_id"
-    ) or None
-            customer = database.session.get(Party, customer_id
-    ) if customer_id else None
+            customer_id = request.form.get("customer_id") or None
+            customer = database.session.get(Party, customer_id) if customer_id else None
             cotizacion = SalesQuotation(
                 customer_id=customer_id,
                 customer_name=customer.name if customer else None,
                 sales_request_id=from_request_id or None,
-                company=request.form.get("company"
-    ) or None,
-                posting_date=request.form.get("posting_date"
-    ) or None,
-                remarks=request.form.get("remarks"
-    ),
+                company=request.form.get("company") or None,
+                posting_date=request.form.get("posting_date") or None,
+                remarks=request.form.get("remarks"),
                 docstatus=0,
-    )
-            database.session.add(cotizacion
-    )
-            database.session.flush(
-    )
+            )
+            database.session.add(cotizacion)
+            database.session.flush()
             assign_document_identifier(
                 document=cotizacion,
                 entity_type="sales_quotation",
-                posting_date_raw=request.form.get("posting_date"
-    ),
-                naming_series_id=request.form.get("naming_series"
-    ) or None,
-    )
-            _total_qty, total = _save_sales_quotation_items(cotizacion.id
-    )
+                posting_date_raw=request.form.get("posting_date"),
+                naming_series_id=request.form.get("naming_series") or None,
+            )
+            _total_qty, total = _save_sales_quotation_items(cotizacion.id)
             cotizacion.total = total
             cotizacion.base_total = total
             cotizacion.grand_total = total
-            database.session.commit(
-    )
-            flash("Cotización creada correctamente.", "success"
-    )
-            return redirect(url_for("ventas.ventas_cotizacion", quotation_id=cotizacion.id
-    )
-    )
+            database.session.commit()
+            flash("Cotización creada correctamente.", "success")
+            return redirect(url_for("ventas.ventas_cotizacion", quotation_id=cotizacion.id))
         except IdentifierConfigurationError as exc:
-            database.session.rollback(
-    )
-            flash(str(exc
-    ), "danger"
-    )
-        transaction_config = {
-        "items": items_disponibles if "items_disponibles" in locals(
-    ) else [],
-        "uoms": uoms_disponibles if "uoms_disponibles" in locals(
-    ) else [],
-        "columns": get_column_preferences(current_user.id, "sales.sales_quotation"
-    ),
-    }
+            database.session.rollback()
+            flash(str(exc), "danger")
     return render_template(
         "ventas/cotizacion_nuevo.html",
         form=formulario,
@@ -833,6 +751,7 @@ def ventas_cotizacion_nueva(
         from_request_id=from_request_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 

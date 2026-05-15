@@ -135,6 +135,7 @@ def compras_solicitud_compra_nueva():
     formulario = FormularioSolicitudCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
     from cacao_accounting.form_preferences import get_column_preferences
+
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -231,16 +232,6 @@ def compras_solicitud_compra_cancel(request_id: str):
     database.session.commit()
     flash("Solicitud de compra cancelada.", "warning")
     return redirect(url_for("compras.compras_solicitud_compra", request_id=request_id))
-@modulo_activo("purchases")
-@login_required
-def compras_solicitud_compra(request_id: str):
-    """Detalle de solicitud de compra."""
-    registro = database.session.get(PurchaseRequest, request_id)
-    if not registro:
-        abort(404)
-    items = database.session.execute(database.select(PurchaseRequestItem).filter_by(purchase_request_id=request_id)).all()
-    titulo = (registro.document_no or request_id) + " - " + APPNAME
-    return render_template("compras/solicitud_compra.html", registro=registro, items=items, titulo=titulo)
 
 
 @compras.route("/supplier-quotation/list")
@@ -268,7 +259,7 @@ def compras_cotizacion_proveedor_nueva():
 
     formulario = FormularioCotizacionProveedor()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
-    from cacao_accounting.form_preferences import get_column_preferences
+
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -546,7 +537,7 @@ def compras_proveedor_nuevo():
     formulario = FormularioProveedor()
     titulo = "Nuevo Proveedor - " + APPNAME
     company_choices = obtener_lista_entidades_por_id_razonsocial()
-    from cacao_accounting.form_preferences import get_column_preferences
+
     selected_company = request.values.get("company") or (company_choices[0][0] if company_choices else None)
     company_settings = build_party_company_settings("supplier", selected_company) if selected_company else None
     if request.method == "POST":
@@ -830,6 +821,7 @@ def compras_orden_compra_nuevo():
     formulario = FormularioOrdenCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
     from cacao_accounting.form_preferences import get_column_preferences
+
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -929,7 +921,7 @@ def compras_solicitud_cotizacion_nueva():
 
     formulario = FormularioSolicitudCotizacion()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
-    from cacao_accounting.form_preferences import get_column_preferences
+
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -1050,6 +1042,7 @@ def compras_recepcion_nuevo():
     formulario = FormularioRecepcionCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
     from cacao_accounting.form_preferences import get_column_preferences
+
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )
@@ -1184,6 +1177,7 @@ def compras_factura_compra_nuevo():
     formulario = FormularioFacturaCompra()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
     from cacao_accounting.form_preferences import get_column_preferences
+
     selected_company = request.values.get("company") or (
         formulario.company.choices[0][0] if formulario.company.choices else None
     )

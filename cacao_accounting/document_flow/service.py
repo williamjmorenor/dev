@@ -340,7 +340,7 @@ def create_document_relation(
     if source_item_id:
         available = pending_qty(source_key, source_id, source_item_id, target_key)
         if qty_decimal > available:
-             raise DocumentFlowError("La cantidad relacionada excede el pendiente disponible.", 409)
+            raise DocumentFlowError("La cantidad relacionada excede el pendiente disponible.", 409)
 
     flow = get_flow(source_key, target_key)
     relation = DocumentRelation(
