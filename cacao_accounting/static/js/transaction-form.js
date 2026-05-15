@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: 2025 - 2026 William Jose MORENO Reyes
 
 (function () {
+  var uidCounter = 0;
+
   function createUid() {
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
-    return Math.random().toString(36).substring(2, 10);
+    uidCounter += 1;
+    return 'transaction-line-' + Date.now() + '-' + uidCounter;
   }
 
   function toNumber(value) {
@@ -16,14 +19,17 @@
   function normalizeAllowedUoms(source, fallback) {
     var values = Array.isArray(source) ? source.slice() : [];
     if (!values.length && fallback) values = [fallback];
+    var seen = new Set();
     return values
       .map(function (value) {
         if (!value) return '';
         if (typeof value === 'object') return value.code || value.value || value.id || '';
         return String(value);
       })
-      .filter(function (value, index, array) {
-        return value && array.indexOf(value) === index;
+      .filter(function (value) {
+        if (!value || seen.has(value)) return false;
+        seen.add(value);
+        return true;
       });
   }
 
