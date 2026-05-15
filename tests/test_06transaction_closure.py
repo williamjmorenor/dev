@@ -310,7 +310,7 @@ def test_payment_references_reject_duplicate_and_negative_allocations(app_ctx):
     database.session.rollback()
 
 
-def test_payment_cancel_reverts_document_relations_and_outstanding(app_ctx, monkeypatch):
+def test_payment_cancellation_reverts_relations(app_ctx, monkeypatch):
     """Cancelar un pago libera las referencias y restaura el saldo pendiente."""
 
     from cacao_accounting.bancos import bancos_pago_cancel, _save_payment_references
