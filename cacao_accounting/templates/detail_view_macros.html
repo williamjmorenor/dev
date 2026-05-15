@@ -206,7 +206,7 @@
 </div>
 
 <script>
-  (function () {
+  document.addEventListener('DOMContentLoaded', function () {
     var rows = Array.prototype.slice.call(document.querySelectorAll('.journal-line-row'));
     if (!rows.length) return;
 
@@ -272,6 +272,6 @@
     });
 
     setActiveRow(rows[0]);
-  })();
+  });
 </script>
 {% endmacro %}

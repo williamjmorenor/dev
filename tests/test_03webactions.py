@@ -1,6 +1,7 @@
 import pytest
 import os
 import sys
+from html import unescape
 
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 
@@ -403,14 +404,14 @@ def test_transaction_forms_render_unified_grid_and_detail_text(request):
                     "/inventory/stock-entry/new",
                 ]:
                     response = client.get(url)
-                    html = response.get_data(as_text=True)
+                    html = unescape(response.get_data(as_text=True))
 
                     assert response.status_code == 200
-                    assert "column.field === &#39;item_code&#39;" in html or "column.field === 'item_code'" in html
-                    assert "column.field === &#39;item_name&#39;" in html or "column.field === 'item_name'" in html
-                    assert "column.field === &#39;uom&#39;" in html or "column.field === 'uom'" in html
-                    assert "column.field === &#39;rate&#39;" in html or "column.field === 'rate'" in html
-                    assert "column.field === &#39;amount&#39;" in html or "column.field === 'amount'" in html
+                    assert "column.field === 'item_code'" in html
+                    assert "column.field === 'item_name'" in html
+                    assert "column.field === 'uom'" in html
+                    assert "column.field === 'rate'" in html
+                    assert "column.field === 'amount'" in html
                     assert "Detalle de línea" in html
 
                 for url in [
