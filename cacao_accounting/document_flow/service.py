@@ -487,7 +487,12 @@ def _state_payload(state: Any) -> dict[str, Any]:
     }
 
 
-def list_source_documents(target_type: str, company: str | None = None) -> list[dict[str, Any]]:
+def list_source_documents(
+    target_type: str,
+    company: str | None = None,
+    party_type: str | None = None,
+    party_id: str | None = None,
+) -> list[dict[str, Any]]:
     """Lista documentos fuente aprobados con saldo para un destino."""
     target_key = normalize_doctype(target_type)
     sources = sorted(source for source, target in ALLOWED_FLOWS if target == target_key)
@@ -497,6 +502,11 @@ def list_source_documents(target_type: str, company: str | None = None) -> list[
         query = database.select(spec.header_model).filter_by(docstatus=1)
         if company and hasattr(spec.header_model, "company"):
             query = query.filter_by(company=company)
+        if party_id:
+            if hasattr(spec.header_model, "customer_id") and party_type == "customer":
+                query = query.filter_by(customer_id=party_id)
+            elif hasattr(spec.header_model, "supplier_id") and party_type == "supplier":
+                query = query.filter_by(supplier_id=party_id)
         for document in database.session.execute(query).scalars().all():
             items = get_source_items(source_key, document.id, target_key)
             if items:

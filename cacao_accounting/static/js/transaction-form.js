@@ -109,10 +109,25 @@
         viewKey: config.viewKey || 'draft',
         preferences: { columns: normalizeColumns(effectivePreferences.columns, messages) },
         messages: messages,
-        header: config.initialHeader || {},
+        header: Object.assign({
+          company: '',
+          naming_series: '',
+          currency: '',
+          posting_date: new Date().toISOString().slice(0, 10),
+          party_type: '',
+          party: '',
+          party_label: '',
+          source_id: ''
+        }, config.initialHeader || {}),
         availableItems: normalizeItems(config.items),
         availableUoms: Array.isArray(config.uoms) ? config.uoms.slice() : [],
         availableWarehouses: Array.isArray(config.warehouses) ? config.warehouses.slice() : [],
+        availableSourceTypes: Array.isArray(config.availableSourceTypes) ? config.availableSourceTypes : [],
+        searchCriteria: {
+          source_type: ''
+        },
+        autofillStep: 1,
+        sourceDocuments: [],
         lines: [],
         sourceItems: [],
         loadingSource: false,
@@ -269,8 +284,61 @@
         },
 
         fetchSource: function (apiUrl) {
+          if (apiUrl) {
+            this.loadingSource = true;
+            this.autofillStep = 2;
+            fetch(apiUrl, { credentials: 'same-origin' })
+              .then(function (response) { return response.json(); })
+              .then(function (data) {
+                this.sourceItems = (data.items || []).map(function (item) {
+                  return Object.assign({ selected: true }, item);
+                });
+                this.loadingSource = false;
+              }.bind(this))
+              .catch(function () {
+                this.loadingSource = false;
+              }.bind(this));
+          } else {
+            this.autofillStep = 1;
+            this.fetchSourceDocuments();
+          }
+        },
+
+        fetchSourceDocuments: function () {
+          var params = new URLSearchParams();
+          params.append('target_type', this.formKey.split('.')[1]);
+          params.append('company', this.header.company);
+          params.append('party_type', this.header.party_type);
+          params.append('party_id', this.header.party);
+
           this.loadingSource = true;
-          fetch(apiUrl, { credentials: 'same-origin' })
+          fetch('/api/document-flow/source-documents?' + params.toString(), { credentials: 'same-origin' })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+              var sourceType = this.searchCriteria.source_type;
+              this.sourceDocuments = (data.source_documents || [])
+                .filter(function (doc) { return !sourceType || doc.source_type === sourceType; })
+                .map(function (doc) { return Object.assign({ selected: false }, doc); });
+              this.loadingSource = false;
+            }.bind(this))
+            .catch(function () {
+              this.loadingSource = false;
+            }.bind(this));
+        },
+
+        fetchSourceItems: function () {
+          var selectedIds = this.sourceDocuments.filter(function (d) { return d.selected; }).map(function (d) { return d.source_id; });
+          if (!selectedIds.length) return;
+
+          var params = new URLSearchParams();
+          params.append('source_type', this.searchCriteria.source_type);
+          params.append('target_type', this.formKey.split('.')[1]);
+          params.append('company', this.header.company);
+          selectedIds.forEach(function (id) { params.append('source_id', id); });
+
+          this.loadingSource = true;
+          this.autofillStep = 2;
+          fetch('/api/document-flow/pending-lines?' + params.toString(), { credentials: 'same-origin' })
             .then(function (response) { return response.json(); })
             .then(function (data) {
               this.sourceItems = (data.items || []).map(function (item) {
@@ -306,6 +374,7 @@
             line.rate = toNumber(item.rate || 0);
             line.source_type = item.source_type || '';
             line.source_id = item.source_id || '';
+            line.source_document_no = item.source_document_no || '';
             line.source_item_id = item.source_item_id || '';
             self.syncLineFromItem(line, false);
             self.calcAmount(line);

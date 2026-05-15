@@ -211,9 +211,7 @@ DOCUMENT_TYPES: dict[str, DocumentType] = {
         ),
         create_actions=(
             DocumentAction("Crear Pago", "payment_entry", "bancos.bancos_pago_nuevo", "from_purchase_invoice"),
-            DocumentAction(
-                "Crear Nota de Crédito", "purchase_invoice", COMPRAS_COMPRAS_FACTURA_COMPRA_NUEVO, "from_invoice"
-            ),
+            DocumentAction("Crear Nota de Crédito", "purchase_invoice", COMPRAS_COMPRAS_FACTURA_COMPRA_NUEVO, "from_invoice"),
         ),
     ),
     "sales_order": DocumentType(

@@ -4,7 +4,53 @@
 </script>
 {% endmacro %}
 
-{% macro transaction_form_header(title, status_label='Borrador', cancel_url=None, submit_label=None) %}
+{% macro smart_select(doctype, name, label, initial_value='', initial_label='', filters={}, filter_sources=[], required=False, min_chars=1, preload=False, required_filters=[], auto_select_default=False, x_model=None, on_select=None) %}
+<div class="ca-smart-select" x-data='smartSelect({
+    doctype: "{{ doctype }}",
+    name: "{{ name }}",
+    minChars: {{ min_chars }},
+    preload: {{ "true" if preload else "false" }},
+    filters: {{ filters | tojson }},
+    filterSources: {{ filter_sources | tojson }},
+    requiredFilters: {{ required_filters | tojson }},
+    autoSelectDefault: {{ "true" if auto_select_default else "false" }},
+    initialValue: {{ initial_value | tojson }},
+    initialLabel: {{ initial_label | tojson }},
+    onSelect: {{ on_select if on_select else "null" }},
+    messages: {
+      placeholder: "{{ _('Buscar') }} {{ label }}",
+      loading: "{{ _('Buscando...') }}",
+      noResults: "{{ _('Sin resultados') }}",
+      minChars: "{{ _('Escriba para buscar') }}",
+      clear: "{{ _('Limpiar') }}",
+      invalid: "{{ _('Seleccione una opción válida') }}",
+      error: "{{ _('No se pudo buscar') }}"
+    }
+  })'
+  {% if x_model %}x-effect="{{ x_model }} = selectedValue"{% endif %}
+>
+  <input type="hidden" id="{{ name }}" name="{{ name }}" x-model="selectedValue" @change="$dispatch('input')">
+  <div class="ca-smart-select-input-wrap">
+    <input class="form-control ca-smart-select-input" type="text" x-model="search" @input="onInput"
+      @focus="onFocus" @blur="closeSoon" placeholder="{{ _('Buscar') }} {{ label }}" {% if required %}required{% endif %}>
+    <button class="ca-smart-select-clear" type="button" x-show="selectedValue" @click="clearSelection"
+      title="{{ _('Limpiar') }}">×</button>
+  </div>
+  <div class="ca-smart-select-menu" x-show="open" x-cloak>
+    <div class="ca-smart-select-state" x-show="loading" x-text="messages.loading"></div>
+    <template x-for="option in options" :key="option.value">
+      <button class="ca-smart-select-option" type="button" @mousedown.prevent="selectOption(option)">
+        <span x-text="option.display_name"></span>
+      </button>
+    </template>
+    <div class="ca-smart-select-state" x-show="!loading && !options.length && search.length >= minChars"
+      x-text="messages.noResults"></div>
+    <div class="ca-smart-select-state text-danger" x-show="error" x-text="error"></div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro transaction_form_header(title, status_label='Borrador', cancel_url=None, submit_label=None, doctype=None) %}
 <style>
   .ca-journal-toolbar {
     align-items: center;
@@ -79,6 +125,49 @@
     </button>
   </div>
 </div>
+
+<div class="ca-card p-3 mb-3">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label" for="company">{{ _('Compañía') }} <span class="text-danger">*</span></label>
+      {{ smart_select(
+          doctype="company",
+          name="company",
+          label=_("Compañía"),
+          preload=True,
+          required=True,
+          x_model="header.company",
+          on_select="function(opt){ document.dispatchEvent(new CustomEvent('company-selected', {detail: opt})); }"
+      ) }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="naming_series">{{ _('Secuencia') }}</label>
+      {{ smart_select(
+          doctype="naming_series",
+          name="naming_series",
+          label=_("Secuencia"),
+          filters={"company": {"selector": "#company"}},
+          filter_sources=["#company"],
+          required_filters=["company"],
+          auto_select_default=True,
+          x_model="header.naming_series"
+      ) }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="currency">{{ _('Moneda') }}</label>
+      {{ smart_select(
+          doctype="currency",
+          name="currency",
+          label=_("Moneda"),
+          x_model="header.currency"
+      ) }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="posting_date">{{ _('Fecha') }} <span class="text-danger">*</span></label>
+      <input type="date" class="form-control" id="posting_date" name="posting_date" x-model="header.posting_date" required>
+    </div>
+  </div>
+</div>
 {% endmacro %}
 
 {% macro transaction_grid(items_disponibles, uoms_disponibles, source_api_url=None, source_label='', warehouses_disponibles=None, title='Líneas de detalle') %}
@@ -116,13 +205,46 @@
             <template x-for="column in visibleColumns" :key="column.field">
               <td>
                 <template x-if="column.field === 'item_code'">
-                  <select :name="'item_code_' + index" x-model="line.item_code" class="form-select form-select-sm"
-                    @change="onItemChange(line)">
-                    <option value="">{{ _('Seleccione') }}</option>
-                    {% for item in items_disponibles %}
-                    <option value="{{ item.code }}">{{ item.code }} — {{ item.name }}</option>
-                    {% endfor %}
-                  </select>
+                  <div class="ca-smart-select" x-data='smartSelect({
+                      doctype: "item",
+                      name: "item_code_" + index,
+                      minChars: 1,
+                      initialValue: line.item_code,
+                      initialLabel: line.item_code,
+                      onSelect: function(opt) {
+                        line.item_code = opt.value || opt.id || "";
+                        line.item_name = opt.display_name || opt.label || "";
+                        onItemChange(line);
+                      },
+                      messages: {
+                        placeholder: "{{ _('Buscar item') }}",
+                        loading: "{{ _('Buscando...') }}",
+                        noResults: "{{ _('Sin resultados') }}",
+                        minChars: "{{ _('Escriba para buscar') }}",
+                        clear: "{{ _('Limpiar') }}",
+                        invalid: "{{ _('Seleccione una opción válida') }}",
+                        error: "{{ _('No se pudo buscar') }}"
+                      }
+                    })'>
+                    <input type="hidden" :name="'item_code_' + index" x-model="selectedValue" @change="$dispatch('input')">
+                    <div class="ca-smart-select-input-wrap">
+                      <input class="form-control form-control-sm ca-smart-select-input" type="text" x-model="search" @input="onInput"
+                        @focus="onFocus" @blur="closeSoon" :placeholder="column.label">
+                      <button class="ca-smart-select-clear" type="button" x-show="selectedValue" @click="clearSelection"
+                        title="{{ _('Limpiar') }}">×</button>
+                    </div>
+                    <div class="ca-smart-select-menu" x-show="open" x-cloak>
+                      <div class="ca-smart-select-state" x-show="loading" x-text="messages.loading"></div>
+                      <template x-for="option in options" :key="option.value">
+                        <button class="ca-smart-select-option" type="button" @mousedown.prevent="selectOption(option)">
+                          <span x-text="option.display_name"></span>
+                        </button>
+                      </template>
+                      <div class="ca-smart-select-state" x-show="!loading && !options.length && search.length >= minChars"
+                        x-text="messages.noResults"></div>
+                      <div class="ca-smart-select-state text-danger" x-show="error" x-text="error"></div>
+                    </div>
+                  </div>
                 </template>
                 <template x-if="column.field === 'item_name'">
                   <input class="form-control form-control-sm" type="text" :name="'item_name_' + index" x-model="line.item_name">
@@ -194,51 +316,117 @@
 
 {% if source_api_url %}
 <div class="modal fade" id="modalAutofill" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
-          <i class="bi bi-table me-2"></i>{{ _('Actualizar Elementos desde') }} {{ _(source_label) }}
+          <i class="bi bi-table me-2"></i>{{ _('Actualizar Elementos') }}
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ _('Cerrar') }}"></button>
       </div>
       <div class="modal-body">
-        <div x-show="loadingSource" class="text-center py-3">
-          <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-          {{ _('Cargando elementos...') }}
-        </div>
-        <div x-show="!loadingSource">
-          <table class="table table-sm ca-table">
-            <thead>
-              <tr>
-                <th style="width:5%"><input type="checkbox" @change="sourceItems.forEach(i => i.selected = $event.target.checked)"></th>
-                <th>{{ _('Código') }}</th>
-                <th>{{ _('Descripción') }}</th>
-                <th>{{ _('Pendiente') }}</th>
-                <th>{{ _('Traer') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="(si, idx) in sourceItems" :key="idx">
+        {# --- Step 1: Search and Select Documents --- #}
+        <div x-show="autofillStep === 1">
+          <div class="row g-2 mb-3">
+            <div class="col-md-5">
+              <label class="form-label small">{{ _('Tipo de Documento Origen') }}</label>
+              <select class="form-select form-select-sm" x-model="searchCriteria.source_type" @change="fetchSourceDocuments()">
+                <option value="">{{ _('Seleccione') }}</option>
+                <template x-for="dt in availableSourceTypes" :key="dt.value">
+                   <option :value="dt.value" x-text="dt.label"></option>
+                </template>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small">{{ _('Tercero') }}</label>
+              <input type="text" class="form-control form-control-sm" :value="header.party_label || header.party" readonly>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="button" class="btn btn-sm btn-outline-secondary w-100" @click="fetchSourceDocuments()">
+                <i class="bi bi-arrow-clockwise me-1"></i>{{ _('Refrescar') }}
+              </button>
+            </div>
+          </div>
+
+          <div x-show="loadingSource" class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            {{ _('Buscando documentos...') }}
+          </div>
+
+          <div x-show="!loadingSource">
+            <table class="table table-sm ca-table">
+              <thead>
                 <tr>
-                  <td><input type="checkbox" x-model="si.selected"></td>
-                  <td x-text="si.item_code"></td>
-                  <td x-text="si.item_name"></td>
-                  <td x-text="Number(si.pending_qty || si.qty || 0).toFixed(4)"></td>
-                  <td>
-                    <input type="number" x-model.number="si.qty" min="0.0001"
-                           :max="si.pending_qty || si.qty" step="0.0001"
-                           class="form-control form-control-sm" style="width:90px">
-                  </td>
+                  <th style="width:5%"><input type="checkbox" @change="sourceDocuments.forEach(d => d.selected = $event.target.checked)"></th>
+                  <th>{{ _('No. Documento') }}</th>
+                  <th>{{ _('Fecha') }}</th>
+                  <th>{{ _('Líneas Pendientes') }}</th>
                 </tr>
-              </template>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                <template x-for="doc in sourceDocuments" :key="doc.source_id">
+                  <tr>
+                    <td><input type="checkbox" x-model="doc.selected"></td>
+                    <td x-text="doc.document_no"></td>
+                    <td x-text="doc.posting_date"></td>
+                    <td x-text="doc.pending_lines"></td>
+                  </tr>
+                </template>
+                <tr x-show="!sourceDocuments.length">
+                   <td colspan="4" class="text-center text-muted py-3">{{ _('No se encontraron documentos pendientes.') }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {# --- Step 2: Select Items from Documents --- #}
+        <div x-show="autofillStep === 2">
+          <div x-show="loadingSource" class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            {{ _('Cargando elementos...') }}
+          </div>
+          <div x-show="!loadingSource">
+            <table class="table table-sm ca-table">
+              <thead>
+                <tr>
+                  <th style="width:5%"><input type="checkbox" @change="sourceItems.forEach(i => i.selected = $event.target.checked)"></th>
+                  <th>{{ _('Documento') }}</th>
+                  <th>{{ _('Código') }}</th>
+                  <th>{{ _('Descripción') }}</th>
+                  <th>{{ _('Pendiente') }}</th>
+                  <th>{{ _('Traer') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(si, idx) in sourceItems" :key="idx">
+                  <tr>
+                    <td><input type="checkbox" x-model="si.selected"></td>
+                    <td class="small" x-text="si.source_document_no"></td>
+                    <td x-text="si.item_code"></td>
+                    <td x-text="si.item_name"></td>
+                    <td x-text="Number(si.pending_qty || si.qty || 0).toFixed(4)"></td>
+                    <td>
+                      <input type="number" x-model.number="si.qty" min="0.0001"
+                             :max="si.pending_qty || si.qty" step="0.0001"
+                             class="form-control form-control-sm" style="width:90px">
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancelar') }}</button>
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="applySource()">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{{ _('Cancelar') }}</button>
+        <button type="button" class="btn btn-sm btn-primary" x-show="autofillStep === 1" :disabled="!sourceDocuments.some(d => d.selected)" @click="fetchSourceItems()">
+          {{ _('Siguiente') }} <i class="bi bi-arrow-right ms-1"></i>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-primary" x-show="autofillStep === 2" @click="autofillStep = 1">
+          <i class="bi bi-arrow-left me-1"></i> {{ _('Atrás') }}
+        </button>
+        <button type="button" class="btn btn-sm btn-primary" x-show="autofillStep === 2" data-bs-dismiss="modal" @click="applySource()">
           <i class="bi bi-arrow-repeat me-1"></i>{{ _('Actualizar') }}
         </button>
       </div>
@@ -258,19 +446,47 @@
         <div class="ca-transaction-detail-grid">
           <div>
             <label class="form-label">{{ _('Cuenta') }}</label>
-            <input class="form-control" type="text" x-model="modalLine.account">
+            {{ smart_select(
+                doctype="account",
+                name="modal_account",
+                label=_("Cuenta"),
+                filters={"company": {"selector": "#company"}},
+                filter_sources=["#company"],
+                x_model="modalLine.account"
+            ) }}
           </div>
           <div>
             <label class="form-label">{{ _('Centro de costos') }}</label>
-            <input class="form-control" type="text" x-model="modalLine.cost_center">
+            {{ smart_select(
+                doctype="cost_center",
+                name="modal_cost_center",
+                label=_("Centro de costos"),
+                filters={"company": {"selector": "#company"}},
+                filter_sources=["#company"],
+                x_model="modalLine.cost_center"
+            ) }}
           </div>
           <div>
             <label class="form-label">{{ _('Unidad de negocio') }}</label>
-            <input class="form-control" type="text" x-model="modalLine.unit">
+            {{ smart_select(
+                doctype="unit",
+                name="modal_unit",
+                label=_("Unidad de negocio"),
+                filters={"company": {"selector": "#company"}},
+                filter_sources=["#company"],
+                x_model="modalLine.unit"
+            ) }}
           </div>
           <div>
             <label class="form-label">{{ _('Proyecto') }}</label>
-            <input class="form-control" type="text" x-model="modalLine.project">
+            {{ smart_select(
+                doctype="project",
+                name="modal_project",
+                label=_("Proyecto"),
+                filters={"company": {"selector": "#company"}},
+                filter_sources=["#company"],
+                x_model="modalLine.project"
+            ) }}
           </div>
           {% if warehouses_disponibles %}
           <div>
@@ -286,7 +502,7 @@
           <div>
             <label class="form-label">{{ _('Trazabilidad') }}</label>
             <input class="form-control" type="text"
-              :value="[modalLine.source_type, modalLine.source_id, modalLine.source_item_id].filter(Boolean).join(' / ')"
+              :value="[modalLine.source_type, modalLine.source_document_no || modalLine.source_id, modalLine.source_item_id].filter(Boolean).join(' / ')"
               readonly>
           </div>
         </div>

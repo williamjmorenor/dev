@@ -244,24 +244,24 @@ def inventario_ajuste_positivo_lista():
     )
 
 
-@inventario.route("/stock-entry/adjustment-negative/list")
+@inventario.route("/stock-entry/inventory-issue/list")
 @modulo_activo("inventory")
 @login_required
-def inventario_ajuste_negativo_lista():
-    """Listado de ajustes negativos de inventario."""
+def inventario_salida_inventario_lista():
+    """Listado de salidas de inventario (incluyendo ajustes negativos)."""
     consulta = database.paginate(
         database.select(StockEntry).filter_by(purpose="adjustment_negative"),
         page=request.args.get("page", default=1, type=int),
         max_per_page=10,
         count=True,
     )
-    titulo = "Listado de Ajustes Negativos - " + APPNAME
+    titulo = "Listado de Salidas de Inventario - " + APPNAME
     return render_template(
         INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
-        vista="inventario.inventario_ajuste_negativo_lista",
-        new_url=url_for("inventario.inventario_ajuste_negativo_nuevo"),
+        vista="inventario.inventario_salida_inventario_lista",
+        new_url=url_for("inventario.inventario_salida_inventario_nuevo"),
     )
 
 
@@ -455,7 +455,7 @@ def _save_stock_entry_items(entry: StockEntry) -> Decimal:
 @inventario.route("/stock-entry/adjustment/new", methods=["GET", "POST"])
 @inventario.route("/stock-entry/reconciliation/new", methods=["GET", "POST"])
 @inventario.route("/stock-entry/adjustment-positive/new", methods=["GET", "POST"])
-@inventario.route("/stock-entry/adjustment-negative/new", methods=["GET", "POST"])
+@inventario.route("/stock-entry/inventory-issue/new", methods=["GET", "POST"])
 @modulo_activo("inventory")
 @login_required
 def inventario_entrada_nuevo():
@@ -490,6 +490,10 @@ def inventario_entrada_nuevo():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "inventory.stock_entry"),
+        "availableSourceTypes": [
+            {"value": "purchase_receipt", "label": _("Recepción de Compra")},
+            {"value": "delivery_note", "label": _("Nota de Entrega")},
+        ],
     }
     if request.method == "POST":
         try:
@@ -543,7 +547,7 @@ def _infer_stock_entry_purpose(path: str) -> str | None:
         return "stock_reconciliation"
     if path.endswith("/adjustment-positive/new"):
         return "adjustment_positive"
-    if path.endswith("/adjustment-negative/new"):
+    if path.endswith("/inventory-issue/new"):
         return "adjustment_negative"
     return None
 
@@ -586,11 +590,11 @@ def inventario_ajuste_positivo_nuevo():
     return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="adjustment_positive"))
 
 
-@inventario.route("/stock-entry/adjustment-negative/new-shortcut")
+@inventario.route("/stock-entry/inventory-issue/new-shortcut")
 @modulo_activo("inventory")
 @login_required
-def inventario_ajuste_negativo_nuevo():
-    """Alias para crear ajuste negativo."""
+def inventario_salida_inventario_nuevo():
+    """Alias para crear salida de inventario."""
     return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="adjustment_negative"))
 
 

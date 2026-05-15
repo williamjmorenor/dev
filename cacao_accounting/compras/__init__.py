@@ -159,6 +159,7 @@ def compras_solicitud_compra_nueva():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_request"),
+        "availableSourceTypes": [],
     }
     if request.method == "POST":
         try:
@@ -292,6 +293,7 @@ def compras_cotizacion_proveedor_nueva():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.supplier_quotation"),
+        "availableSourceTypes": [{"value": "request_for_quotation", "label": _("Solicitud de Cotización")}],
     }
     if request.method == "POST":
         try:
@@ -894,6 +896,10 @@ def compras_orden_compra_nuevo():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_order"),
+        "availableSourceTypes": [
+            {"value": "purchase_request", "label": _("Solicitud de Compra")},
+            {"value": "supplier_quotation", "label": _("Cotización de Proveedor")},
+        ],
     }
     return render_template(
         "compras/orden_compra_nuevo.html",
@@ -967,6 +973,7 @@ def compras_solicitud_cotizacion_nueva():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_quotation"),
+        "availableSourceTypes": [{"value": "purchase_request", "label": _("Solicitud de Compra")}],
     }
     if request.method == "POST":
         try:
@@ -1102,6 +1109,7 @@ def compras_recepcion_nuevo():
         "uoms": uoms_disponibles,
         "warehouses": bodegas_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_receipt"),
+        "availableSourceTypes": [{"value": "purchase_order", "label": _("Orden de Compra")}],
     }
     if request.method == "POST":
         try:
@@ -1252,6 +1260,11 @@ def compras_factura_compra_nuevo():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_invoice"),
+        "availableSourceTypes": [
+            {"value": "purchase_order", "label": _("Orden de Compra")},
+            {"value": "purchase_receipt", "label": _("Recepción de Compra")},
+            {"value": "purchase_invoice", "label": _("Factura de Compra")},
+        ],
     }
     if request.method == "POST":
         try:

@@ -5,14 +5,20 @@
 <form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
   {{ form.csrf_token }}
   {{ tf_macros.transaction_form_header("Pedido de Venta") }}
-  <div class="ca-card">
-    <div class="row g-3 p-3">
+  <div class="ca-card p-3 mb-3">
+    <div class="row g-3">
       <div class="col-md-6">
-        <div class="mb-3">{{ form.customer_id.label(class="form-label") }}{{ form.customer_id(class="form-select") }}</div>
-      </div>
-      <div class="col-md-6">
-        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
-        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control", type="date") }}</div>
+        <label class="form-label" for="customer_id">{{ _('Cliente') }} <span class="text-danger">*</span></label>
+        {{ tf_macros.smart_select(
+            doctype="party",
+            name="customer_id",
+            label=_("Cliente"),
+            filters={"party_type": "customer", "company": {"selector": "#company"}},
+            filter_sources=["#company"],
+            required_filters=["company"],
+            x_model="header.party",
+            on_select="function(opt){ header.party_label = opt.display_name; }"
+        ) }}
       </div>
     </div>
   </div>

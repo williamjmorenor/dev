@@ -20,38 +20,31 @@
   {{ form.csrf_token }}
   {% if from_order_id %}<input type="hidden" name="from_order" value="{{ from_order_id }}">{% endif %}
   {{ tf_macros.transaction_form_header("Recepción de Compra", cancel_url=url_for('compras.compras_recepcion_lista')) }}
-  <div class="ca-card">
-    <div class="row g-3 p-3">
+  <div class="ca-card p-3 mb-3">
+    <div class="row g-3">
       <div class="col-md-6">
-        <div class="mb-3">
-          {{ form.supplier_id.label(class="form-label") }}
-          {{ form.supplier_id(class="form-select") }}
-        </div>
-        <div class="mb-3">
-          {{ form.company.label(class="form-label") }}
-          {{ form.company(class="form-select") }}
-        </div>
-        <div class="mb-3">
-          {{ form.naming_series.label(class="form-label") }}
-          {{ form.naming_series(class="form-select") }}
-        </div>
+        <label class="form-label" for="supplier_id">{{ _('Proveedor') }} <span class="text-danger">*</span></label>
+        {{ tf_macros.smart_select(
+            doctype="party",
+            name="supplier_id",
+            label=_("Proveedor"),
+            filters={"party_type": "supplier", "company": {"selector": "#company"}},
+            filter_sources=["#company"],
+            required_filters=["company"],
+            x_model="header.party",
+            on_select="function(opt){ header.party_label = opt.display_name; }"
+        ) }}
       </div>
       <div class="col-md-6">
-        <div class="mb-3">
-          {{ form.posting_date.label(class="form-label") }}
-          {{ form.posting_date(class="form-control", type="date") }}
-        </div>
-        <div class="mb-3">
-          {{ form.remarks.label(class="form-label") }}
-          {{ form.remarks(class="form-control", rows=3) }}
-        </div>
+        <label class="form-label" for="remarks">{{ _('Observaciones') }}</label>
+        <textarea class="form-control" id="remarks" name="remarks" rows="3" x-model="header.remarks"></textarea>
       </div>
     </div>
   </div>
 
   {% if from_order_id %}
     {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles,
-         source_api_url="/api/buying/purchase-order/" ~ from_order_id ~ "/items?target_type=purchase_receipt",
+         source_api_url="/api/document-flow/pending-lines?source_type=purchase_order&target_type=purchase_receipt&source_id=" ~ from_order_id,
          source_label="Orden de Compra",
          warehouses_disponibles=bodegas_disponibles) }}
   {% else %}

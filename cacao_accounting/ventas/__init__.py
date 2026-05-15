@@ -127,6 +127,7 @@ def ventas_pedido_venta_nuevo():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.sales_request"),
+        "availableSourceTypes": [],
     }
     if request.method == "POST":
         try:
@@ -608,6 +609,10 @@ def ventas_orden_venta_nuevo():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.sales_order"),
+        "availableSourceTypes": [
+            {"value": "sales_request", "label": _("Pedido de Venta")},
+            {"value": "sales_quotation", "label": _("Cotización de Venta")},
+        ],
     }
     if request.method == "POST":
         try:
@@ -717,6 +722,7 @@ def ventas_cotizacion_nueva():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.sales_quotation"),
+        "availableSourceTypes": [{"value": "sales_request", "label": _("Pedido de Venta")}],
     }
     if request.method == "POST":
         try:
@@ -878,6 +884,7 @@ def ventas_entrega_nuevo():
         "uoms": uoms_disponibles,
         "warehouses": bodegas_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.delivery_note"),
+        "availableSourceTypes": [{"value": "sales_order", "label": _("Orden de Venta")}],
     }
     if request.method == "POST":
         try:
@@ -1019,6 +1026,11 @@ def ventas_factura_venta_nuevo():
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.sales_invoice"),
+        "availableSourceTypes": [
+            {"value": "sales_order", "label": _("Orden de Venta")},
+            {"value": "delivery_note", "label": _("Nota de Entrega")},
+            {"value": "sales_invoice", "label": _("Factura de Venta")},
+        ],
     }
     if request.method == "POST":
         try:

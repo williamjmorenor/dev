@@ -13,22 +13,18 @@
 <form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
   {{ form.csrf_token }}
   {{ tf_macros.transaction_form_header("Solicitud de Compra") }}
-  <div class="ca-card">
-    <div class="row g-3 p-3">
+  <div class="ca-card p-3 mb-3">
+    <div class="row g-3">
       <div class="col-md-6">
         <div class="mb-3">{{ form.requested_by.label(class="form-label") }}{{ form.requested_by(class="form-control") }}</div>
         <div class="mb-3">{{ form.department.label(class="form-label") }}{{ form.department(class="form-control") }}</div>
       </div>
       <div class="col-md-6">
-        <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
-        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control", type="date") }}</div>
+        <label class="form-label" for="remarks">{{ _('Observaciones') }}</label>
+        <textarea class="form-control" id="remarks" name="remarks" rows="3" x-model="header.remarks"></textarea>
       </div>
     </div>
   </div>
   {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles) }}
-  <div class="ca-card mt-3 p-3">
-     <label class="form-label">{{ _('Concepto') }}</label>
-     {{ form.remarks(class="form-control", rows=2) }}
-  </div>
 </form>
 {% endblock %}

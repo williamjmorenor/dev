@@ -552,9 +552,7 @@ class SeriesSequenceMap(database.Model, BaseTabla):  # type: ignore[name-defined
     """Mapa N:M entre series y secuencias — flexibilidad maxima."""
 
     __tablename__ = "series_sequence_map"
-    naming_series_id = database.Column(
-        database.String(26), database.ForeignKey(NAMING_SERIES_ID), nullable=False, index=True
-    )
+    naming_series_id = database.Column(database.String(26), database.ForeignKey(NAMING_SERIES_ID), nullable=False, index=True)
     sequence_id = database.Column(database.String(26), database.ForeignKey("sequence.id"), nullable=False, index=True)
     priority = database.Column(database.Integer(), default=0, nullable=False)
     # Condicion JSON para seleccion dinamica (banco, metodo de pago, etc.)
@@ -650,9 +648,7 @@ class SeriesExternalCounterMap(database.Model, BaseTabla):  # type: ignore[name-
     """
 
     __tablename__ = "series_external_counter_map"
-    naming_series_id = database.Column(
-        database.String(26), database.ForeignKey(NAMING_SERIES_ID), nullable=False, index=True
-    )
+    naming_series_id = database.Column(database.String(26), database.ForeignKey(NAMING_SERIES_ID), nullable=False, index=True)
     external_counter_id = database.Column(
         database.String(26), database.ForeignKey(EXTERNAL_COUNTER_ID), nullable=False, index=True
     )
@@ -1122,9 +1118,7 @@ class PurchaseReceipt(database.Model, DocBase):  # type: ignore[name-defined]
     __tablename__ = "purchase_receipt"
     supplier_id = database.Column(database.String(26), database.ForeignKey(PARTY_ID), nullable=True, index=True)
     supplier_name = database.Column(database.String(200), nullable=True)
-    purchase_order_id = database.Column(
-        database.String(26), database.ForeignKey(PURCHASE_ORDER_ID), nullable=True, index=True
-    )
+    purchase_order_id = database.Column(database.String(26), database.ForeignKey(PURCHASE_ORDER_ID), nullable=True, index=True)
     is_return = database.Column(database.Boolean(), default=False, nullable=False)
     total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
     grand_total = database.Column(database.Numeric(precision=20, scale=4), nullable=True)
@@ -1161,9 +1155,7 @@ class PurchaseInvoice(database.Model, DocBase):  # type: ignore[name-defined]
     supplier_invoice_no = database.Column(database.String(50), nullable=True)
     document_type = database.Column(database.String(50), nullable=False, default="purchase_invoice")
     is_return = database.Column(database.Boolean(), default=False, nullable=False)
-    purchase_order_id = database.Column(
-        database.String(26), database.ForeignKey(PURCHASE_ORDER_ID), nullable=True, index=True
-    )
+    purchase_order_id = database.Column(database.String(26), database.ForeignKey(PURCHASE_ORDER_ID), nullable=True, index=True)
     purchase_receipt_id = database.Column(
         database.String(26), database.ForeignKey(PURCHASE_RECEIPT_ID), nullable=True, index=True
     )
@@ -1413,9 +1405,7 @@ class BankAccount(database.Model, BaseTabla):  # type: ignore[name-defined]
     currency = database.Column(database.String(10), database.ForeignKey(CURRENCY_CODE), nullable=True)
     gl_account_id = database.Column(database.String(26), database.ForeignKey(ACCOUNT_ID), nullable=True)
     default_naming_series_id = database.Column(database.String(26), database.ForeignKey(NAMING_SERIES_ID), nullable=True)
-    default_external_counter_id = database.Column(
-        database.String(26), database.ForeignKey(EXTERNAL_COUNTER_ID), nullable=True
-    )
+    default_external_counter_id = database.Column(database.String(26), database.ForeignKey(EXTERNAL_COUNTER_ID), nullable=True)
     is_active = database.Column(database.Boolean(), default=True, nullable=False)
 
 

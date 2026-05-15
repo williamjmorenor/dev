@@ -116,6 +116,7 @@ def test_reports_navigation(flask_server, browser):
 
     context.close()
 
+
 @pytest.mark.skipif(not HAS_PLAYWRIGHT, reason="Playwright not installed")
 def test_journal_entry_list_visibility(flask_server, browser):
     context = browser.new_context()
@@ -131,6 +132,7 @@ def test_journal_entry_list_visibility(flask_server, browser):
     expect(page.get_by_role("link", name="Nuevo")).to_be_visible()
 
     context.close()
+
 
 @pytest.mark.skipif(not HAS_PLAYWRIGHT, reason="Playwright not installed")
 def test_rbac_user_restricted_visibility(flask_server, browser):
