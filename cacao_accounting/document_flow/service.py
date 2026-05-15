@@ -176,7 +176,7 @@ def apply_advance_to_invoice(
 def _state_quantities(
     source_type: str,
     source_id: str,
-    source_item_id: str | None,
+    source_item_id: str | None | None,
     target_type: str | None,
 ) -> tuple[Decimal, Decimal]:
     """Obtiene cantidades canceladas/cerradas para una linea si existe estado cacheado."""
@@ -250,7 +250,7 @@ def get_document_flow_items(target_type: str, source_values: list[str]) -> list[
     return items
 
 
-def pending_qty(source_type: str, source_id: str, source_item_id: str | None, target_type: str) -> Decimal:
+def pending_qty(source_type: str, source_id: str, source_item_id: str | None | None, target_type: str) -> Decimal:
     """Calcula la cantidad pendiente para una linea origen hacia un target."""
     source_item = get_document_item(source_type, source_item_id)
     if not source_item:
@@ -270,7 +270,7 @@ def _assert_same_company(source_type: str, source_id: str, target_type: str, tar
         raise DocumentFlowError("El documento origen y destino pertenecen a companias distintas.", 409)
 
 
-def _update_source_cache(source_type: str, source_id: str, source_item_id: str | None, target_type: str) -> None:
+def _update_source_cache(source_type: str, source_id: str, source_item_id: str | None | None, target_type: str) -> None:
     """Actualiza campos cache de consumo cuando existen en la linea origen."""
     source_key = normalize_doctype(source_type)
     target_key = normalize_doctype(target_type)
@@ -403,7 +403,7 @@ def close_line_balance(
     *,
     source_type: str,
     source_id: str,
-    source_item_id: str | None,
+    source_item_id: str | None | None,
     target_type: str,
     qty: Any | None = None,
     reason: str = "",

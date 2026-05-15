@@ -1500,7 +1500,7 @@ class DocumentLineFlowState(database.Model, BaseTabla):  # type: ignore[name-def
     )
     source_type = database.Column(database.String(50), nullable=False, index=True)
     source_id = database.Column(database.String(26), nullable=False, index=True)
-    source_item_id = database.Column(database.String(26), nullable=True, index=True)
+    source_item_id = database.Column(database.String(26), nullable=False, index=True)
     target_type = database.Column(database.String(50), nullable=False, index=True)
     company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=True, index=True)
     source_qty = database.Column(database.Numeric(precision=20, scale=9), nullable=False, default=0)

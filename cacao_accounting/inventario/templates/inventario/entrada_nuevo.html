@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% block contenido %}
-{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/inventario/templates/inventario/entrada_nuevo.html"></div>{% endif %}
 {% import "macros.html" as macros %}
 {% import "transaction_form_macros.html" as tf_macros %}
 <form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
   {{ form.csrf_token }}
-  {{ tf_macros.transaction_form_header("Nueva Entrada de Almacén") }}
+  {{ tf_macros.transaction_form_header("Movimiento de Inventario") }}
   <div class="ca-card">
     <div class="row g-3 p-3">
       <div class="col-md-6">

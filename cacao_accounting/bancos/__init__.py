@@ -1,4 +1,3 @@
-from flask_login import current_user
 from cacao_accounting.form_preferences import get_column_preferences
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
@@ -18,7 +17,7 @@ from typing import cast
 # ---------------------------------------------------------------------------------------
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
@@ -894,7 +893,7 @@ def bancos_pago_nuevo():
         factura_compra_origen=factura_compra_origen,
         factura_venta_origen=factura_venta_origen,
         facturas_origen=facturas_origen,
-        transaction_config=transaction_config,
+            transaction_config=transaction_config,
     )
 
 

@@ -1,12 +1,21 @@
 {% extends "base.html" %}
 {% block contenido %}
-{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/compras/templates/compras/factura_compra_nuevo.html"></div>{% endif %}
 {% import "macros.html" as macros %}
 {% import "transaction_form_macros.html" as tf_macros %}
+{% set source_api_url = url_for('api.api_purchase_receipt_items', receipt_id=from_receipt_id) if from_receipt_id
+                    else url_for('api.api_purchase_order_items', order_id=from_order_id) if from_order_id
+                    else url_for('api.api_purchase_invoice_items', invoice_id=from_invoice_id) if from_invoice_id
+                    else None %}
 <form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
   {{ form.csrf_token }}
-  {{ tf_macros.transaction_form_header("Factura de Compra") }}
-  <div class="ca-card">
+  {{ tf_macros.transaction_form_header(titulo) }}
+
+  <input type="hidden" name="from_order" value="{{ from_order_id or '' }}">
+  <input type="hidden" name="from_receipt" value="{{ from_receipt_id or '' }}">
+  <input type="hidden" name="from_invoice" value="{{ from_invoice_id or '' }}">
+  <input type="hidden" name="document_type" value="{{ document_type }}">
+
+  <div class="ca-card mb-3">
     <div class="row g-3 p-3">
       <div class="col-md-6">
         <div class="mb-3">{{ form.supplier_id.label(class="form-label") }}{{ form.supplier_id(class="form-select") }}</div>
@@ -14,10 +23,10 @@
       </div>
       <div class="col-md-6">
         <div class="mb-3">{{ form.company.label(class="form-label") }}{{ form.company(class="form-select") }}</div>
-        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control", type="date") }}</div>
+        <div class="mb-3">{{ form.posting_date.label(class="form-label") }}{{ form.posting_date(class="form-control") }}</div>
       </div>
     </div>
   </div>
-  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles) }}
+  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles, source_api_url=source_api_url) }}
 </form>
 {% endblock %}

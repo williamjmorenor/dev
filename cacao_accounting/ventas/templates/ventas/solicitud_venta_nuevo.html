@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block contenido %}
-{% if TESTING %}<div data-test_info="La Plantilla fue renderizada correctamente: cacao_accounting/ventas/templates/ventas/solicitud_venta_nuevo.html"></div>{% endif %}
 {% import "macros.html" as macros %}
 {% import "transaction_form_macros.html" as tf_macros %}
 <form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>

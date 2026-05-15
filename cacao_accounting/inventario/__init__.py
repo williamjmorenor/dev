@@ -1,4 +1,3 @@
-from flask_login import current_user
 from cacao_accounting.form_preferences import get_column_preferences
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 - 2026 William José Moreno Reyes
@@ -9,7 +8,7 @@ from cacao_accounting.form_preferences import get_column_preferences
 from decimal import Decimal
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from cacao_accounting.database import Item, StockEntry, StockEntryItem, UOM, Warehouse, database
 from cacao_accounting.database.helpers import get_active_naming_series
@@ -520,7 +519,7 @@ def inventario_entrada_nuevo():
         uoms_disponibles=uoms_disponibles,
         source_api_url=source_api_url,
         source_label=source_label,
-        transaction_config=transaction_config,
+            transaction_config=transaction_config,
     )
 
 
