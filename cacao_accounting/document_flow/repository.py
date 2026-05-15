@@ -54,7 +54,7 @@ def get_item_parent_id(spec: DocumentType, item: Any) -> str:
 def iter_active_relations_for_source(
     source_type: str,
     source_id: str,
-    source_item_id: str | None | None,
+    source_item_id: str | None,
     target_type: str | None = None,
 ) -> list[DocumentRelation]:
     """Devuelve relaciones cuyo target no esta cancelado."""
@@ -81,7 +81,7 @@ def iter_active_relations_for_source(
 def consumed_qty_for_source(
     source_type: str,
     source_id: str,
-    source_item_id: str | None | None,
+    source_item_id: str | None,
     target_type: str | None = None,
 ) -> Decimal:
     """Suma la cantidad consumida por relaciones activas."""
@@ -103,7 +103,7 @@ def save_relation(relation: DocumentRelation) -> DocumentRelation:
 def get_line_flow_state(
     source_type: str,
     source_id: str,
-    source_item_id: str | None | None,
+    source_item_id: str | None,
     target_type: str,
 ) -> DocumentLineFlowState | None:
     """Obtiene el estado cacheado de una linea fuente para un destino."""
@@ -120,7 +120,7 @@ def get_line_flow_state(
 def recompute_line_flow_state(
     source_type: str,
     source_id: str,
-    source_item_id: str | None | None,
+    source_item_id: str | None,
     target_type: str,
     company: str | None = None,
 ) -> DocumentLineFlowState:

@@ -51,7 +51,7 @@ from cacao_accounting.database import (
 )
 from cacao_accounting.database.helpers import get_active_naming_series
 from cacao_accounting.contabilidad.posting import PostingError, cancel_document, post_bank_transaction, submit_document
-from cacao_accounting.document_flow import create_document_relation
+from cacao_accounting.document_flow import create_document_relation, revert_relations_for_target
 from cacao_accounting.document_flow.service import compute_outstanding_amount, refresh_outstanding_amount_cache
 from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
@@ -704,10 +704,17 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
     """Guarda referencias de pago y actualiza saldos vivos de facturas."""
     total_allocated = Decimal("0")
     i = 0
+    seen_references: set[tuple[str, str]] = set()
     while request.form.get(f"reference_id_{i}"):
         reference_type = request.form.get(f"reference_type_{i}", "")
         reference_id = request.form.get(f"reference_id_{i}", "")
         allocated = _form_decimal(f"allocated_amount_{i}", "0")
+        reference_key = (reference_type, reference_id)
+        if reference_key in seen_references:
+            abort(409)
+        seen_references.add(reference_key)
+        if allocated < 0:
+            abort(409)
         if allocated <= 0:
             i += 1
             continue
@@ -944,6 +951,7 @@ def bancos_pago_cancel(payment_id: str):
         abort(400)
     try:
         cancel_document(registro)
+        revert_relations_for_target("payment_entry", registro.id, reason="payment_cancelled")
         references = (
             database.session.execute(database.select(PaymentReference).filter_by(payment_id=registro.id)).scalars().all()
         )

@@ -176,7 +176,7 @@ def apply_advance_to_invoice(
 def _state_quantities(
     source_type: str,
     source_id: str,
-    source_item_id: str | None | None,
+    source_item_id: str | None,
     target_type: str | None,
 ) -> tuple[Decimal, Decimal]:
     """Obtiene cantidades canceladas/cerradas para una linea si existe estado cacheado."""
@@ -250,7 +250,7 @@ def get_document_flow_items(target_type: str, source_values: list[str]) -> list[
     return items
 
 
-def pending_qty(source_type: str, source_id: str, source_item_id: str | None | None, target_type: str) -> Decimal:
+def pending_qty(source_type: str, source_id: str, source_item_id: str | None, target_type: str) -> Decimal:
     """Calcula la cantidad pendiente para una linea origen hacia un target."""
     source_item = get_document_item(source_type, source_item_id)
     if not source_item:
@@ -270,7 +270,7 @@ def _assert_same_company(source_type: str, source_id: str, target_type: str, tar
         raise DocumentFlowError("El documento origen y destino pertenecen a companias distintas.", 409)
 
 
-def _update_source_cache(source_type: str, source_id: str, source_item_id: str | None | None, target_type: str) -> None:
+def _update_source_cache(source_type: str, source_id: str, source_item_id: str | None, target_type: str) -> None:
     """Actualiza campos cache de consumo cuando existen en la linea origen."""
     source_key = normalize_doctype(source_type)
     target_key = normalize_doctype(target_type)
@@ -382,14 +382,15 @@ def revert_relations_for_target(target_type: str, target_id: str, reason: str = 
         relation.reversed_at = now
         relation.reversed_by = _current_user_id()
         relation.reversal_reason = reason
-        recompute_line_flow_state(
-            relation.source_type,
-            relation.source_id,
-            relation.source_item_id,
-            relation.target_type,
-            relation.company,
-        )
-        _update_source_cache(relation.source_type, relation.source_id, relation.source_item_id, relation.target_type)
+        if relation.source_item_id:
+            recompute_line_flow_state(
+                relation.source_type,
+                relation.source_id,
+                relation.source_item_id,
+                relation.target_type,
+                relation.company,
+            )
+            _update_source_cache(relation.source_type, relation.source_id, relation.source_item_id, relation.target_type)
         _audit(
             "document_relation",
             relation.id,
@@ -404,7 +405,7 @@ def close_line_balance(
     *,
     source_type: str,
     source_id: str,
-    source_item_id: str | None | None,
+    source_item_id: str | None,
     target_type: str,
     qty: Any | None = None,
     reason: str = "",
@@ -629,10 +630,12 @@ def _create_payment_target(payload: dict[str, Any]) -> dict[str, Any]:
     payment = PaymentEntry(
         company=company,
         docstatus=0,
+        posting_date=posting_date,
         payment_type=str(payload.get("payment_type") or "receive"),
         party_type=payload.get("party_type"),
         party_id=payload.get("party_id"),
         bank_account_id=payload.get("bank_account_id"),
+        remarks=payload.get("remarks"),
     )
     database.session.add(payment)
     database.session.flush()
@@ -647,28 +650,47 @@ def _create_payment_target(payload: dict[str, Any]) -> dict[str, Any]:
         external_context={"bank_account_id": payment.bank_account_id},
     )
     total = Decimal("0")
+    seen_references: set[tuple[str, str]] = set()
     for selected in payload.get("lines") or []:
         reference_type = normalize_doctype(str(selected.get("source_document_type") or selected.get("source_type") or ""))
         reference_id = str(selected.get("source_document_id") or selected.get("source_id") or "")
+        reference_key = (reference_type, reference_id)
+        if reference_key in seen_references:
+            raise DocumentFlowError("No se puede repetir la misma factura en un solo pago.", 409)
+        seen_references.add(reference_key)
         invoice = get_document(reference_type, reference_id)
         if not invoice:
             raise DocumentFlowError("Factura origen no encontrada.", 404)
         if company and getattr(invoice, "company", None) and getattr(invoice, "company") != company:
             raise DocumentFlowError("No se pueden mezclar companias incompatibles.", 409)
         allocated = decimal_or_zero(selected.get("qty") or selected.get("allocated_amount"))
-        outstanding = decimal_or_zero(getattr(invoice, "outstanding_amount", None) or getattr(invoice, "grand_total", 0))
-        if allocated <= 0 or allocated > outstanding:
+        outstanding = compute_outstanding_amount(invoice)
+        if allocated <= 0:
+            raise DocumentFlowError("El monto aplicado debe ser mayor que cero.", 409)
+        if allocated > outstanding:
             raise DocumentFlowError("El monto aplicado excede el saldo pendiente.", 409)
-        database.session.add(
-            PaymentReference(
-                payment_id=payment.id,
-                reference_type=reference_type,
-                reference_id=reference_id,
-                total_amount=getattr(invoice, "grand_total", None),
-                outstanding_amount=outstanding,
-                allocated_amount=allocated,
-                allocation_date=payment.posting_date,
-            )
+        reference = PaymentReference(
+            payment_id=payment.id,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            total_amount=getattr(invoice, "grand_total", None),
+            outstanding_amount=outstanding,
+            allocated_amount=allocated,
+            allocation_date=payment.posting_date,
+        )
+        database.session.add(reference)
+        database.session.flush()
+        create_document_relation(
+            source_type=reference_type,
+            source_id=reference_id,
+            source_item_id=None,
+            target_type="payment_entry",
+            target_id=payment.id,
+            target_item_id=reference.id,
+            qty=Decimal("1"),
+            uom=None,
+            rate=allocated,
+            amount=allocated,
         )
         setattr(invoice, "outstanding_amount", outstanding - allocated)
         setattr(invoice, "base_outstanding_amount", outstanding - allocated)
