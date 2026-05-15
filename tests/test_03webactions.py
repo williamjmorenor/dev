@@ -1,6 +1,7 @@
 import pytest
 import os
 import sys
+from html import unescape
 
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 
@@ -377,6 +378,53 @@ def test_sales_quotation_routes(request):
                 response = client.get("/sales/quotation/new")
                 assert response.status_code == 200
                 assert "Nueva Cotización" in response.get_data(as_text=True)
+
+
+def test_transaction_forms_render_unified_grid_and_detail_text(request):
+
+    if request.config.getoption("--slow") == "True":
+
+        with app.app_context():
+            from flask_login import current_user
+
+            with app.test_client() as client:
+                client.post("/login", data={"usuario": "cacao", "acceso": "cacao"})
+                assert current_user.is_authenticated
+
+                for url in [
+                    "/buying/request-for-quotation/new",
+                    "/buying/supplier-quotation/new",
+                    "/buying/purchase-order/new",
+                    "/buying/purchase-receipt/new",
+                    "/buying/purchase-invoice/new",
+                    "/sales/quotation/new",
+                    "/sales/sales-order/new",
+                    "/sales/delivery-note/new",
+                    "/sales/sales-invoice/new",
+                    "/inventory/stock-entry/new",
+                ]:
+                    response = client.get(url)
+                    html = unescape(response.get_data(as_text=True))
+
+                    assert response.status_code == 200
+                    assert "column.field === 'item_code'" in html
+                    assert "column.field === 'item_name'" in html
+                    assert "column.field === 'uom'" in html
+                    assert "column.field === 'rate'" in html
+                    assert "column.field === 'amount'" in html
+                    assert "Detalle de línea" in html
+
+                for url in [
+                    "/buying/purchase-order/POR-DEMO-0000001",
+                    "/sales/sales-order/SOV-DEMO-0000001",
+                    "/sales/delivery-note/ENT-DEMO-0000001",
+                ]:
+                    response = client.get(url)
+                    html = response.get_data(as_text=True)
+
+                    assert response.status_code == 200
+                    assert "Detalle de línea seleccionada" in html
+                    assert "Ver detalle" in html
 
                 response = client.get("/sales/request-for-quotation/new")
                 assert response.status_code == 200

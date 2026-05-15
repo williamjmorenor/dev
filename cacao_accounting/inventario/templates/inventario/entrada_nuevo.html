@@ -18,6 +18,6 @@
       </div>
     </div>
   </div>
-  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles) }}
+  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles, source_api_url=source_api_url, source_label=source_label) }}
 </form>
 {% endblock %}

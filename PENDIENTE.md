@@ -27,7 +27,7 @@
 
 ## UI/UX y Reportes
 - [ ] Filtros de búsqueda en listados de Compras, Ventas y Bancos.
-- [ ] Migrar formularios operativos restantes al Smart Select Framework.
+- [ ] Migrar formularios operativos restantes al Smart Select Framework (la grilla unificada ya quedó alineada con el patrón de comprobante).
 - [ ] Implementar árbol gráfico de trazabilidad (Diagrama de Flujo).
 - [ ] Drill-down universal en el 100% de los reportes operativos.
 - [ ] Exportación consistente a Excel con formato financiero en todos los reportes.
