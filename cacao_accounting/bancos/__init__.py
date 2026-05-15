@@ -711,11 +711,11 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
         allocated = _form_decimal(f"allocated_amount_{i}", "0")
         reference_key = (reference_type, reference_id)
         if reference_key in processed_reference_keys:
-            abort(409)
+            abort(409, description=_("No se puede aplicar la misma factura dos veces en un pago."))
         processed_reference_keys.add(reference_key)
         if allocated <= 0:
             if allocated < 0:
-                abort(409)
+                abort(409, description=_("El monto asignado no puede ser negativo."))
             i += 1
             continue
         if reference_type == "purchase_invoice":

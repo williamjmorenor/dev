@@ -383,8 +383,9 @@ def revert_relations_for_target(target_type: str, target_id: str, reason: str = 
         relation.reversed_by = _current_user_id()
         relation.reversal_reason = reason
         if relation.source_item_id:
-            # Las relaciones header-only (por ejemplo factura -> pago) no generan
-            # estado por línea y solo requieren revertir la trazabilidad.
+            # Solo las relaciones con línea fuente requieren recomputar estados
+            # y caches. Las relaciones header-only (por ejemplo factura -> pago)
+            # se revierten únicamente a nivel de trazabilidad.
             recompute_line_flow_state(
                 relation.source_type,
                 relation.source_id,

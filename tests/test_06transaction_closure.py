@@ -270,7 +270,7 @@ def test_payment_references_reject_cross_company_invoice(app_ctx):
 
 
 def test_payment_references_reject_duplicate_and_negative_allocations(app_ctx):
-    """Las referencias de pago no aceptan duplicados ni montos negativos."""
+    """Las referencias de pago rechazan duplicados y montos negativos."""
 
     from cacao_accounting.bancos import _save_payment_references
     from cacao_accounting.database import PaymentEntry, PurchaseInvoice, database
