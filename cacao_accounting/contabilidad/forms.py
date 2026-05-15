@@ -15,16 +15,16 @@ from wtforms import BooleanField, IntegerField, RadioField, SelectField, StringF
 from wtforms.fields import DateField, DecimalField
 from wtforms.validators import DataRequired, InputRequired, Length, NumberRange, Optional
 
-PADDING_DIGITOS = "Padding (digitos)"
-CODIGO = "Código"
-FECHA_INICIO = "Fecha Inicio"
-FECHA_FIN = "Fecha Fin"
-
 # ---------------------------------------------------------------------------------------
 # Recursos locales
 # ---------------------------------------------------------------------------------------
 from cacao_accounting.database import Entity
 from cacao_accounting.setup.forms import CATALOG_CHOICES, COUNTRY_CHOICES, LANGUAGE_CHOICES
+
+PADDING_DIGITOS = "Padding (digitos)"
+CODIGO = "Código"
+FECHA_INICIO = "Fecha Inicio"
+FECHA_FIN = "Fecha Fin"
 
 ACCOUNT_TYPE_CHOICES = [
     ("", "— Seleccione —"),

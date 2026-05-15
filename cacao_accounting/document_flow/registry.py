@@ -6,10 +6,6 @@
 from dataclasses import dataclass
 from typing import Any
 
-COMPRAS_COMPRAS_FACTURA_COMPRA_NUEVO = "compras.compras_factura_compra_nuevo"
-CREAR_FACTURA = "Crear Factura"
-VENTAS_VENTAS_FACTURA_VENTA_NUEVO = "ventas.ventas_factura_venta_nuevo"
-
 from cacao_accounting.database import (
     DeliveryNote,
     DeliveryNoteItem,
@@ -38,6 +34,10 @@ from cacao_accounting.database import (
     SupplierQuotation,
     SupplierQuotationItem,
 )
+
+COMPRAS_COMPRAS_FACTURA_COMPRA_NUEVO = "compras.compras_factura_compra_nuevo"
+CREAR_FACTURA = "Crear Factura"
+VENTAS_VENTAS_FACTURA_VENTA_NUEVO = "ventas.ventas_factura_venta_nuevo"
 
 
 @dataclass(frozen=True)
