@@ -40,9 +40,6 @@
           Nueva Factura de Venta
           {% if orden_origen %}<small class="text-muted ms-2">desde {{ orden_origen.document_no or orden_origen.id }}</small>{% endif %}
           {% if entrega_origen %}<small class="text-muted ms-2">desde {{ entrega_origen.document_no or entrega_origen.id }}</small>{% endif %}
-          {% if from_invoice_id and not document_type in ['sales_credit_note', 'sales_debit_note'] %}
-            <small class="text-muted ms-2">desde {{ factura_origen.document_no or factura_origen.id }}</small>
-          {% endif %}
         {% endif %}
       </h5>
       <div class="d-flex gap-2">

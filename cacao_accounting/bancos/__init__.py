@@ -713,9 +713,9 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
         if reference_key in processed_reference_keys:
             abort(409)
         processed_reference_keys.add(reference_key)
-        if allocated < 0:
-            abort(409)
-        if allocated == 0:
+        if allocated <= 0:
+            if allocated < 0:
+                abort(409)
             i += 1
             continue
         if reference_type == "purchase_invoice":
