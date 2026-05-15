@@ -20,6 +20,10 @@ from cacao_accounting.version import APPNAME
 
 inventario = Blueprint("inventario", __name__, template_folder="templates")
 
+INVENTARIO_INVENTARIO_ENTRADA_NUEVO = "inventario.inventario_entrada_nuevo"
+INVENTARIO_ENTRADA_LISTA_HTML = "inventario/entrada_lista.html"
+INVENTARIO_INVENTARIO_ENTRADA = "inventario.inventario_entrada"
+
 
 def _series_choices(entity_type: str, company: str | None) -> list[tuple[str, str]]:
     """Construye las opciones de series activas para un doctype y compania."""
@@ -99,9 +103,9 @@ def inventario_entrada_lista():
         count=True,
     )
     titulo = "Listado de Movimientos de Inventario - " + APPNAME
-    new_url = url_for("inventario.inventario_entrada_nuevo")
+    new_url = url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO)
     return render_template(
-        "inventario/entrada_lista.html",
+        INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         vista="inventario.inventario_entrada_lista",
@@ -121,9 +125,9 @@ def inventario_material_receipt_lista():
         count=True,
     )
     titulo = "Listado de Recepciones de Material - " + APPNAME
-    new_url = url_for("inventario.inventario_entrada_nuevo", purpose="material_receipt")
+    new_url = url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="material_receipt")
     return render_template(
-        "inventario/entrada_lista.html",
+        INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         vista="inventario.inventario_material_receipt_lista",
@@ -143,9 +147,9 @@ def inventario_material_issue_lista():
         count=True,
     )
     titulo = "Listado de Salidas de Material - " + APPNAME
-    new_url = url_for("inventario.inventario_entrada_nuevo", purpose="material_issue")
+    new_url = url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="material_issue")
     return render_template(
-        "inventario/entrada_lista.html",
+        INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         vista="inventario.inventario_material_issue_lista",
@@ -165,9 +169,9 @@ def inventario_material_transfer_lista():
         count=True,
     )
     titulo = "Listado de Transferencias de Material - " + APPNAME
-    new_url = url_for("inventario.inventario_entrada_nuevo", purpose="material_transfer")
+    new_url = url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="material_transfer")
     return render_template(
-        "inventario/entrada_lista.html",
+        INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         vista="inventario.inventario_material_transfer_lista",
@@ -189,7 +193,7 @@ def inventario_ajuste_lista():
     titulo = "Listado de Ajustes de Inventario - " + APPNAME
     new_url = url_for("inventario.inventario_ajuste_nuevo")
     return render_template(
-        "inventario/entrada_lista.html",
+        INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         vista="inventario.inventario_ajuste_lista",
@@ -211,7 +215,7 @@ def inventario_reconciliacion_lista():
     titulo = "Listado de Conciliaciones de Inventario - " + APPNAME
     new_url = url_for("inventario.inventario_reconciliacion_nueva")
     return render_template(
-        "inventario/entrada_lista.html",
+        INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         vista="inventario.inventario_reconciliacion_lista",
@@ -232,7 +236,7 @@ def inventario_ajuste_positivo_lista():
     )
     titulo = "Listado de Ajustes Positivos - " + APPNAME
     return render_template(
-        "inventario/entrada_lista.html",
+        INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         vista="inventario.inventario_ajuste_positivo_lista",
@@ -253,7 +257,7 @@ def inventario_ajuste_negativo_lista():
     )
     titulo = "Listado de Ajustes Negativos - " + APPNAME
     return render_template(
-        "inventario/entrada_lista.html",
+        INVENTARIO_ENTRADA_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         vista="inventario.inventario_ajuste_negativo_lista",
@@ -509,7 +513,7 @@ def inventario_entrada_nuevo():
             entry.total_amount = _save_stock_entry_items(entry)
             database.session.commit()
             flash("Entrada de almacén creada correctamente.", "success")
-            return redirect(url_for("inventario.inventario_entrada", entry_id=entry.id))
+            return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA, entry_id=entry.id))
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
@@ -563,7 +567,7 @@ def _stock_entry_title(purpose: str | None) -> str:
 @login_required
 def inventario_ajuste_nuevo():
     """Alias para crear ajuste de inventario."""
-    return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="stock_adjustment"))
+    return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="stock_adjustment"))
 
 
 @inventario.route("/stock-entry/reconciliation/new-shortcut")
@@ -571,7 +575,7 @@ def inventario_ajuste_nuevo():
 @login_required
 def inventario_reconciliacion_nueva():
     """Alias para crear conciliación física de inventario."""
-    return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="stock_reconciliation"))
+    return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="stock_reconciliation"))
 
 
 @inventario.route("/stock-entry/adjustment-positive/new-shortcut")
@@ -579,7 +583,7 @@ def inventario_reconciliacion_nueva():
 @login_required
 def inventario_ajuste_positivo_nuevo():
     """Alias para crear ajuste positivo."""
-    return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="adjustment_positive"))
+    return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="adjustment_positive"))
 
 
 @inventario.route("/stock-entry/adjustment-negative/new-shortcut")
@@ -587,7 +591,7 @@ def inventario_ajuste_positivo_nuevo():
 @login_required
 def inventario_ajuste_negativo_nuevo():
     """Alias para crear ajuste negativo."""
-    return redirect(url_for("inventario.inventario_entrada_nuevo", purpose="adjustment_negative"))
+    return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA_NUEVO, purpose="adjustment_negative"))
 
 
 def _source_context(source_type: str | None, source_id: str | None) -> tuple[str | None, str]:
@@ -632,9 +636,9 @@ def inventario_entrada_submit(entry_id: str):
     except PostingError as exc:
         database.session.rollback()
         flash(_(str(exc)), "danger")
-        return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))
+        return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA, entry_id=entry_id))
     flash(_("Entrada de almacen aprobada y contabilizada."), "success")
-    return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))
+    return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA, entry_id=entry_id))
 
 
 @inventario.route("/stock-entry/<entry_id>/cancel", methods=["POST"])
@@ -654,6 +658,6 @@ def inventario_entrada_cancel(entry_id: str):
     except PostingError as exc:
         database.session.rollback()
         flash(_(str(exc)), "danger")
-        return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))
+        return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA, entry_id=entry_id))
     flash(_("Entrada de almacen cancelada con reverso contable."), "warning")
-    return redirect(url_for("inventario.inventario_entrada", entry_id=entry_id))
+    return redirect(url_for(INVENTARIO_INVENTARIO_ENTRADA, entry_id=entry_id))

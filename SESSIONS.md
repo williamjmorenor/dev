@@ -78,3 +78,14 @@
 - **Plantillas operativas:** Los formularios transaccionales de Compras, Ventas e Inventario migraron al macro compartido `transaction_form_macros.html` para replicar la UX del comprobante contable en documentos nuevos.
 - **Detalle de documentos:** `detail_view_macros.html` y `macros.lineas_tabla_lectura` ahora renderizan una tabla interactiva con panel y modal de detalle por línea, alineada con `journal.html`.
 - **Cobertura:** Se agregaron pruebas para el JS del framework transaccional y una validación web que comprueba el render del grid unificado y del detalle por línea.
+
+## 2026-05-15 (Resolución de issues identificados en FIXME.md)
+- **Correcciones Funcionales:** Se agregaron columnas predeterminadas para formularios de transacción nuevos. Se habilitó el flujo desde Solicitud de Compra hacia Orden de Compra.
+- **Formularios Dinámicos:** La grilla transaccional ahora respeta las cantidades editadas manualmente en el modal al importar líneas origen.
+- **Refactorización:** Simplificación de retornos en el servicio de conciliación de compras.
+- **Calidad:** De-duplicación masiva de literales de cadena en todo el proyecto mediante la definición de constantes centralizadas. Suite completa de 609 pruebas aprobada.
+
+## 2026-05-15 (Merge de `fix/resolve-fixme-issues-17130081935948712802` en main)
+- **Conflictos resueltos:** Se preservaron tanto la UX unificada de `transaction-form.js` como las correcciones funcionales de FIXME, incluyendo la importación con cantidad editable desde documentos origen.
+- **Documentación de estado:** `SESSIONS.md`, `ESTADO_ACTUAL.md` y `PENDIENTE.md` quedaron sincronizados con el estado integrado de la rama.
+- **Verificación:** Se ejecutó la batería de calidad del proyecto antes y después de la integración para confirmar que no se perdió funcionalidad.
