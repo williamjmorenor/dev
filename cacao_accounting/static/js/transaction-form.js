@@ -294,10 +294,14 @@
                 line.source_item_id === item.source_item_id;
             });
             if (exists) return;
+            var selectedQty = item.qty;
+            if (selectedQty === null || selectedQty === undefined || selectedQty === '') {
+              selectedQty = item.pending_qty || 0;
+            }
             var line = self.newLine();
             line.item_code = item.item_code || '';
             line.item_name = item.item_name || '';
-            line.qty = toNumber(item.pending_qty || item.qty || 0);
+            line.qty = toNumber(selectedQty);
             line.uom = item.uom || '';
             line.rate = toNumber(item.rate || 0);
             line.source_type = item.source_type || '';

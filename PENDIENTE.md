@@ -32,9 +32,6 @@
 - [ ] Drill-down universal en el 100% de los reportes operativos.
 - [ ] Exportación consistente a Excel con formato financiero en todos los reportes.
 
-## Nota de Integración (2026-05-14)
-- [ ] Verificar en CI la integración selectiva completa sobre `main`.
-
 # PENDIENTE
 
 - **Reportes:** Implementar más reportes operativos usando el nuevo framework.

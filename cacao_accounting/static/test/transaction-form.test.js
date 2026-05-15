@@ -123,4 +123,35 @@ describe('transaction-form', function () {
     assert.strictEqual(line.uom, 'SERV');
     assert.deepStrictEqual(component.getLineUoms(line).map((uom) => uom.code), ['SERV']);
   });
+
+  it('preserves edited source quantities when importing lines', function () {
+    const create = loadTransactionForm();
+    const component = create({
+      items: [{ code: 'ITEM-001', name: 'Caja de cacao', uom: 'UND' }],
+      uoms: [{ code: 'UND', name: 'Unidad' }],
+      defaultRows: 1,
+    });
+
+    component.init();
+    component.sourceItems = [
+      {
+        selected: true,
+        item_code: 'ITEM-001',
+        item_name: 'Caja de cacao',
+        qty: 2.5,
+        pending_qty: 10,
+        uom: 'UND',
+        rate: 4,
+        source_type: 'purchase_order',
+        source_id: 'PO-001',
+        source_item_id: 'PO-ROW-001',
+      },
+    ];
+
+    component.applySource();
+
+    assert.strictEqual(component.lines.length, 1);
+    assert.strictEqual(component.lines[0].qty, 2.5);
+    assert.strictEqual(component.lines[0].amount, 10);
+  });
 });
