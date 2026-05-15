@@ -153,3 +153,9 @@ Refactor this method to not always return the same value.
 - Define a constant instead of duplicating this literal "inventario.inventario_entrada_nuevo" 8 times.
 - Define a constant instead of duplicating this literal "inventario/entrada_lista.html" 8 times.
 - Define a constant instead of duplicating this literal "inventario.inventario_entrada" 5 times.
+
+# cacao_accounting/inventario/forms.py
+
+- Define a constant instead of duplicating this literal "Código" 3 times.
+- Define a constant instead of duplicating this literal "reportes/report_table.html" 5 times.
+
