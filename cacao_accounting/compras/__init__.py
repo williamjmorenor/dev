@@ -147,6 +147,8 @@ def compras_solicitud_compra_nueva():
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Solicitud de Compra - " + APPNAME
     transaction_config = {
+        "formKey": "purchases.purchase_request",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_request"),
@@ -256,6 +258,7 @@ def compras_cotizacion_proveedor_nueva():
     """Formulario para crear una cotización de proveedor."""
     from cacao_accounting.compras.forms import FormularioCotizacionProveedor
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.form_preferences import get_column_preferences
 
     formulario = FormularioCotizacionProveedor()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
@@ -276,6 +279,13 @@ def compras_cotizacion_proveedor_nueva():
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Cotización de Proveedor - " + APPNAME
+    transaction_config = {
+        "formKey": "purchases.supplier_quotation",
+        "viewKey": "draft",
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.supplier_quotation"),
+    }
     if request.method == "POST":
         try:
             supplier_id = request.form.get("supplier_id") or None
@@ -315,6 +325,7 @@ def compras_cotizacion_proveedor_nueva():
         from_rfq_id=from_rfq_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -869,6 +880,8 @@ def compras_orden_compra_nuevo():
             database.session.rollback()
             flash(str(exc), "danger")
     transaction_config = {
+        "formKey": "purchases.purchase_order",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_order"),
@@ -918,6 +931,7 @@ def compras_solicitud_cotizacion_nueva():
     """Formulario para crear una solicitud de cotización."""
     from cacao_accounting.compras.forms import FormularioSolicitudCotizacion
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.form_preferences import get_column_preferences
 
     formulario = FormularioSolicitudCotizacion()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
@@ -936,6 +950,13 @@ def compras_solicitud_cotizacion_nueva():
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Solicitud de Cotización - " + APPNAME
+    transaction_config = {
+        "formKey": "purchases.purchase_quotation",
+        "viewKey": "draft",
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "purchases.purchase_quotation"),
+    }
     if request.method == "POST":
         try:
             supplier_id = request.form.get("supplier_id") or None
@@ -972,6 +993,7 @@ def compras_solicitud_cotizacion_nueva():
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -1063,8 +1085,11 @@ def compras_recepcion_nuevo():
     ]
     titulo = "Nueva Recepción de Compra - " + APPNAME
     transaction_config = {
+        "formKey": "purchases.purchase_receipt",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
+        "warehouses": bodegas_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_receipt"),
     }
     if request.method == "POST":
@@ -1211,6 +1236,8 @@ def compras_factura_compra_nuevo():
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = f"Nueva {document_title} - {APPNAME}"
     transaction_config = {
+        "formKey": "purchases.purchase_invoice",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "purchases.purchase_invoice"),

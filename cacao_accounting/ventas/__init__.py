@@ -122,6 +122,8 @@ def ventas_pedido_venta_nuevo():
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nuevo Pedido de Venta - " + APPNAME
     transaction_config = {
+        "formKey": "sales.sales_request",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.sales_request"),
@@ -601,6 +603,8 @@ def ventas_orden_venta_nuevo():
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Orden de Venta - " + APPNAME
     transaction_config = {
+        "formKey": "sales.sales_order",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.sales_order"),
@@ -708,6 +712,8 @@ def ventas_cotizacion_nueva():
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Cotización - " + APPNAME
     transaction_config = {
+        "formKey": "sales.sales_quotation",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.sales_quotation"),
@@ -866,8 +872,11 @@ def ventas_entrega_nuevo():
     ]
     titulo = "Nueva Nota de Entrega - " + APPNAME
     transaction_config = {
+        "formKey": "sales.delivery_note",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
+        "warehouses": bodegas_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.delivery_note"),
     }
     if request.method == "POST":
@@ -1005,6 +1014,8 @@ def ventas_factura_venta_nuevo():
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Factura de Venta - " + APPNAME
     transaction_config = {
+        "formKey": "sales.sales_invoice",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "sales.sales_invoice"),

@@ -1,6 +1,8 @@
 {# Esta no es una página web, contiene funciones para que puedan ser usadas en otras páginas. #}
 {# Referencia: https://jinja.palletsprojects.com/en/2.11.x/templates/#macros #}
 
+{% import "detail_view_macros.html" as dv_macros %}
+
 {# Ayuda a agregar a importar los mismos archivos en el header de los archivos .html #}
 {% macro headertags() -%}
 {# Linea en blanco intencional #}
@@ -635,38 +637,5 @@
 
 {# ─── Line Items read-only table (for detail pages) ───────────── #}
 {% macro lineas_tabla_lectura(items) %}
-<div class="ca-card mt-3">
-  <div class="ca-card-header">
-    <h6 class="ca-card-title mb-0"><i class="bi bi-table me-1"></i>Productos / Servicios</h6>
-  </div>
-  <div class="table-responsive p-2">
-    <table class="ca-table">
-      <caption class="visually-hidden">Líneas del documento</caption>
-      <thead>
-        <tr>
-          <th scope="col">Código</th>
-          <th scope="col">Descripción</th>
-          <th scope="col">Cantidad</th>
-          <th scope="col">UOM</th>
-          <th scope="col">Precio Unit.</th>
-          <th scope="col">Monto</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for fila in items %}
-        <tr>
-          <td>{{ fila[0].item_code }}</td>
-          <td>{{ fila[0].item_name or "" }}</td>
-          <td>{{ fila[0].qty }}</td>
-          <td>{{ fila[0].uom or "" }}</td>
-          <td>{{ fila[0].rate or "" }}</td>
-          <td>{{ fila[0].amount or "" }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-3">Sin líneas registradas.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
+{{ dv_macros.detail_lines_table(items) }}
 {% endmacro %}

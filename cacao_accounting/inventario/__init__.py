@@ -481,6 +481,8 @@ def inventario_entrada_nuevo():
     source_api_url, source_label = _source_context(request.args.get("source_type"), request.args.get("source_id"))
     titulo = _stock_entry_title(_infer_stock_entry_purpose(request.path))
     transaction_config = {
+        "formKey": "inventory.stock_entry",
+        "viewKey": "draft",
         "items": items_disponibles,
         "uoms": uoms_disponibles,
         "columns": get_column_preferences(current_user.id, "inventory.stock_entry"),
