@@ -33,5 +33,12 @@
 - [ ] Exportación consistente a Excel con formato financiero en todos los reportes.
 
 ## Nota de Integración (2026-05-14)
-- [x] Integración selectiva desde `ia/main` completada: base documental de `1965ac44a352de5af34d604b81400a2bc8aed74a` y endpoints/prueba de salud desde `bef4029e25000512539a27164f8915cf3b4b2acc`.
 - [ ] Verificar en CI la integración selectiva completa sobre `main`.
+
+# PENDIENTE
+
+- **Reportes:** Implementar más reportes operativos usando el nuevo framework.
+- **Migración gradual UI:** Seguir migrando formularios operativos al patrón común sin tocar todavía pagos bancarios ni documentos con origen complejo sin cobertura funcional suficiente.
+- **Localización:** Ampliar catálogos impositivos para otros países.
+- **Automatización:** Webhooks para integración con sistemas externos.
+- **E2E:** Ampliar cobertura de pruebas Playwright en el nuevo flujo estandarizado.

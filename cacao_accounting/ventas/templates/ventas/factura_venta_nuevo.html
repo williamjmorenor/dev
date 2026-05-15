@@ -20,9 +20,7 @@
   {% if from_order_id %}<input type="hidden" name="from_order" value="{{ from_order_id }}">{% endif %}
   {% if from_note_id %}<input type="hidden" name="from_note" value="{{ from_note_id }}">{% endif %}
   {% if from_invoice_id %}<input type="hidden" name="from_invoice" value="{{ from_invoice_id }}">{% endif %}
-  {% if from_return_id %}
-    <input type="hidden" name="from_return" value="{{ from_return_id }}">
-  {% endif %}
+  {% if from_return_id %}<input type="hidden" name="from_return" value="{{ from_return_id }}">{% endif %}
   <input type="hidden" name="document_type" value="{{ document_type or 'sales_invoice' }}">
   {% if document_type == 'sales_invoice' %}
     <input type="hidden" name="is_return" value="0">
@@ -42,9 +40,6 @@
           Nueva Factura de Venta
           {% if orden_origen %}<small class="text-muted ms-2">desde {{ orden_origen.document_no or orden_origen.id }}</small>{% endif %}
           {% if entrega_origen %}<small class="text-muted ms-2">desde {{ entrega_origen.document_no or entrega_origen.id }}</small>{% endif %}
-          {% if from_invoice_id and not document_type in ['sales_credit_note','sales_debit_note'] %}
-            <small class="text-muted ms-2">desde {{ factura_origen.document_no or factura_origen.id }}</small>
-          {% endif %}
         {% endif %}
       </h5>
       <div class="d-flex gap-2">
@@ -80,9 +75,9 @@
     </div>
   </div>
 
-  {% if from_return_id %}
+  {% if from_return_id or from_invoice_id %}
     {{ macros.lineas_items(items_disponibles, uoms_disponibles,
-         source_api_url="/api/sales/sales-invoice/" ~ from_return_id ~ "/items?target_type=sales_invoice",
+         source_api_url="/api/sales/sales-invoice/" ~ from_invoice_id ~ "/items?target_type=sales_invoice",
          source_label="Factura de Venta") }}
   {% elif from_note_id %}
     {{ macros.lineas_items(items_disponibles, uoms_disponibles,

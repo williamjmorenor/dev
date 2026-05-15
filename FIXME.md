@@ -1,4 +1,34 @@
-## cacao_accounting/compras/purchase_reconciliation_service.py
+# cacao_accounting/form_preferences.py
+def get_column_preferences(user_id: str | None, form_key: str, view_key: str = DEFAULT_VIEW_KEY) -> list[dict[str, Any]]:
+    """Obtiene solo la lista de columnas de la preferencia del usuario."""
+    pref = get_form_preference(user_id, form_key, view_key)  # type: ignore[arg-type]
+    return pref.get("columns") or []
+
+Provide default columns for transaction grids
+
+Every new transaction form wired to transaction_grid passes columns=get_column_preferences(...), but for any non-journal form without a saved UserFormPreference, default_form_preference returns columns: []; then visibleColumns is empty and the grid renders no item/qty/rate inputs, so new users can only create zero-line/zero-total documents. Return a shared default transaction column set for these form keys, or make the grid fall back when preferences are empty.
+
+# cacao_accounting/compras/templates/compras/orden_compra_nuevo.html
+Comment on lines +30 to +31
+  {% set source_api_url = "/api/document-flow/pending-lines?source_type=purchase_request&target_type=purchase_order&source_id=" ~ from_request_id if from_request_id else None %}
+  {{ tf_macros.transaction_grid(items_disponibles, uoms_disponibles, source_api_url=source_api_url, source_label="Solicitud de Compra") }}
+
+Wire purchase-request context into purchase orders
+
+The purchase request detail links here with ?from_request=<id>, but compras_orden_compra_nuevo never reads or passes from_request_id/solicitud_origen, so this expression is always false/undefined and the source API plus hidden source field are omitted. In that context, users cannot pull pending request lines into a purchase order, breaking the new “Crear Orden de Compra” flow from purchase requests.
+
+# cacao_accounting/static/js/transaction-form.js
+Comment on lines +119 to +122
+                qty: i.pending_qty || i.qty,
+                uom: i.uom,
+                rate: i.rate,
+                amount: (i.pending_qty || i.qty) * i.rate,
+
+Honor edited quantities when applying source lines
+
+In the “Actualizar Elementos” modal, the editable input is bound to si.qty, but this code imports i.pending_qty whenever it is nonzero. If a source line has 10 pending and the user changes “Traer” to 3, the form still adds/submits 10, so partial receipts/invoices/orders from a source document cannot be created through this UI.
+
+# cacao_accounting/compras/purchase_reconciliation_service.py
 
 - Refactor this method to not always return the same value:
 

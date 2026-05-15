@@ -6,7 +6,7 @@
 from decimal import Decimal
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from cacao_accounting.database import (
     DeliveryNote,
@@ -102,6 +102,7 @@ def ventas_pedido_venta_lista():
 def ventas_pedido_venta_nuevo():
     """Formulario para crear un pedido de venta."""
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.form_preferences import get_column_preferences
     from cacao_accounting.ventas.forms import FormularioPedidoVenta
 
     formulario = FormularioPedidoVenta()
@@ -120,6 +121,11 @@ def ventas_pedido_venta_nuevo():
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nuevo Pedido de Venta - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "sales.sales_request"),
+    }
     if request.method == "POST":
         try:
             customer_id = request.form.get("customer_id") or None
@@ -156,6 +162,7 @@ def ventas_pedido_venta_nuevo():
         titulo=titulo,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -170,6 +177,38 @@ def ventas_pedido_venta(request_id: str):
     items = database.session.execute(database.select(SalesRequestItem).filter_by(sales_request_id=request_id)).all()
     titulo = (registro.document_no or request_id) + " - " + APPNAME
     return render_template("ventas/solicitud_venta.html", registro=registro, items=items, titulo=titulo)
+
+
+@ventas.route("/sales-request/<request_id>/submit", methods=["POST"])
+@modulo_activo("sales")
+@login_required
+def ventas_pedido_venta_submit(request_id: str):
+    """Aprueba un pedido de venta."""
+    registro = database.session.get(SalesRequest, request_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 0:
+        abort(400)
+    registro.docstatus = 1
+    database.session.commit()
+    flash("Pedido de venta aprobado.", "success")
+    return redirect(url_for("ventas.ventas_pedido_venta", request_id=request_id))
+
+
+@ventas.route("/sales-request/<request_id>/cancel", methods=["POST"])
+@modulo_activo("sales")
+@login_required
+def ventas_pedido_venta_cancel(request_id: str):
+    """Cancela un pedido de venta."""
+    registro = database.session.get(SalesRequest, request_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 1:
+        abort(400)
+    registro.docstatus = 2
+    database.session.commit()
+    flash("Pedido de venta cancelado.", "warning")
+    return redirect(url_for("ventas.ventas_pedido_venta", request_id=request_id))
 
 
 @ventas.route("/delivery-note/list")
@@ -392,16 +431,19 @@ def _save_sales_order_items(order_id: str) -> tuple[Decimal, Decimal]:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = SalesOrderItem(
                 sales_order_id=order_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "sales_order", order_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -419,16 +461,19 @@ def _save_sales_request_items(request_id: str) -> tuple[Decimal, Decimal]:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = SalesRequestItem(
                 sales_request_id=request_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "sales_request", request_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -446,16 +491,19 @@ def _save_sales_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = SalesQuotationItem(
                 sales_quotation_id=quotation_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "sales_quotation", quotation_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -529,6 +577,7 @@ def _save_sales_invoice_items(invoice_id: str) -> tuple[Decimal, Decimal]:
 def ventas_orden_venta_nuevo():
     """Formulario para crear una orden de venta."""
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.form_preferences import get_column_preferences
     from cacao_accounting.ventas.forms import FormularioOrdenVenta
 
     formulario = FormularioOrdenVenta()
@@ -551,6 +600,11 @@ def ventas_orden_venta_nuevo():
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Orden de Venta - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "sales.sales_order"),
+    }
     if request.method == "POST":
         try:
             customer_id = request.form.get("customer_id") or None
@@ -592,6 +646,7 @@ def ventas_orden_venta_nuevo():
         from_quotation_id=from_quotation_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -631,6 +686,7 @@ def ventas_cotizacion_lista():
 def ventas_cotizacion_nueva():
     """Formulario para crear una cotización de venta."""
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.form_preferences import get_column_preferences
     from cacao_accounting.ventas.forms import FormularioCotizacionVenta
 
     formulario = FormularioCotizacionVenta()
@@ -651,6 +707,11 @@ def ventas_cotizacion_nueva():
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Cotización - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "sales.sales_quotation"),
+    }
     if request.method == "POST":
         try:
             customer_id = request.form.get("customer_id") or None
@@ -690,6 +751,7 @@ def ventas_cotizacion_nueva():
         from_request_id=from_request_id,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -704,6 +766,39 @@ def ventas_cotizacion(quotation_id: str):
     items = database.session.execute(database.select(SalesQuotationItem).filter_by(sales_quotation_id=quotation_id)).all()
     titulo = (registro.document_no or quotation_id) + " - " + APPNAME
     return render_template("ventas/cotizacion.html", registro=registro, items=items, titulo=titulo)
+
+
+@ventas.route("/sales-quotation/<quotation_id>/submit", methods=["POST"])
+@modulo_activo("sales")
+@login_required
+def ventas_cotizacion_submit(quotation_id: str):
+    """Aprueba una cotización de venta."""
+    registro = database.session.get(SalesQuotation, quotation_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 0:
+        abort(400)
+    registro.docstatus = 1
+    database.session.commit()
+    flash("Cotización de venta aprobada.", "success")
+    return redirect(url_for("ventas.ventas_cotizacion", quotation_id=quotation_id))
+
+
+@ventas.route("/sales-quotation/<quotation_id>/cancel", methods=["POST"])
+@modulo_activo("sales")
+@login_required
+def ventas_cotizacion_cancel(quotation_id: str):
+    """Cancela una cotización de venta."""
+    registro = database.session.get(SalesQuotation, quotation_id)
+    if not registro:
+        abort(404)
+    if registro.docstatus != 1:
+        abort(400)
+    registro.docstatus = 2
+    revert_relations_for_target("sales_quotation", quotation_id)
+    database.session.commit()
+    flash("Cotización de venta cancelada.", "warning")
+    return redirect(url_for("ventas.ventas_cotizacion", quotation_id=quotation_id))
 
 
 @ventas.route("/sales-order/<order_id>/submit", methods=["POST"])
@@ -746,6 +841,7 @@ def ventas_entrega_nuevo():
     """Formulario para crear una nota de entrega."""
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
     from cacao_accounting.database import Warehouse
+    from cacao_accounting.form_preferences import get_column_preferences
     from cacao_accounting.ventas.forms import FormularioEntregaVenta
 
     formulario = FormularioEntregaVenta()
@@ -769,6 +865,11 @@ def ventas_entrega_nuevo():
         {"code": w[0].code, "name": w[0].name} for w in database.session.execute(database.select(Warehouse)).all()
     ]
     titulo = "Nueva Nota de Entrega - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "sales.delivery_note"),
+    }
     if request.method == "POST":
         try:
             entrega = DeliveryNote(
@@ -788,24 +889,14 @@ def ventas_entrega_nuevo():
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_delivery_note_items(entrega.id)
+            entrega.total = total
+            entrega.grand_total = total
+            database.session.commit()
+            flash("Nota de entrega creada correctamente.", "success")
+            return redirect(url_for("ventas.ventas_entrega", note_id=entrega.id))
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
-            return render_template(
-                "ventas/entrega_nuevo.html",
-                form=formulario,
-                titulo=titulo,
-                orden_origen=orden_origen,
-                from_order_id=from_order_id,
-                items_disponibles=items_disponibles,
-                uoms_disponibles=uoms_disponibles,
-                bodegas_disponibles=bodegas_disponibles,
-            )
-        entrega.total = total
-        entrega.grand_total = total
-        database.session.commit()
-        flash("Nota de entrega creada correctamente.", "success")
-        return redirect(url_for("ventas.ventas_entrega", note_id=entrega.id))
     return render_template(
         "ventas/entrega_nuevo.html",
         form=formulario,
@@ -815,6 +906,7 @@ def ventas_entrega_nuevo():
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
         bodegas_disponibles=bodegas_disponibles,
+        transaction_config=transaction_config,
     )
 
 
@@ -879,6 +971,7 @@ def ventas_entrega_cancel(note_id: str):
 def ventas_factura_venta_nuevo():
     """Formulario para crear una factura de venta."""
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+    from cacao_accounting.form_preferences import get_column_preferences
     from cacao_accounting.ventas.forms import FormularioFacturaVenta
 
     formulario = FormularioFacturaVenta()
@@ -911,6 +1004,11 @@ def ventas_factura_venta_nuevo():
     ]
     uoms_disponibles = [{"code": u[0].code, "name": u[0].name} for u in database.session.execute(database.select(UOM)).all()]
     titulo = "Nueva Factura de Venta - " + APPNAME
+    transaction_config = {
+        "items": items_disponibles,
+        "uoms": uoms_disponibles,
+        "columns": get_column_preferences(current_user.id, "sales.sales_invoice"),
+    }
     if request.method == "POST":
         try:
             document_type = request.form.get("document_type") or "sales_invoice"
@@ -939,33 +1037,18 @@ def ventas_factura_venta_nuevo():
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_sales_invoice_items(factura.id)
+            factura.total = total
+            factura.base_total = total
+            factura.grand_total = total
+            factura.base_grand_total = total
+            factura.outstanding_amount = total
+            factura.base_outstanding_amount = total
+            database.session.commit()
+            flash("Factura de venta creada correctamente.", "success")
+            return redirect(url_for("ventas.ventas_factura_venta", invoice_id=factura.id))
         except (DocumentFlowError, IdentifierConfigurationError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
-            return render_template(
-                "ventas/factura_venta_nuevo.html",
-                form=formulario,
-                titulo=titulo,
-                orden_origen=orden_origen,
-                entrega_origen=entrega_origen,
-                factura_origen=factura_origen,
-                from_order_id=from_order_id,
-                from_note_id=from_note_id,
-                from_invoice_id=from_invoice_id,
-                from_return_id=from_return_id,
-                document_type=document_type,
-                items_disponibles=items_disponibles,
-                uoms_disponibles=uoms_disponibles,
-            )
-        factura.total = total
-        factura.base_total = total
-        factura.grand_total = total
-        factura.base_grand_total = total
-        factura.outstanding_amount = total
-        factura.base_outstanding_amount = total
-        database.session.commit()
-        flash("Factura de venta creada correctamente.", "success")
-        return redirect(url_for("ventas.ventas_factura_venta", invoice_id=factura.id))
     return render_template(
         "ventas/factura_venta_nuevo.html",
         form=formulario,
@@ -980,6 +1063,7 @@ def ventas_factura_venta_nuevo():
         document_type=document_type,
         items_disponibles=items_disponibles,
         uoms_disponibles=uoms_disponibles,
+        transaction_config=transaction_config,
     )
 
 

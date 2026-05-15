@@ -16,7 +16,7 @@ from typing import cast
 # ---------------------------------------------------------------------------------------
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
@@ -51,6 +51,7 @@ from cacao_accounting.database import (
 )
 from cacao_accounting.database.helpers import get_active_naming_series
 from cacao_accounting.contabilidad.posting import PostingError, cancel_document, post_bank_transaction, submit_document
+from cacao_accounting.document_flow import create_document_relation, revert_relations_for_target
 from cacao_accounting.document_flow.service import compute_outstanding_amount, refresh_outstanding_amount_cache
 from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
@@ -703,11 +704,18 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
     """Guarda referencias de pago y actualiza saldos vivos de facturas."""
     total_allocated = Decimal("0")
     i = 0
+    processed_reference_keys: set[tuple[str, str]] = set()
     while request.form.get(f"reference_id_{i}"):
         reference_type = request.form.get(f"reference_type_{i}", "")
         reference_id = request.form.get(f"reference_id_{i}", "")
         allocated = _form_decimal(f"allocated_amount_{i}", "0")
+        reference_key = (reference_type, reference_id)
+        if reference_key in processed_reference_keys:
+            abort(409, description=_("No se puede aplicar la misma factura dos veces en un pago."))
+        processed_reference_keys.add(reference_key)
         if allocated <= 0:
+            if allocated < 0:
+                abort(409, description=_("El monto asignado no puede ser negativo."))
             i += 1
             continue
         if reference_type == "purchase_invoice":
@@ -734,6 +742,19 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
             allocation_date=payment.posting_date,
         )
         database.session.add(reference)
+        database.session.flush()
+        create_document_relation(
+            source_type=reference_type,
+            source_id=reference_id,
+            source_item_id=None,
+            target_type="payment_entry",
+            target_id=payment.id,
+            target_item_id=reference.id,
+            qty=Decimal("1"),
+            uom=None,
+            rate=allocated,
+            amount=allocated,
+        )
         invoice.outstanding_amount = outstanding - allocated
         invoice.base_outstanding_amount = invoice.outstanding_amount
         total_allocated += allocated
@@ -763,6 +784,7 @@ def bancos_pago_nuevo():
     from cacao_accounting.bancos.forms import FormularioPago
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
     from cacao_accounting.database import ExternalCounter, Party
+    from cacao_accounting.form_preferences import get_column_preferences
 
     formulario = FormularioPago()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
@@ -803,6 +825,11 @@ def bancos_pago_nuevo():
     )
     factura_venta_origen = database.session.get(SalesInvoice, from_sales_invoice_ids[0]) if from_sales_invoice_ids else None
     titulo = "Nuevo Pago - " + APPNAME
+    transaction_config = {
+        "items": [],
+        "uoms": [],
+        "columns": get_column_preferences(getattr(current_user, "id", None), "banking.payment_entry"),
+    }
     if request.method == "POST":
         try:
             amount = _form_decimal("paid_amount", "0")
@@ -873,6 +900,7 @@ def bancos_pago_nuevo():
         factura_compra_origen=factura_compra_origen,
         factura_venta_origen=factura_venta_origen,
         facturas_origen=facturas_origen,
+        transaction_config=transaction_config,
     )
 
 
@@ -923,6 +951,7 @@ def bancos_pago_cancel(payment_id: str):
         abort(400)
     try:
         cancel_document(registro)
+        revert_relations_for_target("payment_entry", registro.id, reason="payment_cancelled")
         references = (
             database.session.execute(database.select(PaymentReference).filter_by(payment_id=registro.id)).scalars().all()
         )
