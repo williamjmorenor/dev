@@ -3,34 +3,64 @@
 
 from __future__ import annotations
 import json
+import re
 from decimal import Decimal
 from datetime import date
 import pytest
 from cacao_accounting import create_app
 from cacao_accounting.database import (
-    database, Entity, Book, ExchangeRate, User, Modules,
-    PurchaseRequest, PurchaseRequestItem, PurchaseQuotation, PurchaseQuotationItem,
-    SupplierQuotation, SupplierQuotationItem, PurchaseOrder, PurchaseOrderItem,
-    PurchaseReceipt, PurchaseReceiptItem,
-    PurchaseInvoice, PurchaseInvoiceItem,
-    SalesRequest, SalesRequestItem, SalesQuotation, SalesQuotationItem,
-    SalesOrder, SalesOrderItem, DeliveryNote, DeliveryNoteItem,
-    SalesInvoice, SalesInvoiceItem,
-    StockEntry, StockEntryItem, GLEntry, StockLedgerEntry, DocumentRelation, Party
+    database,
+    Entity,
+    Book,
+    ExchangeRate,
+    User,
+    Modules,
+    PurchaseRequest,
+    PurchaseRequestItem,
+    PurchaseQuotation,
+    PurchaseQuotationItem,
+    SupplierQuotation,
+    SupplierQuotationItem,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseReceipt,
+    PurchaseReceiptItem,
+    PurchaseInvoice,
+    PurchaseInvoiceItem,
+    SalesRequest,
+    SalesRequestItem,
+    SalesQuotation,
+    SalesQuotationItem,
+    SalesOrder,
+    SalesOrderItem,
+    DeliveryNote,
+    DeliveryNoteItem,
+    SalesInvoice,
+    SalesInvoiceItem,
+    StockEntry,
+    StockEntryItem,
+    GLEntry,
+    StockLedgerEntry,
+    DocumentRelation,
+    Party,
 )
 from cacao_accounting.database.helpers import inicia_base_de_datos
 
+
 @pytest.fixture()
 def app_ctx():
-    app = create_app({
-        "TESTING": True,
-        "SECRET_KEY": "test_secret_key",
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "SQLALCHEMY_TRACK_MODIFICATIONS": False,
-        "WTF_CSRF_ENABLED": False,
-    })
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "test_secret_key",
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+            "WTF_CSRF_ENABLED": False,
+        }
+    )
     with app.app_context():
         from cacao_accounting.datos.dev import master_data
+
         inicia_base_de_datos(app, user="cacao", passwd="cacao", with_examples=False)
         master_data()
 
@@ -50,26 +80,46 @@ def app_ctx():
             ExchangeRate(origin="EUR", destination="NIO", rate=Decimal("40.0"), date=today),
         ]
         for r in rates:
-            exists = database.session.execute(
-                database.select(ExchangeRate).filter_by(origin=r.origin, destination=r.destination, date=r.date)
-            ).scalars().first()
+            exists = (
+                database.session.execute(
+                    database.select(ExchangeRate).filter_by(origin=r.origin, destination=r.destination, date=r.date)
+                )
+                .scalars()
+                .first()
+            )
             if not exists:
                 database.session.add(r)
 
         database.session.commit()
         yield app
 
+
 def login(client, username, password):
     return client.post("/login", data={"usuario": username, "acceso": password}, follow_redirects=True)
 
+
+def get_error(data):
+    if isinstance(data, bytes):
+        data = data.decode()
+    match = re.search(r'class="alert alert-danger.*?>(.*?)</div>', data, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def assert_no_danger(response, msg=""):
+    error = get_error(response.data)
+    assert error is None, f"{msg}: {error}"
+
+
 def check_ledger_entries(voucher_id, expected_books_count=3):
-    entries = database.session.execute(
-        database.select(GLEntry).filter_by(voucher_id=voucher_id)
-    ).scalars().all()
+    entries = database.session.execute(database.select(GLEntry).filter_by(voucher_id=voucher_id)).scalars().all()
 
     # Group entries by ledger_id
     books_with_entries = set(e.ledger_id for e in entries)
-    assert len(books_with_entries) >= expected_books_count, f"Expected entries in {expected_books_count} books, found {len(books_with_entries)}"
+    assert (
+        len(books_with_entries) >= expected_books_count
+    ), f"Expected entries in {expected_books_count} books, found {len(books_with_entries)}"
 
     # Check that for each book, debits == credits
     for ledger_id in books_with_entries:
@@ -80,11 +130,15 @@ def check_ledger_entries(voucher_id, expected_books_count=3):
 
     return entries
 
+
 def check_document_relation(source_id, target_id):
-    rel = database.session.execute(
-        database.select(DocumentRelation).filter_by(source_id=source_id, target_id=target_id)
-    ).scalars().first()
+    rel = (
+        database.session.execute(database.select(DocumentRelation).filter_by(source_id=source_id, target_id=target_id))
+        .scalars()
+        .first()
+    )
     assert rel is not None, f"Relation between {source_id} and {target_id} not found"
+
 
 def test_setup_correct(app_ctx):
     client = app_ctx.test_client()
@@ -97,6 +151,7 @@ def test_setup_correct(app_ctx):
     # Check entities
     entities = database.session.execute(database.select(Entity)).scalars().all()
     assert len(entities) > 0
+
 
 def test_purchase_happy_path(app_ctx):
     client = app_ctx.test_client()
@@ -113,7 +168,7 @@ def test_purchase_happy_path(app_ctx):
         "qty_0": "10",
         "uom_0": "UND",
         "rate_0": "50",
-        "amount_0": "500"
+        "amount_0": "500",
     }
     response = client.post("/buying/purchase-request/new", data=pr_data, follow_redirects=True)
     assert response.status_code == 200
@@ -142,15 +197,21 @@ def test_purchase_happy_path(app_ctx):
         "amount_0": "500",
         "source_type_0": "purchase_request",
         "source_id_0": pr.id,
-        "source_item_id_0": "dummy" # In real use, this would be the PR item ID
+        "source_item_id_0": "dummy",  # In real use, this would be the PR item ID
     }
     # Need to get actual PR item ID
-    pr_item = database.session.execute(database.select(PurchaseRequestItem).filter_by(purchase_request_id=pr.id)).scalars().first()
+    pr_item = (
+        database.session.execute(database.select(PurchaseRequestItem).filter_by(purchase_request_id=pr.id)).scalars().first()
+    )
     rfq_data["source_item_id_0"] = pr_item.id
 
     response = client.post("/buying/request-for-quotation/new", data=rfq_data, follow_redirects=True)
     assert response.status_code == 200
-    rfq = database.session.execute(database.select(PurchaseQuotation).order_by(PurchaseQuotation.created.desc())).scalars().first()
+    rfq = (
+        database.session.execute(database.select(PurchaseQuotation).order_by(PurchaseQuotation.created.desc()))
+        .scalars()
+        .first()
+    )
     assert rfq.docstatus == 0
     check_document_relation(pr.id, rfq.id)
 
@@ -167,16 +228,25 @@ def test_purchase_happy_path(app_ctx):
         "from_rfq": rfq.id,
         "item_code_0": "ART-001",
         "qty_0": "10",
-        "rate_0": "45", # Supplier offered better price
+        "rate_0": "45",  # Supplier offered better price
         "amount_0": "450",
         "source_type_0": "purchase_quotation",
         "source_id_0": rfq.id,
         # Get rfq item id
-        "source_item_id_0": database.session.execute(database.select(PurchaseQuotationItem).filter_by(purchase_quotation_id=rfq.id)).scalars().first().id
+        "source_item_id_0": database.session.execute(
+            database.select(PurchaseQuotationItem).filter_by(purchase_quotation_id=rfq.id)
+        )
+        .scalars()
+        .first()
+        .id,
     }
     response = client.post("/buying/supplier-quotation/new", data=sq_data, follow_redirects=True)
     assert response.status_code == 200
-    sq = database.session.execute(database.select(SupplierQuotation).order_by(SupplierQuotation.created.desc())).scalars().first()
+    sq = (
+        database.session.execute(database.select(SupplierQuotation).order_by(SupplierQuotation.created.desc()))
+        .scalars()
+        .first()
+    )
     client.post(f"/buying/supplier-quotation/{sq.id}/submit", follow_redirects=True)
     database.session.refresh(sq)
     assert sq.docstatus == 1
@@ -193,7 +263,12 @@ def test_purchase_happy_path(app_ctx):
         "amount_0": "450",
         "source_type_0": "supplier_quotation",
         "source_id_0": sq.id,
-        "source_item_id_0": database.session.execute(database.select(SupplierQuotationItem).filter_by(supplier_quotation_id=sq.id)).scalars().first().id
+        "source_item_id_0": database.session.execute(
+            database.select(SupplierQuotationItem).filter_by(supplier_quotation_id=sq.id)
+        )
+        .scalars()
+        .first()
+        .id,
     }
     response = client.post("/buying/purchase-order/new", data=po_data, follow_redirects=True)
     assert response.status_code == 200
@@ -217,7 +292,10 @@ def test_purchase_happy_path(app_ctx):
         "warehouse_0": "PRINCIPAL",
         "source_type_0": "purchase_order",
         "source_id_0": po.id,
-        "source_item_id_0": database.session.execute(database.select(PurchaseOrderItem).filter_by(purchase_order_id=po.id)).scalars().first().id
+        "source_item_id_0": database.session.execute(database.select(PurchaseOrderItem).filter_by(purchase_order_id=po.id))
+        .scalars()
+        .first()
+        .id,
     }
     response = client.post("/buying/purchase-receipt/new", data=prc_data, follow_redirects=True)
     assert response.status_code == 200
@@ -242,7 +320,12 @@ def test_purchase_happy_path(app_ctx):
         "amount_0": "450",
         "source_type_0": "purchase_receipt",
         "source_id_0": prc.id,
-        "source_item_id_0": database.session.execute(database.select(PurchaseReceiptItem).filter_by(purchase_receipt_id=prc.id)).scalars().first().id
+        "source_item_id_0": database.session.execute(
+            database.select(PurchaseReceiptItem).filter_by(purchase_receipt_id=prc.id)
+        )
+        .scalars()
+        .first()
+        .id,
     }
     response = client.post("/buying/purchase-invoice/new", data=pi_data, follow_redirects=True)
     assert response.status_code == 200
@@ -259,6 +342,7 @@ def test_purchase_happy_path(app_ctx):
     # Purchase Invoice should have reference to Purchase Receipt
     assert pi.purchase_receipt_id == prc.id
 
+
 def test_sales_happy_path(app_ctx):
     client = app_ctx.test_client()
     login(client, "cacao", "cacao")
@@ -274,7 +358,7 @@ def test_sales_happy_path(app_ctx):
         "qty_0": "5",
         "uom_0": "UND",
         "rate_0": "80",
-        "amount_0": "400"
+        "amount_0": "400",
     }
     response = client.post("/sales/sales-request/new", data=sr_data, follow_redirects=True)
     assert response.status_code == 200
@@ -295,7 +379,10 @@ def test_sales_happy_path(app_ctx):
         "amount_0": "400",
         "source_type_0": "sales_request",
         "source_id_0": sr.id,
-        "source_item_id_0": database.session.execute(database.select(SalesRequestItem).filter_by(sales_request_id=sr.id)).scalars().first().id
+        "source_item_id_0": database.session.execute(database.select(SalesRequestItem).filter_by(sales_request_id=sr.id))
+        .scalars()
+        .first()
+        .id,
     }
     response = client.post("/sales/quotation/new", data=sq_data, follow_redirects=True)
     assert response.status_code == 200
@@ -313,11 +400,14 @@ def test_sales_happy_path(app_ctx):
         "from_quotation": sq.id,
         "item_code_0": "ART-001",
         "qty_0": "5",
-        "rate_0": "85", # Price adjustment
+        "rate_0": "85",  # Price adjustment
         "amount_0": "425",
         "source_type_0": "sales_quotation",
         "source_id_0": sq.id,
-        "source_item_id_0": database.session.execute(database.select(SalesQuotationItem).filter_by(sales_quotation_id=sq.id)).scalars().first().id
+        "source_item_id_0": database.session.execute(database.select(SalesQuotationItem).filter_by(sales_quotation_id=sq.id))
+        .scalars()
+        .first()
+        .id,
     }
     response = client.post("/sales/sales-order/new", data=so_data, follow_redirects=True)
     assert response.status_code == 200
@@ -341,7 +431,10 @@ def test_sales_happy_path(app_ctx):
         "warehouse_0": "PRINCIPAL",
         "source_type_0": "sales_order",
         "source_id_0": so.id,
-        "source_item_id_0": database.session.execute(database.select(SalesOrderItem).filter_by(sales_order_id=so.id)).scalars().first().id
+        "source_item_id_0": database.session.execute(database.select(SalesOrderItem).filter_by(sales_order_id=so.id))
+        .scalars()
+        .first()
+        .id,
     }
     response = client.post("/sales/delivery-note/new", data=dn_data, follow_redirects=True)
     assert response.status_code == 200
@@ -349,11 +442,7 @@ def test_sales_happy_path(app_ctx):
 
     # We need stock to deliver. Let's create a manual stock entry to receive some stock first.
     se = StockEntry(
-        purpose="material_receipt",
-        company="cacao",
-        posting_date=date.today(),
-        to_warehouse="PRINCIPAL",
-        docstatus=0
+        purpose="material_receipt", company="cacao", posting_date=date.today(), to_warehouse="PRINCIPAL", docstatus=0
     )
     database.session.add(se)
     database.session.flush()
@@ -365,12 +454,13 @@ def test_sales_happy_path(app_ctx):
         uom="UND",
         qty_in_base_uom=100,
         basic_rate=50,
-        amount=5000
+        amount=5000,
     )
     database.session.add(sei)
     database.session.commit()
 
     from cacao_accounting.contabilidad.posting import submit_document
+
     submit_document(se)
     database.session.commit()
 
@@ -394,7 +484,10 @@ def test_sales_happy_path(app_ctx):
         "amount_0": "425",
         "source_type_0": "delivery_note",
         "source_id_0": dn.id,
-        "source_item_id_0": database.session.execute(database.select(DeliveryNoteItem).filter_by(delivery_note_id=dn.id)).scalars().first().id
+        "source_item_id_0": database.session.execute(database.select(DeliveryNoteItem).filter_by(delivery_note_id=dn.id))
+        .scalars()
+        .first()
+        .id,
     }
     response = client.post("/sales/sales-invoice/new", data=si_data, follow_redirects=True)
     assert response.status_code == 200
@@ -410,6 +503,7 @@ def test_sales_happy_path(app_ctx):
     # Check reconciliation
     assert si.delivery_note_id == dn.id
 
+
 def test_inventory_cycle(app_ctx):
     client = app_ctx.test_client()
     login(client, "cacao", "cacao")
@@ -424,11 +518,17 @@ def test_inventory_cycle(app_ctx):
         "qty_0": "50",
         "uom_0": "UND",
         "rate_0": "60",
-        "amount_0": "3000"
+        "amount_0": "3000",
     }
     response = client.post("/inventory/stock-entry/new", data=mr_data, follow_redirects=True)
     assert response.status_code == 200
-    mr = database.session.execute(database.select(StockEntry).filter_by(purpose="material_receipt").order_by(StockEntry.created.desc())).scalars().first()
+    mr = (
+        database.session.execute(
+            database.select(StockEntry).filter_by(purpose="material_receipt").order_by(StockEntry.created.desc())
+        )
+        .scalars()
+        .first()
+    )
     client.post(f"/inventory/stock-entry/{mr.id}/submit", follow_redirects=True)
     database.session.refresh(mr)
     assert mr.docstatus == 1
@@ -445,18 +545,24 @@ def test_inventory_cycle(app_ctx):
         "qty_0": "20",
         "uom_0": "UND",
         "rate_0": "60",
-        "amount_0": "1200"
+        "amount_0": "1200",
     }
     response = client.post("/inventory/stock-entry/new", data=mt_data, follow_redirects=True)
     assert response.status_code == 200
-    mt = database.session.execute(database.select(StockEntry).filter_by(purpose="material_transfer").order_by(StockEntry.created.desc())).scalars().first()
+    mt = (
+        database.session.execute(
+            database.select(StockEntry).filter_by(purpose="material_transfer").order_by(StockEntry.created.desc())
+        )
+        .scalars()
+        .first()
+    )
     client.post(f"/inventory/stock-entry/{mt.id}/submit", follow_redirects=True)
     database.session.refresh(mt)
     assert mt.docstatus == 1
     # Material Transfer might not generate GL entries if only moving between warehouses in same company
     # But Stock Ledger should be created
     sle = database.session.execute(database.select(StockLedgerEntry).filter_by(voucher_id=mt.id)).scalars().all()
-    assert len(sle) == 2 # One for out, one for in
+    assert len(sle) == 2  # One for out, one for in
 
     # 3. Material Issue (e.g., for internal use)
     mi_data = {
@@ -468,15 +574,22 @@ def test_inventory_cycle(app_ctx):
         "qty_0": "5",
         "uom_0": "UND",
         "rate_0": "60",
-        "amount_0": "300"
+        "amount_0": "300",
     }
     response = client.post("/inventory/stock-entry/new", data=mi_data, follow_redirects=True)
     assert response.status_code == 200
-    mi = database.session.execute(database.select(StockEntry).filter_by(purpose="material_issue").order_by(StockEntry.created.desc())).scalars().first()
+    mi = (
+        database.session.execute(
+            database.select(StockEntry).filter_by(purpose="material_issue").order_by(StockEntry.created.desc())
+        )
+        .scalars()
+        .first()
+    )
     client.post(f"/inventory/stock-entry/{mi.id}/submit", follow_redirects=True)
     database.session.refresh(mi)
     assert mi.docstatus == 1
     check_ledger_entries(mi.id)
+
 
 def test_returns(app_ctx):
     client = app_ctx.test_client()
@@ -486,26 +599,17 @@ def test_returns(app_ctx):
     # First need a submitted invoice
     customer = database.session.execute(database.select(Party).filter_by(party_type="customer")).scalars().first()
     si = SalesInvoice(
-        company="cacao",
-        customer_id=customer.id,
-        posting_date=date.today(),
-        document_type="sales_invoice",
-        docstatus=1
+        company="cacao", customer_id=customer.id, posting_date=date.today(), document_type="sales_invoice", docstatus=1
     )
     database.session.add(si)
     database.session.flush()
-    sii = SalesInvoiceItem(
-        sales_invoice_id=si.id,
-        item_code="ART-001",
-        qty=10,
-        rate=100,
-        amount=1000
-    )
+    sii = SalesInvoiceItem(sales_invoice_id=si.id, item_code="ART-001", qty=10, rate=100, amount=1000)
     database.session.add(sii)
     database.session.commit()
 
     # Post it manually to have GL entries to reverse
     from cacao_accounting.contabilidad.posting import post_document_to_gl, submit_document
+
     post_document_to_gl(si)
     database.session.commit()
 
@@ -522,11 +626,17 @@ def test_returns(app_ctx):
         "amount_0": "1000",
         "source_type_0": "sales_invoice",
         "source_id_0": si.id,
-        "source_item_id_0": sii.id
+        "source_item_id_0": sii.id,
     }
     response = client.post("/sales/sales-invoice/new", data=sr_data, follow_redirects=True)
     assert response.status_code == 200
-    cn = database.session.execute(database.select(SalesInvoice).filter_by(document_type="sales_credit_note").order_by(SalesInvoice.created.desc())).scalars().first()
+    cn = (
+        database.session.execute(
+            database.select(SalesInvoice).filter_by(document_type="sales_credit_note").order_by(SalesInvoice.created.desc())
+        )
+        .scalars()
+        .first()
+    )
     client.post(f"/sales/sales-invoice/{cn.id}/submit", follow_redirects=True)
     database.session.refresh(cn)
     assert cn.docstatus == 1
@@ -538,21 +648,11 @@ def test_returns(app_ctx):
     # 2. Purchase Return
     supplier = database.session.execute(database.select(Party).filter_by(party_type="supplier")).scalars().first()
     pi = PurchaseInvoice(
-        company="cacao",
-        supplier_id=supplier.id,
-        posting_date=date.today(),
-        document_type="purchase_invoice",
-        docstatus=1
+        company="cacao", supplier_id=supplier.id, posting_date=date.today(), document_type="purchase_invoice", docstatus=1
     )
     database.session.add(pi)
     database.session.flush()
-    pii = PurchaseInvoiceItem(
-        purchase_invoice_id=pi.id,
-        item_code="ART-001",
-        qty=10,
-        rate=50,
-        amount=500
-    )
+    pii = PurchaseInvoiceItem(purchase_invoice_id=pi.id, item_code="ART-001", qty=10, rate=50, amount=500)
     database.session.add(pii)
     database.session.commit()
     post_document_to_gl(pi)
@@ -571,16 +671,25 @@ def test_returns(app_ctx):
         "amount_0": "500",
         "source_type_0": "purchase_invoice",
         "source_id_0": pi.id,
-        "source_item_id_0": pii.id
+        "source_item_id_0": pii.id,
     }
     response = client.post("/buying/purchase-invoice/new", data=pr_data, follow_redirects=True)
     assert response.status_code == 200
-    pr = database.session.execute(database.select(PurchaseInvoice).filter_by(document_type="purchase_return").order_by(PurchaseInvoice.created.desc())).scalars().first()
+    pr = (
+        database.session.execute(
+            database.select(PurchaseInvoice)
+            .filter_by(document_type="purchase_return")
+            .order_by(PurchaseInvoice.created.desc())
+        )
+        .scalars()
+        .first()
+    )
     client.post(f"/buying/purchase-invoice/{pr.id}/submit", follow_redirects=True)
     database.session.refresh(pr)
     assert pr.docstatus == 1
     assert pr.is_return is True
     check_ledger_entries(pr.id)
+
 
 def test_partial_and_over_deliveries(app_ctx):
     client = app_ctx.test_client()
@@ -588,21 +697,10 @@ def test_partial_and_over_deliveries(app_ctx):
 
     # 1. Partial Delivery
     customer = database.session.execute(database.select(Party).filter_by(party_type="customer")).scalars().first()
-    so = SalesOrder(
-        company="cacao",
-        customer_id=customer.id,
-        posting_date=date.today(),
-        docstatus=1
-    )
+    so = SalesOrder(company="cacao", customer_id=customer.id, posting_date=date.today(), docstatus=1)
     database.session.add(so)
     database.session.flush()
-    soi = SalesOrderItem(
-        sales_order_id=so.id,
-        item_code="ART-001",
-        qty=20,
-        rate=100,
-        amount=2000
-    )
+    soi = SalesOrderItem(sales_order_id=so.id, item_code="ART-001", qty=20, rate=100, amount=2000)
     database.session.add(soi)
     database.session.commit()
 
@@ -620,27 +718,32 @@ def test_partial_and_over_deliveries(app_ctx):
         "warehouse_0": "PRINCIPAL",
         "source_type_0": "sales_order",
         "source_id_0": so.id,
-        "source_item_id_0": soi.id
+        "source_item_id_0": soi.id,
     }
     client.post("/sales/delivery-note/new", data=dn1_data, follow_redirects=True)
     dn1 = database.session.execute(database.select(DeliveryNote).order_by(DeliveryNote.created.desc())).scalars().first()
 
     # Ensure stock
-    se = StockEntry(purpose="material_receipt", company="cacao", posting_date=date.today(), to_warehouse="PRINCIPAL", docstatus=1)
+    se = StockEntry(
+        purpose="material_receipt", company="cacao", posting_date=date.today(), to_warehouse="PRINCIPAL", docstatus=1
+    )
     database.session.add(se)
     database.session.flush()
-    database.session.add(StockEntryItem(
-        stock_entry_id=se.id,
-        item_code="ART-001",
-        target_warehouse="PRINCIPAL",
-        qty=100,
-        uom="UND",
-        qty_in_base_uom=100,
-        basic_rate=50,
-        amount=5000
-    ))
+    database.session.add(
+        StockEntryItem(
+            stock_entry_id=se.id,
+            item_code="ART-001",
+            target_warehouse="PRINCIPAL",
+            qty=100,
+            uom="UND",
+            qty_in_base_uom=100,
+            basic_rate=50,
+            amount=5000,
+        )
+    )
     database.session.commit()
     from cacao_accounting.contabilidad.posting import post_document_to_gl
+
     post_document_to_gl(se)
     database.session.commit()
 
@@ -655,10 +758,7 @@ def test_partial_and_over_deliveries(app_ctx):
     client.post("/sales/delivery-note/new", data=dn2_data, follow_redirects=True)
     dn2 = database.session.execute(database.select(DeliveryNote).order_by(DeliveryNote.created.desc())).scalars().first()
     response = client.post(f"/sales/delivery-note/{dn2.id}/submit", follow_redirects=True)
-    if b"danger" in response.data:
-        from tests.test_uoms_full import get_error
-        print(f"PARTIAL DN2 ERROR: {get_error(response.data)}")
-    assert b"danger" not in response.data
+    assert_no_danger(response, "PARTIAL DN2 ERROR")
     database.session.refresh(dn2)
     assert dn2.docstatus == 1
 
@@ -666,11 +766,11 @@ def test_partial_and_over_deliveries(app_ctx):
     # Depending on business logic, this might be allowed or not.
     # Usually it's allowed but might need confirmation.
     dn3_data = dn1_data.copy()
-    dn3_data["qty_0"] = "5" # Extra 5
+    dn3_data["qty_0"] = "5"  # Extra 5
     dn3_data["qty_in_base_uom_0"] = "5"
     client.post("/sales/delivery-note/new", data=dn3_data, follow_redirects=True)
     dn3 = database.session.execute(database.select(DeliveryNote).order_by(DeliveryNote.created.desc())).scalars().first()
     response = client.post(f"/sales/delivery-note/{dn3.id}/submit", follow_redirects=True)
-    assert b"danger" not in response.data
+    assert_no_danger(response, "OVER DN3 ERROR")
     database.session.refresh(dn3)
-    assert dn3.docstatus == 1 # If it submitted, then over-delivery is technically allowed by engine
+    assert dn3.docstatus == 1  # If it submitted, then over-delivery is technically allowed by engine

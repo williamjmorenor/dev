@@ -16,6 +16,7 @@ except ImportError:
 
 from cacao_accounting import create_app
 from cacao_accounting.database.helpers import inicia_base_de_datos
+from cacao_accounting.database import database
 from cacao_accounting.config import configuracion
 
 
@@ -44,6 +45,9 @@ def flask_server():
     server_thread.start()
     time.sleep(2)
     yield "http://localhost:5008"
+    with app.app_context():
+        database.session.remove()
+        database.engine.dispose()
     if os.path.exists(db_path):
         os.remove(db_path)
 
@@ -87,7 +91,7 @@ def test_transaction_form_multi_source_autofill(flask_server, browser):
     company_input = company_select.locator("input.ca-smart-select-input")
     company_input.click()
     company_input.fill("Cacao")
-    page.locator(".ca-smart-select-option >> text=Cacao Accounting - Nicaragua").click()
+    page.locator(".ca-smart-select-option", has_text="Choco Sonrisas Sociedad Anonima").click()
 
     # 4. Select Customer
     customer_select = page.locator(".ca-smart-select", has=page.locator('input[name="customer_id"]'))
@@ -129,7 +133,7 @@ def test_smart_select_filtering(flask_server, browser):
     company_select = page.locator(".ca-smart-select", has=page.locator('input[name="company"]'))
     company_input = company_select.locator("input.ca-smart-select-input")
     company_input.fill("Cacao")
-    page.locator(".ca-smart-select-option >> text=Cacao Accounting - Nicaragua").click()
+    page.locator(".ca-smart-select-option", has_text="Choco Sonrisas Sociedad Anonima").click()
 
     # Now verify sequence options appear
     series_input.click()
