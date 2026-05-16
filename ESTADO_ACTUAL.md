@@ -5,3 +5,4 @@
 - **Módulos Operativos:** Compras, Ventas e Inventario utilizan macros compartidas y siguen las mismas reglas de UX.
 - **Rutas de Inventario:** Renombradas a `inventory-issue` para mayor claridad semántica.
 - **Pruebas:** Cobertura de más de 600 tests unitarios/integración y suite E2E Playwright básica para UI transaccional.
+- **Calidad (2026-05-16):** Validado en `.venv` con Black, Ruff, Flake8, Mypy y Pytest (`607 passed, 5 skipped`).

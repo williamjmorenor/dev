@@ -9,6 +9,7 @@ import pytest
 
 try:
     from playwright.sync_api import expect, sync_playwright
+
     HAS_PLAYWRIGHT = True
 except ImportError:
     HAS_PLAYWRIGHT = False
