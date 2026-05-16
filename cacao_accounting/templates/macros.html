@@ -645,6 +645,6 @@
 {% endmacro %}
 
 {# ─── Line Items read-only table (for detail pages) ───────────── #}
-{% macro lineas_tabla_lectura(items) %}
-{{ dv_macros.detail_lines_table(items) }}
+{% macro lineas_tabla_lectura(items, currency_code='') %}
+{{ dv_macros.detail_lines_table(items, currency_code=currency_code) }}
 {% endmacro %}

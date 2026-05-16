@@ -74,7 +74,7 @@
 </div>
 {% endmacro %}
 
-{% macro detail_lines_table(items, title='Productos / Servicios') %}
+{% macro detail_lines_table(items, title='Productos / Servicios', currency_code='') %}
 <div class="ca-card mt-3">
   <div class="ca-card-header">
     <h6 class="ca-card-title mb-0"><i class="bi bi-table me-1"></i>{{ _(title) }}</h6>
@@ -90,8 +90,8 @@
           <th>{{ _('Descripción') }}</th>
           <th>{{ _('Unidad de medida') }}</th>
           <th class="text-end">{{ _('Cantidad') }}</th>
-          <th class="text-end">{{ _('Precio / Costo Unitario') }}</th>
-          <th class="text-end">{{ _('Precio / Costo Total') }}</th>
+          <th class="text-end">{{ _('Precio / Costo Unitario') }}{% if currency_code %} ({{ currency_code }}){% endif %}</th>
+          <th class="text-end">{{ _('Precio / Costo Total') }}{% if currency_code %} ({{ currency_code }}){% endif %}</th>
           <th>{{ _('Acciones') }}</th>
         </tr>
       </thead>
@@ -103,9 +103,9 @@
             data-item-code="{{ item.item_code|default('', true) }}"
             data-item-name="{{ item.item_name|default('', true) }}"
             data-uom="{{ item.uom|default('', true) }}"
-            data-qty="{{ item.qty|default('', true) }}"
-            data-rate="{{ item.rate|default('', true) or item.basic_rate|default('', true) }}"
-            data-amount="{{ item.amount|default('', true) }}"
+            data-qty="{{ format_quantity(item.qty|default(0, true)) }}"
+            data-rate="{{ format_money_with_currency(item.rate|default('', true) or item.basic_rate|default('', true), currency_code) }}"
+            data-amount="{{ format_money_with_currency(item.amount|default(0, true), currency_code) }}"
             data-warehouse="{{ item.warehouse|default('', true) or item.source_warehouse|default('', true) or item.target_warehouse|default('', true) }}"
             data-account="{{ item.account|default('', true) }}"
             data-cost-center="{{ item.cost_center|default('', true) }}"
@@ -119,9 +119,9 @@
           <td>{{ item.item_code|default('', true) or '-' }}</td>
           <td>{{ item.item_name|default('', true) or '-' }}</td>
           <td>{{ item.uom|default('', true) or '-' }}</td>
-          <td class="text-end">{{ item.qty|default('', true) or 0 }}</td>
-          <td class="text-end">{{ item.rate|default('', true) or item.basic_rate|default('', true) or 0 }}</td>
-          <td class="text-end">{{ item.amount|default('', true) or 0 }}</td>
+          <td class="text-end">{{ format_quantity(item.qty|default(0, true)) }}</td>
+          <td class="text-end">{{ format_money_with_currency(item.rate|default('', true) or item.basic_rate|default('', true), currency_code) }}</td>
+          <td class="text-end">{{ format_money_with_currency(item.amount|default(0, true), currency_code) }}</td>
           <td>
             <button type="button" class="btn btn-sm btn-outline-primary btn-line-modal"
                 data-bs-toggle="modal" data-bs-target="#lineDetailModal">{{ _('Ver detalle') }}</button>
@@ -145,8 +145,8 @@
     <div class="col-md-8"><strong>{{ _('Descripción') }}</strong><p class="mb-0" id="line-item-name">-</p></div>
     <div class="col-md-4"><strong>{{ _('Unidad de medida') }}</strong><p class="mb-0" id="line-uom">-</p></div>
     <div class="col-md-4"><strong>{{ _('Cantidad') }}</strong><p class="mb-0" id="line-qty">0</p></div>
-    <div class="col-md-4"><strong>{{ _('Precio / Costo Unitario') }}</strong><p class="mb-0" id="line-rate">0</p></div>
-    <div class="col-md-4"><strong>{{ _('Precio / Costo Total') }}</strong><p class="mb-0" id="line-amount">0</p></div>
+    <div class="col-md-4"><strong>{{ _('Precio / Costo Unitario') }}{% if currency_code %} ({{ currency_code }}){% endif %}</strong><p class="mb-0" id="line-rate">0</p></div>
+    <div class="col-md-4"><strong>{{ _('Precio / Costo Total') }}{% if currency_code %} ({{ currency_code }}){% endif %}</strong><p class="mb-0" id="line-amount">0</p></div>
     <div class="col-md-4"><strong>{{ _('Bodega') }}</strong><p class="mb-0" id="line-warehouse">-</p></div>
     <div class="col-md-4"><strong>{{ _('Cuenta') }}</strong><p class="mb-0" id="line-account">-</p></div>
     <div class="col-md-4"><strong>{{ _('Centro de costos') }}</strong><p class="mb-0" id="line-cost-center">-</p></div>
@@ -176,9 +176,9 @@
           <dd class="col-sm-8" id="modal-line-uom">-</dd>
           <dt class="col-sm-4">{{ _('Cantidad') }}</dt>
           <dd class="col-sm-8" id="modal-line-qty">0</dd>
-          <dt class="col-sm-4">{{ _('Precio / Costo Unitario') }}</dt>
+          <dt class="col-sm-4">{{ _('Precio / Costo Unitario') }}{% if currency_code %} ({{ currency_code }}){% endif %}</dt>
           <dd class="col-sm-8" id="modal-line-rate">0</dd>
-          <dt class="col-sm-4">{{ _('Precio / Costo Total') }}</dt>
+          <dt class="col-sm-4">{{ _('Precio / Costo Total') }}{% if currency_code %} ({{ currency_code }}){% endif %}</dt>
           <dd class="col-sm-8" id="modal-line-amount">0</dd>
           <dt class="col-sm-4">{{ _('Bodega') }}</dt>
           <dd class="col-sm-8" id="modal-line-warehouse">-</dd>

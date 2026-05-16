@@ -44,6 +44,7 @@
             url_for('compras.compras_cotizacion_proveedor_lista'),
             url_for('compras.compras_cotizacion_proveedor_nueva')) }}
 {% endset %}
+{% set currency_code = document_currency_code(registro) %}
 {{ dv_macros.detail_header(
     registro.document_no or registro.id,
     _('Cotización de Proveedor'),
@@ -53,11 +54,12 @@
       (_('Número'), registro.document_no),
       (_('Proveedor'), registro.supplier_name),
       (_('Fecha'), registro.posting_date),
-      (_('Total'), registro.grand_total),
+      (_('Total'), format_money_with_currency(registro.grand_total, currency_code)),
+      (_('Moneda'), currency_code),
       (_('Observaciones'), registro.remarks)
     ],
     'bi-file-earmark-text'
 ) }}
-{{ macros.lineas_tabla_lectura(items) }}
+{{ macros.lineas_tabla_lectura(items, currency_code) }}
 {{ macros.document_flow_trace("supplier_quotation", registro) }}
 {% endblock %}
