@@ -39,7 +39,6 @@ from cacao_accounting.database import (
     BankAccount,
     BankMatchingRule,
     BankTransaction,
-    Entity,
     ExternalCounter,
     NamingSeries,
     PaymentEntry,
