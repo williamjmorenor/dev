@@ -15,7 +15,8 @@
   function normalizeValue(value) {
     if (value === null || value === undefined) return '';
     if (typeof value === 'function') return normalizeValue(value());
-    if (Array.isArray(value)) return value.map(normalizeValue).filter(v => v !== '').join(',');
+    // Preserve arrays so appendParam can send each element as a separate param
+    if (Array.isArray(value)) return value;
 
     if (typeof value === 'object') {
       if (value.selector) {
@@ -26,7 +27,10 @@
             const hidden = el.querySelector ? el.querySelector('input[type="hidden"]') : null;
             if (hidden) return hidden.value;
           }
-          return el.value || '';
+          const rawValue = el.value;
+          if (rawValue === undefined || rawValue === null || rawValue === '') return '';
+          if (typeof rawValue === 'object') return normalizeObjectValue(rawValue);
+          return String(rawValue);
         }
         return '';
       }
@@ -37,7 +41,12 @@
 
   function appendParam(params, key, value) {
     const normalized = normalizeValue(value);
-    if (normalized !== '') {
+    if (Array.isArray(normalized)) {
+      normalized.forEach((v) => {
+        const s = normalizeValue(v);
+        if (!Array.isArray(s) && s !== '') params.append(key, s);
+      });
+    } else if (normalized !== '') {
       params.append(key, normalized);
     }
   }
@@ -90,22 +99,24 @@
           }
 
           // Watch selectedValue to update search label when changed from outside
-          this.$watch('selectedValue', (value) => {
-            const normalized = normalizeValue(value);
-            if (!normalized) {
-              this.search = '';
-              this.selectedLabel = '';
-            } else {
-              const opt = this.options.find((o) => normalizeValue(o.value !== undefined ? o.value : o.id) === normalized);
-              if (opt) {
-                this.selectedLabel = opt.display_name || opt.label || '';
-                this.search = this.selectedLabel;
-              } else if (normalized !== normalizeValue(this.selectedLabel)) {
-                // Keep label if we have it, otherwise fallback to value
-                this.search = this.selectedLabel || normalized;
+          if (typeof this.$watch === 'function') {
+            this.$watch('selectedValue', (value) => {
+              const normalized = normalizeValue(value);
+              if (!normalized) {
+                this.search = '';
+                this.selectedLabel = '';
+              } else {
+                const opt = this.options.find((o) => normalizeValue(o.value !== undefined ? o.value : o.id) === normalized);
+                if (opt) {
+                  this.selectedLabel = opt.display_name || opt.label || '';
+                  this.search = this.selectedLabel;
+                } else if (normalized !== normalizeValue(this.selectedLabel)) {
+                  // Keep label if we have it, otherwise fallback to value
+                  this.search = this.selectedLabel || normalized;
+                }
               }
-            }
-          });
+            });
+          }
         },
 
         bindFilterSources() {
@@ -150,16 +161,18 @@
         },
 
         onFocus() {
-          if (this.preload || this.preloadOnFocus) {
-             if (!this.open && !this.loading) {
-                if (this.options.length > 0) {
-                   this.open = true;
-                } else if (this.requiredFiltersPresent()) {
-                   this.preloadOptions({ openMenu: true });
-                }
-             }
+          if (this.preloadOnFocus) {
+            if (this.loading) {
+              this.open = true;
+            } else if (!this.open) {
+              if (this.options.length > 0) {
+                this.open = true;
+              } else if (this.requiredFiltersPresent()) {
+                this.preloadOptions({ openMenu: true });
+              }
+            }
           } else if (this.options.length > 0) {
-             this.open = true;
+            this.open = true;
           }
         },
 
@@ -186,9 +199,7 @@
 
           const currentFilters = this.resolvedFilters();
           Object.keys(currentFilters).forEach((key) => {
-            if (currentFilters[key] !== '') {
-               params.append(key, currentFilters[key]);
-            }
+            appendParam(params, key, currentFilters[key]);
           });
 
           this.loading = true;
@@ -241,9 +252,7 @@
 
           const currentFilters = this.resolvedFilters();
           Object.keys(currentFilters).forEach((key) => {
-            if (currentFilters[key] !== '') {
-               params.append(key, currentFilters[key]);
-            }
+            appendParam(params, key, currentFilters[key]);
           });
 
           this.loading = true;

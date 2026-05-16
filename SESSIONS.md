@@ -1,6 +1,16 @@
 # SESSIONS - Historical Decisions & Milestones
 
-## 2026-05-16 (Validación de 72.patch y estabilización de calidad)
+## 2026-05-16 (Corrección de fallos de CI en smart-select.js)
+- **Diagnóstico:** 7 tests JS fallando: 5 por `this.$watch is not a function` en entorno de pruebas sin Alpine, 1 por normalización de `el.value` objeto en selector-filter, 1 por arrays de filtros enviados como cadena unida en lugar de params separados.
+- **Correcciones aplicadas en `cacao_accounting/static/js/smart-select.js`:**
+  1. Guard `if (typeof this.$watch === 'function')` en `init()` para compatibilidad con entornos de test.
+  2. `normalizeValue`: arrays ahora se preservan (no se unen con coma); selector-filter normaliza `el.value` objeto via `normalizeObjectValue`.
+  3. `appendParam`: maneja arrays iterando y agregando cada elemento como param separado.
+  4. `onFocus()`: preload en foco solo cuando `preloadOnFocus=true` (no cuando solo `preload=true`).
+  5. `fetchOptions` y `preloadOptions`: usan `appendParam` para agregar filtros, habilitando multi-params.
+- **Resultado:** 17/17 JS passing, 607/607 Python passing, CodeQL sin alertas.
+
+
 - **Revisión de parche:** Se verificó que `72.patch` contiene los commits `4e8b192`, `3ea5f45` y `49a9081`, ya presentes en la rama.
 - **Incorporación/ajuste mínimo:** Se aplicó formato Black en `tests/test_e2e_transactional_ui.py` para eliminar el único fallo de estilo pendiente.
 - **Verificación completa:** Black, Ruff, Flake8, Mypy y Pytest ejecutados en `.venv` con resultado exitoso (`607 passed, 5 skipped`).
