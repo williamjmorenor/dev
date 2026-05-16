@@ -47,6 +47,7 @@ from cacao_accounting.database import (
     ReconciliationItem,
     SalesInvoice,
     SeriesExternalCounterMap,
+    User,
     database,
 )
 from cacao_accounting.database.helpers import get_active_naming_series
@@ -214,6 +215,48 @@ def bancos_transferencia_lista():
     return render_template("bancos/pago_lista.html", consulta=consulta, titulo=titulo, is_transfer_list=True)
 
 
+@bancos.route("/payment/debit-note/list")
+@modulo_activo("cash")
+@login_required
+def bancos_nota_debito_lista():
+    """Listado de notas de débito bancario (retiros)."""
+    consulta = database.paginate(
+        database.select(PaymentEntry).filter_by(payment_type="debit_note"),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Notas de Débito Bancario - " + APPNAME
+    return render_template(
+        "bancos/pago_lista.html",
+        consulta=consulta,
+        titulo=titulo,
+        page_heading=_("Listado de Notas de Débito Bancario"),
+        new_url=url_for("bancos.bancos_nota_debito_nueva"),
+    )
+
+
+@bancos.route("/payment/credit-note/list")
+@modulo_activo("cash")
+@login_required
+def bancos_nota_credito_lista():
+    """Listado de notas de crédito bancario (depósitos)."""
+    consulta = database.paginate(
+        database.select(PaymentEntry).filter_by(payment_type="credit_note"),
+        page=request.args.get("page", default=1, type=int),
+        max_per_page=10,
+        count=True,
+    )
+    titulo = "Listado de Notas de Crédito Bancario - " + APPNAME
+    return render_template(
+        "bancos/pago_lista.html",
+        consulta=consulta,
+        titulo=titulo,
+        page_heading=_("Listado de Notas de Crédito Bancario"),
+        new_url=url_for("bancos.bancos_nota_credito_nueva"),
+    )
+
+
 @bancos.route("/bank-transaction/list")
 @modulo_activo("cash")
 @login_required
@@ -227,48 +270,6 @@ def bancos_transaccion_lista():
     )
     titulo = "Listado de Transacciones Bancarias - " + APPNAME
     return render_template(BANCOS_TRANSACCION_LISTA_HTML, consulta=consulta, titulo=titulo)
-
-
-@bancos.route("/bank-transaction/debit-note/list")
-@modulo_activo("cash")
-@login_required
-def bancos_nota_debito_lista():
-    """Listado de notas de débito bancario (retiros)."""
-    consulta = database.paginate(
-        database.select(BankTransaction).filter(BankTransaction.withdrawal.is_not(None)),
-        page=request.args.get("page", default=1, type=int),
-        max_per_page=10,
-        count=True,
-    )
-    titulo = "Listado de Notas de Débito Bancario - " + APPNAME
-    return render_template(
-        BANCOS_TRANSACCION_LISTA_HTML,
-        consulta=consulta,
-        titulo=titulo,
-        page_heading="Listado de Notas de Débito Bancario",
-        new_url=url_for("bancos.bancos_nota_debito_nueva"),
-    )
-
-
-@bancos.route("/bank-transaction/credit-note/list")
-@modulo_activo("cash")
-@login_required
-def bancos_nota_credito_lista():
-    """Listado de notas de crédito bancario (depósitos)."""
-    consulta = database.paginate(
-        database.select(BankTransaction).filter(BankTransaction.deposit.is_not(None)),
-        page=request.args.get("page", default=1, type=int),
-        max_per_page=10,
-        count=True,
-    )
-    titulo = "Listado de Notas de Crédito Bancario - " + APPNAME
-    return render_template(
-        BANCOS_TRANSACCION_LISTA_HTML,
-        consulta=consulta,
-        titulo=titulo,
-        page_heading="Listado de Notas de Crédito Bancario",
-        new_url=url_for("bancos.bancos_nota_credito_nueva"),
-    )
 
 
 def _crear_nota_bancaria(note_kind: str):
@@ -550,20 +551,58 @@ def bancos_regla_matching_ejecutar(rule_id: str):
     return redirect(url_for("bancos.bancos_reglas_matching"))
 
 
-@bancos.route("/bank-transaction/debit-note/new", methods=["GET", "POST"])
+@bancos.route("/payment/debit-note/new", methods=["GET", "POST"])
 @modulo_activo("cash")
 @login_required
 def bancos_nota_debito_nueva():
-    """Formulario de nota de débito bancaria."""
-    return _crear_nota_bancaria("debit")
+    """Formulario de nota de débito bancaria (utiliza PaymentEntry)."""
+    from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+
+    if request.method == "POST":
+        return bancos_pago_nuevo()
+
+    return render_template(
+        "bancos/nota_nueva.html",
+        titulo=_("Nueva Nota de Débito Bancario") + " - " + APPNAME,
+        payment_type="debit_note",
+        companies=obtener_lista_entidades_por_id_razonsocial(),
+    )
 
 
-@bancos.route("/bank-transaction/credit-note/new", methods=["GET", "POST"])
+@bancos.route("/payment/credit-note/new", methods=["GET", "POST"])
 @modulo_activo("cash")
 @login_required
 def bancos_nota_credito_nueva():
-    """Formulario de nota de crédito bancaria."""
-    return _crear_nota_bancaria("credit")
+    """Formulario de nota de crédito bancaria (utiliza PaymentEntry)."""
+    from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+
+    if request.method == "POST":
+        return bancos_pago_nuevo()
+
+    return render_template(
+        "bancos/nota_nueva.html",
+        titulo=_("Nueva Nota de Crédito Bancario") + " - " + APPNAME,
+        payment_type="credit_note",
+        companies=obtener_lista_entidades_por_id_razonsocial(),
+    )
+
+
+@bancos.route("/payment/transfer/new", methods=["GET", "POST"])
+@modulo_activo("cash")
+@login_required
+def bancos_transferencia_nueva():
+    """Formulario de transferencia entre cuentas bancarias."""
+    from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
+
+    if request.method == "POST":
+        return bancos_pago_nuevo()
+
+    return render_template(
+        "bancos/transferencia_nueva.html",
+        titulo=_("Nueva Transferencia Bancaria") + " - " + APPNAME,
+        payment_type="internal_transfer",
+        companies=obtener_lista_entidades_por_id_razonsocial(),
+    )
 
 
 @bancos.route("/bank/new", methods=["GET", "POST"])
@@ -704,38 +743,55 @@ def _payment_source_rows(purchase_invoice_ids: list[str], sales_invoice_ids: lis
     return rows
 
 
-def _save_payment_references(payment: PaymentEntry) -> Decimal:
+def _save_payment_references(payment: PaymentEntry, lines: list[dict] | None = None) -> Decimal:
     """Guarda referencias de pago y actualiza saldos vivos de facturas."""
+    if lines is None:
+        lines = []
+        i = 0
+        while request.form.get(f"reference_id_{i}"):
+            lines.append(
+                {
+                    "reference_type": request.form.get(f"reference_type_{i}", ""),
+                    "reference_id": request.form.get(f"reference_id_{i}", ""),
+                    "allocated_amount": _form_decimal(f"allocated_amount_{i}", "0"),
+                }
+            )
+            i += 1
+
     total_allocated = Decimal("0")
-    i = 0
     processed_reference_keys: set[tuple[str, str]] = set()
-    while request.form.get(f"reference_id_{i}"):
-        reference_type = request.form.get(f"reference_type_{i}", "")
-        reference_id = request.form.get(f"reference_id_{i}", "")
-        allocated = _form_decimal(f"allocated_amount_{i}", "0")
+    for line in lines:
+        reference_type = line.get("reference_type", "")
+        reference_id = line.get("reference_id", "")
+        allocated = Decimal(str(line.get("allocated_amount", "0")))
         reference_key = (reference_type, reference_id)
         if reference_key in processed_reference_keys:
-            abort(409, description=_("No se puede aplicar la misma factura dos veces en un pago."))
+            from werkzeug.exceptions import Conflict
+
+            raise Conflict(_("No se puede aplicar la misma factura dos veces en un pago."))
         processed_reference_keys.add(reference_key)
         if allocated <= 0:
             if allocated < 0:
-                abort(409, description=_("El monto asignado no puede ser negativo."))
-            i += 1
+                from werkzeug.exceptions import Conflict
+
+                raise Conflict(_("El monto asignado no puede ser negativo."))
             continue
         if reference_type == "purchase_invoice":
             invoice = database.session.get(PurchaseInvoice, reference_id)
         elif reference_type == "sales_invoice":
             invoice = database.session.get(SalesInvoice, reference_id)
         else:
-            abort(400)
+            raise ValueError(_("Tipo de referencia inválido."))
         if not invoice:
-            abort(404)
+            raise ValueError(_("Documento referenciado no existe."))
         invoice = cast(PurchaseInvoice | SalesInvoice, invoice)
         if payment.company and invoice.company and payment.company != invoice.company:
-            abort(409)
-        outstanding = _invoice_outstanding(invoice)
-        if allocated > outstanding:
-            abort(409)
+            from werkzeug.exceptions import Conflict
+
+            raise Conflict(_("El documento referenciado no pertenece a la misma compañía."))
+        outstanding = compute_outstanding_amount(invoice)
+        if allocated > outstanding + Decimal("0.01"):
+            raise ValueError(_("El monto aplicado no puede ser mayor al saldo pendiente."))
         reference = PaymentReference(
             payment_id=payment.id,
             reference_type=reference_type,
@@ -762,7 +818,6 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
         invoice.outstanding_amount = outstanding - allocated
         invoice.base_outstanding_amount = invoice.outstanding_amount
         total_allocated += allocated
-        i += 1
     return total_allocated
 
 
@@ -785,87 +840,70 @@ def _refresh_payment_reference_document(reference_type: str, reference_id: str) 
 @login_required
 def bancos_pago_nuevo():
     """Formulario para crear un nuevo pago."""
-    from cacao_accounting.bancos.forms import FormularioPago
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
-    from cacao_accounting.database import ExternalCounter, Party
     from cacao_accounting.form_preferences import get_column_preferences
 
-    formulario = FormularioPago()
-    formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
-    selected_company = request.values.get("company") or (
-        formulario.company.choices[0][0] if formulario.company.choices else None
-    )
-    formulario.naming_series.choices = _series_choices("payment_entry", selected_company)
-    formulario.bank_account_id.choices = [("", "")] + [
-        (str(b[0].id), f"{b[0].account_name} {b[0].account_no or ''}".strip())
-        for b in database.session.execute(database.select(BankAccount).filter_by(is_active=True)).all()
-    ]
-    formulario.party_id.choices = [("", "")] + [
-        (str(p[0].id), p[0].name) for p in database.session.execute(database.select(Party)).all()
-    ]
-    # Contadores externos activos para la compania seleccionada
-    counters_query = database.select(ExternalCounter).filter_by(is_active=True)
-    if selected_company:
-        counters_query = counters_query.filter_by(company=selected_company)
-    active_counters = database.session.execute(counters_query).scalars().all()
-    formulario.external_counter_id.choices = [("", "— Sin contador externo —")] + [
-        (str(c.id), f"{c.name} (siguiente: {c.next_suggested_formatted})") for c in active_counters
-    ]
-
-    from_purchase_invoice_ids = request.values.getlist("from_purchase_invoice")
-    from_sales_invoice_ids = request.values.getlist("from_sales_invoice")
-    facturas_origen = _payment_source_rows(from_purchase_invoice_ids, from_sales_invoice_ids)
-    if request.method == "GET" and facturas_origen:
-        first = facturas_origen[0]["document"]
-        formulario.company.data = first.company
-        formulario.party_id.data = getattr(first, "supplier_id", None) or getattr(first, "customer_id", None)
-        formulario.party_type.data = "supplier" if facturas_origen[0]["reference_type"] == "purchase_invoice" else "customer"
-        formulario.payment_type.data = "pay" if facturas_origen[0]["reference_type"] == "purchase_invoice" else "receive"
-        formulario.paid_amount.data = str(
-            sum((_invoice_outstanding(row["document"]) for row in facturas_origen), Decimal("0"))
-        )
-    factura_compra_origen = (
-        database.session.get(PurchaseInvoice, from_purchase_invoice_ids[0]) if from_purchase_invoice_ids else None
-    )
-    factura_venta_origen = database.session.get(SalesInvoice, from_sales_invoice_ids[0]) if from_sales_invoice_ids else None
-    titulo = "Nuevo Pago - " + APPNAME
-    transaction_config = {
-        "items": [],
-        "uoms": [],
-        "columns": get_column_preferences(getattr(current_user, "id", None), "banking.payment_entry"),
-    }
     if request.method == "POST":
+        payload_raw = request.form.get("payment_payload")
+        if payload_raw:
+            payload = json.loads(payload_raw)
+        else:
+            # Fallback para pruebas unitarias que no envían payment_payload
+            payload = {
+                "payment_type": request.form.get("payment_type"),
+                "company": request.form.get("company"),
+                "bank_account_id": request.form.get("bank_account_id"),
+                "posting_date": request.form.get("posting_date"),
+                "paid_amount": request.form.get("paid_amount") or request.form.get("received_amount"),
+                "party_id": request.form.get("party_id"),
+                "party_type": request.form.get("party_type"),
+                "naming_series_id": request.form.get("naming_series"),
+                "external_counter_id": request.form.get("external_counter_id"),
+                "external_number": request.form.get("external_number"),
+            }
         try:
-            amount = _form_decimal("paid_amount", "0")
-            payment_type = request.form.get("payment_type") or "receive"
-            if payment_type == "internal_transfer" and (from_purchase_invoice_ids or from_sales_invoice_ids):
-                abort(409)
-            if from_purchase_invoice_ids and from_sales_invoice_ids:
-                abort(409)
+            payment_type = payload.get("payment_type") or "receive"
+            company = payload.get("company")
+            bank_account_id = payload.get("bank_account_id")
+            amount = Decimal(str(payload.get("paid_amount") or "0"))
+            target_bank_account_id = payload.get("target_bank_account_id")
+
+            paid_from_account_id = payload.get("paid_from_account_id")
+            paid_to_account_id = payload.get("paid_to_account_id")
+            if payment_type == "internal_transfer":
+                source_bank = database.session.get(BankAccount, bank_account_id) if bank_account_id else None
+                target_bank = database.session.get(BankAccount, target_bank_account_id) if target_bank_account_id else None
+                if source_bank and not paid_from_account_id:
+                    paid_from_account_id = source_bank.gl_account_id
+                if target_bank and not paid_to_account_id:
+                    paid_to_account_id = target_bank.gl_account_id
+
             payment = PaymentEntry(
                 payment_type=payment_type,
-                company=request.form.get("company") or None,
-                bank_account_id=request.form.get("bank_account_id") or None,
-                party_type=request.form.get("party_type") or None,
-                party_id=request.form.get("party_id") or None,
-                remarks=request.form.get("remarks"),
+                company=company,
+                bank_account_id=bank_account_id,
+                party_type=payload.get("party_type"),
+                party_id=payload.get("party_id"),
+                paid_from_account_id=paid_from_account_id,
+                paid_to_account_id=paid_to_account_id,
+                remarks=payload.get("remarks"),
                 docstatus=0,
             )
-            if payment_type == "pay":
+
+            if payment_type in ("pay", "debit_note", "internal_transfer"):
                 payment.paid_amount = amount
                 payment.base_paid_amount = amount
-            elif payment_type == "receive":
+            if payment_type in ("receive", "credit_note", "internal_transfer"):
                 payment.received_amount = amount
                 payment.base_received_amount = amount
-            else:
-                payment.paid_amount = amount
-                payment.received_amount = amount
+
             database.session.add(payment)
             database.session.flush()
+
             default_series_id, default_counter_id = _payment_numbering_defaults(payment.bank_account_id)
-            naming_series_id = request.form.get("naming_series") or default_series_id
-            external_counter_id = request.form.get("external_counter_id") or default_counter_id
-            # Contexto para seleccion contextual del contador externo
+            naming_series_id = payload.get("naming_series_id") or default_series_id
+            external_counter_id = payload.get("external_counter_id") or default_counter_id
+
             ext_context = {
                 "payment_type": payment_type,
                 "bank_account_id": payment.bank_account_id,
@@ -873,38 +911,62 @@ def bancos_pago_nuevo():
             assign_document_identifier(
                 document=payment,
                 entity_type="payment_entry",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=payload.get("posting_date"),
                 naming_series_id=naming_series_id,
                 external_counter_id=external_counter_id,
-                external_number=request.form.get("external_number") or None,
+                external_number=payload.get("external_number") or None,
                 external_context=ext_context,
             )
-            allocated = _save_payment_references(payment)
-            if allocated and amount != allocated:
+
+            lines = payload.get("lines") or []
+            allocated = _save_payment_references(payment, lines)
+
+            if allocated and amount != allocated and payment_type in ("pay", "receive"):
                 raise ValueError(_("El monto del pago debe coincidir con el monto asignado a referencias."))
-            if amount == 0 and allocated:
-                if payment_type == "pay":
-                    payment.paid_amount = allocated
-                    payment.base_paid_amount = allocated
-                else:
-                    payment.received_amount = allocated
-                    payment.base_received_amount = allocated
+
             database.session.commit()
-            flash("Pago creado correctamente.", "success")
+            flash(_("Pago registrado correctamente."), "success")
             return redirect(url_for(BANCOS_BANCOS_PAGO, payment_id=payment.id))
-        except IdentifierConfigurationError as exc:
+        except (IdentifierConfigurationError, ValueError) as exc:
             database.session.rollback()
             flash(str(exc), "danger")
+
+    from_purchase_invoice_ids = request.values.getlist("from_purchase_invoice")
+    from_sales_invoice_ids = request.values.getlist("from_sales_invoice")
+    facturas_origen = _payment_source_rows(from_purchase_invoice_ids, from_sales_invoice_ids)
+
+    initial_payment = {}
+    if facturas_origen:
+        first = facturas_origen[0]["document"]
+        initial_payment = {
+            "company": first.company,
+            "party_id": getattr(first, "supplier_id", None) or getattr(first, "customer_id", None),
+            "party_type": "supplier" if facturas_origen[0]["reference_type"] == "purchase_invoice" else "customer",
+            "payment_type": "pay" if facturas_origen[0]["reference_type"] == "purchase_invoice" else "receive",
+            "paid_amount": float(sum((compute_outstanding_amount(row["document"]) for row in facturas_origen), Decimal("0"))),
+            "lines": [
+                {
+                    "reference_type": row["reference_type"],
+                    "reference_id": row["document"].id,
+                    "document_no": row["document"].document_no or row["document"].id,
+                    "total_amount": float(row["document"].grand_total or 0),
+                    "outstanding_amount": float(compute_outstanding_amount(row["document"])),
+                    "allocated_amount": float(compute_outstanding_amount(row["document"])),
+                }
+                for row in facturas_origen
+            ],
+        }
+
+    transaction_config = {
+        "columns": get_column_preferences(getattr(current_user, "id", None), "banking.payment_entry"),
+    }
+
     return render_template(
         "bancos/pago_nuevo.html",
-        form=formulario,
-        titulo=titulo,
-        from_purchase_invoice_ids=from_purchase_invoice_ids,
-        from_sales_invoice_ids=from_sales_invoice_ids,
-        factura_compra_origen=factura_compra_origen,
-        factura_venta_origen=factura_venta_origen,
-        facturas_origen=facturas_origen,
+        titulo="Nuevo Pago - " + APPNAME,
+        initial_payment=initial_payment,
         transaction_config=transaction_config,
+        companies=obtener_lista_entidades_por_id_razonsocial(),
     )
 
 
@@ -914,12 +976,43 @@ def bancos_pago_nuevo():
 def bancos_pago(payment_id):
     """Detalle de pago."""
     from flask import abort
+    from cacao_accounting.gl.service import obtener_entradas_libro_mayor
 
     registro = database.session.get(PaymentEntry, payment_id)
     if not registro:
         abort(404)
+
+    # Entradas contables
+    lineas_gl = obtener_entradas_libro_mayor(voucher_type="payment_entry", voucher_id=payment_id)
+
+    # Referencias (facturas aplicadas)
+    referencias = database.session.execute(database.select(PaymentReference).filter_by(payment_id=payment_id)).scalars().all()
+
+    # Nombres para mostrar
+    banco = database.session.get(BankAccount, registro.bank_account_id) if registro.bank_account_id else None
+    banco_destino = None
+    if registro.payment_type == "internal_transfer" and registro.paid_to_account_id:
+        banco_destino = (
+            database.session.execute(
+                database.select(BankAccount).filter_by(company=registro.company, gl_account_id=registro.paid_to_account_id)
+            )
+            .scalars()
+            .first()
+        )
+
+    creador = database.session.get(User, registro.created_by) if registro.created_by else None
+
     titulo = (registro.document_no or payment_id) + " - " + APPNAME
-    return render_template("bancos/pago.html", registro=registro, titulo=titulo)
+    return render_template(
+        "bancos/pago.html",
+        registro=registro,
+        titulo=titulo,
+        lineas_gl=lineas_gl,
+        referencias=referencias,
+        banco=banco,
+        banco_destino=banco_destino,
+        creador=creador,
+    )
 
 
 @bancos.route("/payment/<payment_id>/submit", methods=["POST"])
