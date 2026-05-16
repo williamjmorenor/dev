@@ -41,5 +41,6 @@
 - [ ] Webhooks para integracion con sistemas externos.
 - [ ] Ampliar cobertura de pruebas Playwright en el nuevo flujo estandarizado.
 - [ ] Mejorar la estabilidad de los tests E2E en entornos de CI/Sandbox con latencia de red.
+- [ ] Normalizar formato Black en `tests/test_e2e_modules.py` y `tests/test_uoms_full.py` (actualmente fuera del alcance funcional de esta iteración).
 - [ ] Continuar la estandarizacion de reportes HTML siguiendo el patron de `financial_report.html`.
 - [ ] Extender el uso de `smart-select` a dimensiones personalizadas si se requiere en el futuro.
