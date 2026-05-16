@@ -3,6 +3,7 @@
 
 """Modulo de Ventas."""
 
+from datetime import date
 from decimal import Decimal
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -43,6 +44,16 @@ from cacao_accounting.party_settings import (
 from cacao_accounting.version import APPNAME
 
 ventas = Blueprint("ventas", __name__, template_folder="templates")
+
+
+def _parse_date(value: str | None) -> date | None:
+    """Parsea una fecha en formato ISO."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _series_choices(entity_type: str, company: str | None) -> list[tuple[str, str]]:
@@ -133,11 +144,12 @@ def ventas_pedido_venta_nuevo():
         try:
             customer_id = request.form.get("customer_id") or None
             customer = database.session.get(Party, customer_id) if customer_id else None
+            posting_date = _parse_date(request.form.get("posting_date"))
             pedido = SalesRequest(
                 customer_id=customer_id,
                 customer_name=customer.name if customer else None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
             )
@@ -146,7 +158,7 @@ def ventas_pedido_venta_nuevo():
             assign_document_identifier(
                 document=pedido,
                 entity_type="sales_request",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_sales_request_items(pedido.id)
@@ -618,12 +630,13 @@ def ventas_orden_venta_nuevo():
         try:
             customer_id = request.form.get("customer_id") or None
             customer = database.session.get(Party, customer_id) if customer_id else None
+            posting_date = _parse_date(request.form.get("posting_date"))
             orden = SalesOrder(
                 customer_id=customer_id,
                 customer_name=customer.name if customer else None,
                 sales_quotation_id=from_quotation_id or None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
             )
@@ -632,7 +645,7 @@ def ventas_orden_venta_nuevo():
             assign_document_identifier(
                 document=orden,
                 entity_type="sales_order",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_sales_order_items(orden.id)
@@ -728,12 +741,13 @@ def ventas_cotizacion_nueva():
         try:
             customer_id = request.form.get("customer_id") or None
             customer = database.session.get(Party, customer_id) if customer_id else None
+            posting_date = _parse_date(request.form.get("posting_date"))
             cotizacion = SalesQuotation(
                 customer_id=customer_id,
                 customer_name=customer.name if customer else None,
                 sales_request_id=from_request_id or None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
             )
@@ -742,7 +756,7 @@ def ventas_cotizacion_nueva():
             assign_document_identifier(
                 document=cotizacion,
                 entity_type="sales_quotation",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_sales_quotation_items(cotizacion.id)
@@ -888,10 +902,11 @@ def ventas_entrega_nuevo():
     }
     if request.method == "POST":
         try:
+            posting_date = _parse_date(request.form.get("posting_date"))
             entrega = DeliveryNote(
                 customer_id=request.form.get("customer_id") or None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 sales_order_id=request.form.get("from_order") or None,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
@@ -901,7 +916,7 @@ def ventas_entrega_nuevo():
             assign_document_identifier(
                 document=entrega,
                 entity_type="delivery_note",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_delivery_note_items(entrega.id)
@@ -1035,10 +1050,11 @@ def ventas_factura_venta_nuevo():
     if request.method == "POST":
         try:
             document_type = request.form.get("document_type") or "sales_invoice"
+            posting_date = _parse_date(request.form.get("posting_date"))
             factura = SalesInvoice(
                 customer_id=request.form.get("customer_id") or None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 document_type=document_type,
                 sales_order_id=request.form.get("from_order") or None,
                 delivery_note_id=request.form.get("from_note") or None,
@@ -1056,7 +1072,7 @@ def ventas_factura_venta_nuevo():
             assign_document_identifier(
                 document=factura,
                 entity_type="sales_invoice",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_sales_invoice_items(factura.id)

@@ -2,6 +2,13 @@
 {% block contenido %}
 {% import "macros.html" as macros %}
 {% import "transaction_form_macros.html" as tf_macros %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb lh-sm">
+    <li class="breadcrumb-item"><a href="{{ url_for('cacao_app.pagina_inicio') }}" class="link-dark"><i class="bi bi-house"></i> {{ _('Inicio') }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('ventas.ventas_') }}" class="link-dark">{{ _('Ventas') }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ _('Nuevo Pedido') }}</li>
+  </ol>
+</nav>
 <form method="post" id="form-main" x-data='transactionForm({{ transaction_config | tojson | safe }})'>
   {{ form.csrf_token }}
   {{ tf_macros.transaction_form_header("Pedido de Venta") }}

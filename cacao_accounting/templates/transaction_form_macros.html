@@ -175,13 +175,12 @@
   <div class="ca-journal-toolbar mb-3">
     <h5 class="mb-0">{{ _(title) }}</h5>
     <div class="d-flex gap-2 flex-wrap">
-      {% if source_api_url %}
       <button class="btn btn-sm btn-outline-secondary" type="button"
+              x-show="availableSourceTypes.length > 0"
               data-bs-toggle="modal" data-bs-target="#modalAutofill"
-              @click="fetchSource('{{ source_api_url }}')">
+              @click="fetchSource('{{ source_api_url or '' }}')">
         <i class="bi bi-arrow-repeat"></i> {{ _('Actualizar Elementos') }}
       </button>
-      {% endif %}
       <button class="btn btn-sm btn-outline-secondary" type="button" @click="addMultipleRows(5)">{{ _('Añadir múltiple') }}</button>
       <button class="btn btn-sm btn-outline-primary" type="button" @click="addRow()">{{ _('Añadir fila') }}</button>
     </div>
@@ -250,12 +249,39 @@
                   <input class="form-control form-control-sm" type="text" :name="'item_name_' + index" x-model="line.item_name">
                 </template>
                 <template x-if="column.field === 'uom'">
-                  <select :name="'uom_' + index" x-model="line.uom" class="form-select form-select-sm">
-                    <option value="">{{ _('Seleccione') }}</option>
-                    <template x-for="uom in getLineUoms(line)" :key="uom.code">
-                      <option :value="uom.code" x-text="uom.code"></option>
-                    </template>
-                  </select>
+                  <div class="ca-smart-select" x-data='smartSelect({
+                      doctype: "uom",
+                      name: "uom_" + index,
+                      minChars: 0,
+                      preload: true,
+                      initialValue: line.uom,
+                      initialLabel: line.uom,
+                      onSelect: function(opt) {
+                        line.uom = opt.value || opt.id || "";
+                      },
+                      messages: {
+                        placeholder: "{{ _('UOM') }}",
+                        loading: "...",
+                        noResults: "",
+                        minChars: "",
+                        clear: "×",
+                        invalid: "!",
+                        error: "!"
+                      }
+                    })'>
+                    <input type="hidden" :name="'uom_' + index" x-model="selectedValue" @change="$dispatch('input')">
+                    <div class="ca-smart-select-input-wrap">
+                      <input class="form-control form-control-sm ca-smart-select-input" type="text" x-model="search" @input="onInput"
+                        @focus="onFocus" @blur="closeSoon" :placeholder="column.label">
+                    </div>
+                    <div class="ca-smart-select-menu" x-show="open" x-cloak>
+                      <template x-for="option in options" :key="option.value">
+                        <button class="ca-smart-select-option" type="button" @mousedown.prevent="selectOption(option)">
+                          <span x-text="option.display_name"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
                 </template>
                 <template x-if="column.field === 'qty'">
                   <input class="form-control form-control-sm text-end" type="number" step="0.0001" min="0"
@@ -314,8 +340,7 @@
   </div>
 </section>
 
-{% if source_api_url %}
-<div class="modal fade" id="modalAutofill" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalAutofill" tabindex="-1" aria-hidden="true" x-show="availableSourceTypes.length > 0">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
@@ -433,7 +458,6 @@
     </div>
   </div>
 </div>
-{% endif %}
 
 <div class="modal fade" id="lineDetailModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">

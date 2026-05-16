@@ -6,13 +6,16 @@ import tempfile
 import threading
 import time
 import pytest
-from playwright.sync_api import expect, sync_playwright
+
+try:
+    from playwright.sync_api import expect, sync_playwright
+    HAS_PLAYWRIGHT = True
+except ImportError:
+    HAS_PLAYWRIGHT = False
 
 from cacao_accounting import create_app
 from cacao_accounting.database.helpers import inicia_base_de_datos
 from cacao_accounting.config import configuracion
-
-HAS_PLAYWRIGHT = True
 
 
 @pytest.fixture(scope="module")
@@ -46,8 +49,13 @@ def flask_server():
 
 @pytest.fixture(scope="module")
 def browser():
+    if not HAS_PLAYWRIGHT:
+        pytest.skip("Playwright not installed")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        try:
+            browser = p.chromium.launch(headless=True)
+        except Exception as e:
+            pytest.skip(f"Browser launch failed: {e}")
         yield browser
         browser.close()
 
@@ -56,7 +64,8 @@ def login(page, base_url, username, password):
     page.goto(f"{base_url}/login")
     page.locator('input[name="usuario"]').fill(username)
     page.locator('input[name="acceso"]').fill(password)
-    page.click('button[type="submit"]')
+    page.get_by_role("button", name="Iniciar Sesión").click()
+    # Wait for either home or app dashboard
     page.wait_for_url(lambda url: "/index" in url or "/app" in url or url.endswith("/"), timeout=15000)
 
 

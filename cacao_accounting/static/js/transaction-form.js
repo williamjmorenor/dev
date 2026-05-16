@@ -2,31 +2,31 @@
 // SPDX-FileCopyrightText: 2025 - 2026 William Jose MORENO Reyes
 
 (function () {
-  var uidCounter = 0;
+  let uidCounter = 0;
 
   function createUid() {
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
     uidCounter += 1;
-    return 'transaction-line-' + Date.now() + '-' + uidCounter;
+    return `transaction-line-${Date.now()}-${uidCounter}`;
   }
 
   function toNumber(value) {
-    var parsed = parseFloat(value || 0);
+    const parsed = parseFloat(value || 0);
     if (Number.isNaN(parsed)) return 0;
     return parsed;
   }
 
   function normalizeAllowedUoms(source, fallback) {
-    var values = Array.isArray(source) ? source.slice() : [];
-    if (!values.length && fallback) values = [fallback];
-    var seen = new Set();
+    const values = Array.isArray(source) ? [...source] : [];
+    if (!values.length && fallback) values.push(fallback);
+    const seen = new Set();
     return values
-      .map(function (value) {
+      .map((value) => {
         if (!value) return '';
         if (typeof value === 'object') return value.code || value.value || value.id || '';
         return String(value);
       })
-      .filter(function (value) {
+      .filter((value) => {
         if (!value || seen.has(value)) return false;
         seen.add(value);
         return true;
@@ -45,10 +45,10 @@
   }
 
   function normalizeColumns(columns, messages) {
-    var baseColumns = defaultColumns(messages);
-    var normalized = Array.isArray(columns) ? columns
-      .filter(function (column) { return column && column.field; })
-      .map(function (column) {
+    const baseColumns = defaultColumns(messages);
+    const normalized = Array.isArray(columns) ? columns
+      .filter((column) => column && column.field)
+      .map((column) => {
         return {
           field: String(column.field),
           label: column.label || String(column.field),
@@ -60,8 +60,8 @@
 
     if (!normalized.length) return baseColumns;
 
-    baseColumns.forEach(function (requiredColumn) {
-      var existing = normalized.find(function (column) { return column.field === requiredColumn.field; });
+    baseColumns.forEach((requiredColumn) => {
+      const existing = normalized.find((column) => column.field === requiredColumn.field);
       if (existing) {
         existing.label = existing.label || requiredColumn.label;
         existing.width = existing.width || requiredColumn.width;
@@ -77,29 +77,31 @@
 
   function normalizeItems(items) {
     if (!Array.isArray(items)) return [];
-    return items.map(function (item) {
-      var normalized = item || {};
-      var defaultUom = normalized.uom || normalized.default_uom || '';
-      return Object.assign({}, normalized, {
+    return items.map((item) => {
+      const normalized = item || {};
+      const defaultUom = normalized.uom || normalized.default_uom || '';
+      return {
+        ...normalized,
         code: normalized.code || normalized.value || '',
         name: normalized.name || normalized.item_name || normalized.label || '',
         default_uom: defaultUom,
         allowed_uoms: normalizeAllowedUoms(normalized.allowed_uoms || normalized.uoms, defaultUom),
-      });
+      };
     });
   }
 
-  document.addEventListener('alpine:init', function () {
-    Alpine.data('transactionForm', function (config) {
-      var messages = Object.assign({
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('transactionForm', (config) => {
+      const messages = {
         itemCode: 'Código del item',
         itemName: 'Descripción del item',
         uom: 'Unidad de medida',
         qty: 'Cantidad',
         rate: 'Precio / Costo Unitario',
         amount: 'Precio / Costo Total',
-      }, config.messages || {});
-      var effectivePreferences = config.initialPreferences;
+        ...config.messages
+      };
+      let effectivePreferences = config.initialPreferences;
       if (!effectivePreferences || !Array.isArray(effectivePreferences.columns)) {
         effectivePreferences = { columns: config.columns || [] };
       }
@@ -108,8 +110,8 @@
         formKey: config.formKey || '',
         viewKey: config.viewKey || 'draft',
         preferences: { columns: normalizeColumns(effectivePreferences.columns, messages) },
-        messages: messages,
-        header: Object.assign({
+        messages,
+        header: {
           company: '',
           naming_series: '',
           currency: '',
@@ -117,11 +119,12 @@
           party_type: '',
           party: '',
           party_label: '',
-          source_id: ''
-        }, config.initialHeader || {}),
+          source_id: '',
+          ...config.initialHeader
+        },
         availableItems: normalizeItems(config.items),
-        availableUoms: Array.isArray(config.uoms) ? config.uoms.slice() : [],
-        availableWarehouses: Array.isArray(config.warehouses) ? config.warehouses.slice() : [],
+        availableUoms: Array.isArray(config.uoms) ? [...config.uoms] : [],
+        availableWarehouses: Array.isArray(config.warehouses) ? [...config.warehouses] : [],
         availableSourceTypes: Array.isArray(config.availableSourceTypes) ? config.availableSourceTypes : [],
         searchCriteria: {
           source_type: ''
@@ -135,28 +138,31 @@
         modalLine: null,
         payload: '',
 
-        init: function () {
-          var self = this;
-          this.lines = (config.initialLines || []).map(function (line) {
-            return self.normalizeLine(line);
+        init() {
+          if (!this.header.party_type) {
+            if (this.formKey.startsWith('sales.')) this.header.party_type = 'customer';
+            if (this.formKey.startsWith('purchases.')) this.header.party_type = 'supplier';
+          }
+          this.lines = (config.initialLines || []).map((line) => {
+            return this.normalizeLine(line);
           });
           if (!this.lines.length) this.addMultipleRows(config.defaultRows || 2);
         },
 
         get visibleColumns() {
-          return (this.preferences.columns || []).filter(function (column) {
+          return (this.preferences.columns || []).filter((column) => {
             return column.visible !== false;
           });
         },
 
         get totalAmount() {
-          return this.lines.reduce(function (total, line) {
+          return this.lines.reduce((total, line) => {
             return total + toNumber(line.amount);
           }, 0);
         },
 
-        newLine: function () {
-          return Object.assign({
+        newLine() {
+          return {
             uid: createUid(),
             item_code: '',
             item_name: '',
@@ -174,12 +180,13 @@
             source_id: '',
             source_item_id: '',
             allowed_uoms: [],
-          }, config.linePrototype || {});
+            ...config.linePrototype
+          };
         },
 
-        normalizeLine: function (line) {
-          var base = this.newLine();
-          var normalized = Object.assign({}, base, line || {});
+        normalizeLine(line) {
+          const base = this.newLine();
+          const normalized = { ...base, ...(line || {}) };
           normalized.uid = normalized.uid || base.uid;
           normalized.allowed_uoms = normalizeAllowedUoms(normalized.allowed_uoms, normalized.uom);
           this.calcAmount(normalized);
@@ -187,28 +194,28 @@
           return normalized;
         },
 
-        findItem: function (itemCode) {
-          return this.availableItems.find(function (item) {
+        findItem(itemCode) {
+          return this.availableItems.find((item) => {
             return item.code === itemCode;
           }) || null;
         },
 
-        getLineUoms: function (line) {
-          var item = this.findItem(line.item_code);
-          var allowed = normalizeAllowedUoms(
+        getLineUoms(line) {
+          const item = this.findItem(line.item_code);
+          const allowed = normalizeAllowedUoms(
             (item && item.allowed_uoms) || line.allowed_uoms,
             (item && item.default_uom) || line.uom
           );
           if (!allowed.length) {
-            return this.availableUoms.slice();
+            return [...this.availableUoms];
           }
-          return allowed.map(function (code) {
-            return this.availableUoms.find(function (uom) { return uom.code === code; }) || { code: code, name: code };
-          }, this);
+          return allowed.map((code) => {
+            return this.availableUoms.find((uom) => uom.code === code) || { code: code, name: code };
+          });
         },
 
-        syncLineFromItem: function (line, keepCustomName) {
-          var item = this.findItem(line.item_code);
+        syncLineFromItem(line, keepCustomName) {
+          const item = this.findItem(line.item_code);
           if (!item) {
             line.allowed_uoms = normalizeAllowedUoms(line.allowed_uoms, line.uom);
             return;
@@ -223,39 +230,39 @@
           if (!line.uom && item.default_uom) line.uom = item.default_uom;
         },
 
-        onItemChange: function (line) {
+        onItemChange(line) {
           this.syncLineFromItem(line, false);
           this.calcAmount(line);
         },
 
-        addRow: function () {
+        addRow() {
           this.lines.push(this.newLine());
         },
 
-        addMultipleRows: function (count) {
-          for (var index = 0; index < count; index += 1) this.addRow();
+        addMultipleRows(count) {
+          for (let index = 0; index < count; index += 1) this.addRow();
         },
 
-        insertRow: function (index, direction) {
-          var target = direction < 0 ? index : index + 1;
+        insertRow(index, direction) {
+          const target = direction < 0 ? index : index + 1;
           this.lines.splice(target, 0, this.newLine());
         },
 
-        moveRow: function (index, direction) {
-          var target = index + direction;
+        moveRow(index, direction) {
+          const target = index + direction;
           if (target < 0 || target >= this.lines.length) return;
-          var current = this.lines[index];
+          const current = this.lines[index];
           this.lines[index] = this.lines[target];
           this.lines[target] = current;
         },
 
-        duplicateRow: function (index) {
-          var copy = this.normalizeLine(this.lines[index]);
+        duplicateRow(index) {
+          const copy = this.normalizeLine(this.lines[index]);
           copy.uid = createUid();
           this.lines.splice(index + 1, 0, copy);
         },
 
-        removeRow: function (index) {
+        removeRow(index) {
           if (this.lines.length === 1) {
             this.lines[index] = this.newLine();
             return;
@@ -263,110 +270,106 @@
           this.lines.splice(index, 1);
         },
 
-        calcAmount: function (line) {
+        calcAmount(line) {
           line.amount = toNumber(line.qty) * toNumber(line.rate);
         },
 
-        openDetails: function (index) {
+        openDetails(index) {
           this.activeIndex = index;
           this.modalLine = this.normalizeLine(this.lines[index]);
-          var modalEl = document.getElementById('lineDetailModal');
+          const modalEl = document.getElementById('lineDetailModal');
           if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
         },
 
-        saveModalLine: function () {
+        saveModalLine() {
           if (this.activeIndex !== null && this.modalLine) {
             this.calcAmount(this.modalLine);
             this.lines[this.activeIndex] = this.normalizeLine(this.modalLine);
           }
-          var modalEl = document.getElementById('lineDetailModal');
+          const modalEl = document.getElementById('lineDetailModal');
           if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         },
 
-        fetchSource: function (apiUrl) {
+        async fetchSource(apiUrl) {
           if (apiUrl) {
             this.loadingSource = true;
             this.autofillStep = 2;
-            fetch(apiUrl, { credentials: 'same-origin' })
-              .then(function (response) { return response.json(); })
-              .then(function (data) {
-                this.sourceItems = (data.items || []).map(function (item) {
-                  return Object.assign({ selected: true }, item);
-                });
-                this.loadingSource = false;
-              }.bind(this))
-              .catch(function () {
-                this.loadingSource = false;
-              }.bind(this));
+            try {
+              const response = await fetch(apiUrl, { credentials: 'same-origin' });
+              const data = await response.json();
+              this.sourceItems = (data.items || []).map((item) => {
+                return { ...item, selected: true };
+              });
+              this.loadingSource = false;
+            } catch (err) {
+              this.loadingSource = false;
+            }
           } else {
             this.autofillStep = 1;
             this.fetchSourceDocuments();
           }
         },
 
-        fetchSourceDocuments: function () {
-          var params = new URLSearchParams();
+        async fetchSourceDocuments() {
+          const params = new URLSearchParams();
           params.append('target_type', this.formKey.split('.')[1]);
           params.append('company', this.header.company);
           params.append('party_type', this.header.party_type);
           params.append('party_id', this.header.party);
 
           this.loadingSource = true;
-          fetch('/api/document-flow/source-documents?' + params.toString(), { credentials: 'same-origin' })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-              var sourceType = this.searchCriteria.source_type;
-              this.sourceDocuments = (data.source_documents || [])
-                .filter(function (doc) { return !sourceType || doc.source_type === sourceType; })
-                .map(function (doc) { return Object.assign({ selected: false }, doc); });
-              this.loadingSource = false;
-            }.bind(this))
-            .catch(function () {
-              this.loadingSource = false;
-            }.bind(this));
+          try {
+            const response = await fetch(`/api/document-flow/source-documents?${params.toString()}`, { credentials: 'same-origin' });
+            const data = await response.json();
+            const sourceType = this.searchCriteria.source_type;
+            this.sourceDocuments = (data.source_documents || [])
+              .filter((doc) => !sourceType || doc.source_type === sourceType)
+              .map((doc) => { return { ...doc, selected: false }; });
+            this.loadingSource = false;
+          } catch (err) {
+            this.loadingSource = false;
+          }
         },
 
-        fetchSourceItems: function () {
-          var selectedIds = this.sourceDocuments.filter(function (d) { return d.selected; }).map(function (d) { return d.source_id; });
+        async fetchSourceItems() {
+          const selectedIds = this.sourceDocuments.filter((d) => d.selected).map((d) => d.source_id);
           if (!selectedIds.length) return;
 
-          var params = new URLSearchParams();
+          const params = new URLSearchParams();
           params.append('source_type', this.searchCriteria.source_type);
           params.append('target_type', this.formKey.split('.')[1]);
           params.append('company', this.header.company);
-          selectedIds.forEach(function (id) { params.append('source_id', id); });
+          selectedIds.forEach((id) => { params.append('source_id', id); });
 
           this.loadingSource = true;
           this.autofillStep = 2;
-          fetch('/api/document-flow/pending-lines?' + params.toString(), { credentials: 'same-origin' })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-              this.sourceItems = (data.items || []).map(function (item) {
-                return Object.assign({ selected: true }, item);
-              });
-              this.loadingSource = false;
-            }.bind(this))
-            .catch(function () {
-              this.loadingSource = false;
-            }.bind(this));
+          try {
+            const response = await fetch(`/api/document-flow/pending-lines?${params.toString()}`, { credentials: 'same-origin' });
+            const data = await response.json();
+            this.sourceItems = (data.items || []).map((item) => {
+              return { ...item, selected: true };
+            });
+            this.loadingSource = false;
+          } catch (err) {
+            this.loadingSource = false;
+          }
         },
 
-        applySource: function () {
-          var self = this;
-          this.sourceItems.filter(function (item) {
+        applySource() {
+          this.sourceItems.filter((item) => {
             return item.selected;
-          }).forEach(function (item) {
-            var exists = self.lines.some(function (line) {
+          }).forEach((item) => {
+            const exists = this.lines.some((line) => {
               return line.source_type === item.source_type &&
                 line.source_id === item.source_id &&
                 line.source_item_id === item.source_item_id;
             });
             if (exists) return;
-            var selectedQty = item.qty;
+            let selectedQty = item.qty;
             if (selectedQty === null || selectedQty === undefined || selectedQty === '') {
               selectedQty = item.pending_qty || 0;
             }
-            var line = self.newLine();
+            const line = this.newLine();
             line.item_code = item.item_code || '';
             line.item_name = item.item_name || '';
             line.qty = toNumber(selectedQty);
@@ -376,63 +379,65 @@
             line.source_id = item.source_id || '';
             line.source_document_no = item.source_document_no || '';
             line.source_item_id = item.source_item_id || '';
-            self.syncLineFromItem(line, false);
-            self.calcAmount(line);
-            self.lines.push(line);
+            this.syncLineFromItem(line, false);
+            this.calcAmount(line);
+            this.lines.push(line);
           });
 
-          this.lines = this.lines.filter(function (line) {
+          this.lines = this.lines.filter((line) => {
             return line.item_code || line.item_name || line.source_id;
           });
           if (!this.lines.length) this.addRow();
         },
 
-        moveColumn: function (index, direction) {
-          var target = index + direction;
+        moveColumn(index, direction) {
+          const target = index + direction;
           if (target < 0 || target >= this.preferences.columns.length) return;
-          var column = this.preferences.columns.splice(index, 1)[0];
+          const column = this.preferences.columns.splice(index, 1)[0];
           this.preferences.columns.splice(target, 0, column);
         },
 
-        savePreferences: function () {
+        async savePreferences() {
           if (!this.formKey || !this.viewKey) return;
-          var self = this;
-          var csrfInput = document.querySelector('input[name="csrf_token"]');
-          var csrfToken = csrfInput ? csrfInput.value : '';
-          fetch('/api/form-preferences/' + encodeURIComponent(this.formKey) + '/' + encodeURIComponent(this.viewKey), {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            credentials: 'same-origin',
-            body: JSON.stringify(this.preferences)
-          })
-            .then(function (response) { return response.json(); })
-            .then(function (payload) {
-              self.preferences = { columns: normalizeColumns(payload.columns || [], self.messages) };
-              var modalEl = document.getElementById('columnsModal');
-              if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+          const csrfInput = document.querySelector('input[name="csrf_token"]');
+          const csrfToken = csrfInput ? csrfInput.value : '';
+          try {
+            const response = await fetch(`/api/form-preferences/${encodeURIComponent(this.formKey)}/${encodeURIComponent(this.viewKey)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+              credentials: 'same-origin',
+              body: JSON.stringify(this.preferences)
             });
+            const payload = await response.json();
+            this.preferences = { columns: normalizeColumns(payload.columns || [], this.messages) };
+            const modalEl = document.getElementById('columnsModal');
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+          } catch (err) {
+            // No-op
+          }
         },
 
-        resetPreferences: function () {
+        async resetPreferences() {
           if (!this.formKey || !this.viewKey) {
             this.preferences = { columns: defaultColumns(this.messages) };
             return;
           }
-          var self = this;
-          var csrfInput = document.querySelector('input[name="csrf_token"]');
-          var csrfToken = csrfInput ? csrfInput.value : '';
-          fetch('/api/form-preferences/' + encodeURIComponent(this.formKey) + '/' + encodeURIComponent(this.viewKey), {
-            method: 'DELETE',
-            headers: { 'X-CSRFToken': csrfToken },
-            credentials: 'same-origin'
-          })
-            .then(function (response) { return response.json(); })
-            .then(function (payload) {
-              self.preferences = { columns: normalizeColumns(payload.columns || [], self.messages) };
+          const csrfInput = document.querySelector('input[name="csrf_token"]');
+          const csrfToken = csrfInput ? csrfInput.value : '';
+          try {
+            const response = await fetch(`/api/form-preferences/${encodeURIComponent(this.formKey)}/${encodeURIComponent(this.viewKey)}`, {
+              method: 'DELETE',
+              headers: { 'X-CSRFToken': csrfToken },
+              credentials: 'same-origin'
             });
+            const payload = await response.json();
+            this.preferences = { columns: normalizeColumns(payload.columns || [], this.messages) };
+          } catch (err) {
+            // No-op
+          }
         },
 
-        formatMoney: function (value) {
+        formatMoney(value) {
           return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
       };

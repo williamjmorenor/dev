@@ -4,6 +4,7 @@
 
 """Modulo de Inventarios."""
 
+from datetime import date
 from decimal import Decimal
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -19,6 +20,17 @@ from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
 
 inventario = Blueprint("inventario", __name__, template_folder="templates")
+
+
+def _parse_date(value: str | None) -> date | None:
+    """Parsea una fecha en formato ISO."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
 
 INVENTARIO_INVENTARIO_ENTRADA_NUEVO = "inventario.inventario_entrada_nuevo"
 INVENTARIO_ENTRADA_LISTA_HTML = "inventario/entrada_lista.html"
@@ -497,10 +509,11 @@ def inventario_entrada_nuevo():
     }
     if request.method == "POST":
         try:
+            posting_date = _parse_date(request.form.get("posting_date"))
             entry = StockEntry(
                 purpose=request.form.get("purpose") or "material_receipt",
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 from_warehouse=request.form.get("from_warehouse") or None,
                 to_warehouse=request.form.get("to_warehouse") or None,
                 remarks=request.form.get("remarks"),
@@ -511,7 +524,7 @@ def inventario_entrada_nuevo():
             assign_document_identifier(
                 document=entry,
                 entity_type="stock_entry",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             entry.total_amount = _save_stock_entry_items(entry)

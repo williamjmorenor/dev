@@ -6,6 +6,7 @@
 # ---------------------------------------------------------------------------------------
 # Libreria estandar
 # --------------------------------------------------------------------------------------
+from datetime import date
 from decimal import Decimal
 
 # ---------------------------------------------------------------------------------------
@@ -78,6 +79,16 @@ DOCUMENT_TYPE_LABELS: dict[str, str] = {
     PURCHASE_CREDIT_NOTE: "Nota de Crédito de Compra",
     PURCHASE_RETURN: "Devolución de Compra",
 }
+
+
+def _parse_date(value: str | None) -> date | None:
+    """Parsea una fecha en formato ISO."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _series_choices(entity_type: str, company: str | None) -> list[tuple[str, str]]:
@@ -163,11 +174,12 @@ def compras_solicitud_compra_nueva():
     }
     if request.method == "POST":
         try:
+            posting_date = _parse_date(request.form.get("posting_date"))
             solicitud = PurchaseRequest(
                 requested_by=request.form.get("requested_by"),
                 department=request.form.get("department"),
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
             )
@@ -176,7 +188,7 @@ def compras_solicitud_compra_nueva():
             assign_document_identifier(
                 document=solicitud,
                 entity_type="purchase_request",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             total_qty, total = _save_purchase_request_items(solicitud.id)
@@ -299,12 +311,13 @@ def compras_cotizacion_proveedor_nueva():
         try:
             supplier_id = request.form.get("supplier_id") or None
             supplier = database.session.get(Party, supplier_id) if supplier_id else None
+            posting_date = _parse_date(request.form.get("posting_date"))
             cotizacion = SupplierQuotation(
                 supplier_id=supplier_id,
                 supplier_name=supplier.name if supplier else None,
                 purchase_quotation_id=from_rfq_id or None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
             )
@@ -313,7 +326,7 @@ def compras_cotizacion_proveedor_nueva():
             assign_document_identifier(
                 document=cotizacion,
                 entity_type="supplier_quotation",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             total_qty, total = _save_supplier_quotation_items(cotizacion.id)
@@ -672,16 +685,19 @@ def _save_purchase_order_items(order_id: str) -> tuple[Decimal, Decimal]:
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = PurchaseOrderItem(
                 purchase_order_id=order_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "purchase_order", order_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -699,16 +715,19 @@ def _save_purchase_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = PurchaseQuotationItem(
                 purchase_quotation_id=quotation_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "purchase_quotation", quotation_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -753,16 +772,19 @@ def _save_supplier_quotation_items(quotation_id: str) -> tuple[Decimal, Decimal]
             qty = _form_decimal(f"qty_{i}", "1")
             rate = _form_decimal(f"rate_{i}", "0")
             amount = _line_amount(i)
+            uom = request.form.get(f"uom_{i}") or None
             linea = SupplierQuotationItem(
                 supplier_quotation_id=quotation_id,
                 item_code=item_code,
                 item_name=request.form.get(f"item_name_{i}", ""),
                 qty=qty,
-                uom=request.form.get(f"uom_{i}") or None,
+                uom=uom,
                 rate=rate,
                 amount=amount,
             )
             database.session.add(linea)
+            database.session.flush()
+            _create_line_relation(i, "supplier_quotation", quotation_id, linea.id, qty, uom, rate, amount)
             total_qty += qty
             total += amount
         i += 1
@@ -862,11 +884,12 @@ def compras_orden_compra_nuevo():
         try:
             supplier_id = request.form.get("supplier_id") or None
             supplier = database.session.get(Party, supplier_id) if supplier_id else None
+            posting_date = _parse_date(request.form.get("posting_date"))
             orden = PurchaseOrder(
                 supplier_id=supplier_id,
                 supplier_name=supplier.name if supplier else None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
             )
@@ -875,7 +898,7 @@ def compras_orden_compra_nuevo():
             assign_document_identifier(
                 document=orden,
                 entity_type="purchase_order",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             total_qty, total = _save_purchase_order_items(orden.id)
@@ -979,11 +1002,12 @@ def compras_solicitud_cotizacion_nueva():
         try:
             supplier_id = request.form.get("supplier_id") or None
             supplier = database.session.get(Party, supplier_id) if supplier_id else None
+            posting_date = _parse_date(request.form.get("posting_date"))
             cotizacion = PurchaseQuotation(
                 supplier_id=supplier_id,
                 supplier_name=supplier.name if supplier else None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
             )
@@ -992,7 +1016,7 @@ def compras_solicitud_cotizacion_nueva():
             assign_document_identifier(
                 document=cotizacion,
                 entity_type="purchase_quotation",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             total_qty, total = _save_purchase_quotation_items(cotizacion.id)
@@ -1113,10 +1137,11 @@ def compras_recepcion_nuevo():
     }
     if request.method == "POST":
         try:
+            posting_date = _parse_date(request.form.get("posting_date"))
             recepcion = PurchaseReceipt(
                 supplier_id=request.form.get("supplier_id") or None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 purchase_order_id=request.form.get("from_order") or None,
                 remarks=request.form.get("remarks"),
                 docstatus=0,
@@ -1126,7 +1151,7 @@ def compras_recepcion_nuevo():
             assign_document_identifier(
                 document=recepcion,
                 entity_type="purchase_receipt",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_purchase_receipt_items(recepcion.id)
@@ -1269,10 +1294,11 @@ def compras_factura_compra_nuevo():
     if request.method == "POST":
         try:
             document_type = request.form.get("document_type") or PURCHASE_INVOICE
+            posting_date = _parse_date(request.form.get("posting_date"))
             factura = PurchaseInvoice(
                 supplier_id=request.form.get("supplier_id") or None,
                 company=request.form.get("company") or None,
-                posting_date=request.form.get("posting_date") or None,
+                posting_date=posting_date,
                 supplier_invoice_no=request.form.get("supplier_invoice_no"),
                 document_type=document_type,
                 purchase_order_id=request.form.get("from_order") or None,
@@ -1291,7 +1317,7 @@ def compras_factura_compra_nuevo():
             assign_document_identifier(
                 document=factura,
                 entity_type="purchase_invoice",
-                posting_date_raw=request.form.get("posting_date"),
+                posting_date_raw=posting_date,
                 naming_series_id=request.form.get("naming_series") or None,
             )
             _total_qty, total = _save_purchase_invoice_items(factura.id)
