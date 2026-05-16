@@ -110,11 +110,11 @@ class CacaoConfig(database.Model):  # type: ignore[name-defined]
     """Key / Value config."""
 
     id = database.Column(
-        database.String(10),
+        database.String(26),
         primary_key=True,
         nullable=False,
         index=True,
-        default=obtiene_texto_unico_cuid2,
+        default=obtiene_texto_unico,
     )
     key = database.Column(database.String(50), nullable=False, index=True)
     value = database.Column(database.String(500), nullable=False, index=True)
@@ -906,11 +906,11 @@ class StockLedgerEntry(database.Model):  # type: ignore[name-defined]
 
     __tablename__ = "stock_ledger_entry"
     id = database.Column(
-        database.String(10),
+        database.String(26),
         primary_key=True,
         nullable=False,
         index=True,
-        default=obtiene_texto_unico_cuid2,
+        default=obtiene_texto_unico,
     )
     posting_date = database.Column(database.Date(), nullable=False, index=True)
     posting_time = database.Column(database.Time(), nullable=True)
@@ -951,11 +951,11 @@ class StockValuationLayer(database.Model):  # type: ignore[name-defined]
 
     __tablename__ = "stock_valuation_layer"
     id = database.Column(
-        database.String(10),
+        database.String(26),
         primary_key=True,
         nullable=False,
         index=True,
-        default=obtiene_texto_unico_cuid2,
+        default=obtiene_texto_unico,
     )
     item_code = database.Column(database.String(50), database.ForeignKey(ITEM_CODE), nullable=False, index=True)
     warehouse = database.Column(database.String(20), database.ForeignKey(WAREHOUSE_CODE), nullable=False, index=True)
@@ -1553,11 +1553,11 @@ class GLBase:
     """General Ledger Base — columnas compartidas por entidades GL."""
 
     id = database.Column(
-        database.String(10),
+        database.String(26),
         primary_key=True,
         nullable=False,
         index=True,
-        default=obtiene_texto_unico_cuid2,
+        default=obtiene_texto_unico,
     )
     entity = database.Column(database.String(10), index=True)
     account = database.Column(database.String(50), index=True)
@@ -1731,11 +1731,11 @@ class GLEntry(database.Model):  # type: ignore[name-defined]
     )
 
     id = database.Column(
-        database.String(10),
+        database.String(26),
         primary_key=True,
         nullable=False,
         index=True,
-        default=obtiene_texto_unico_cuid2,
+        default=obtiene_texto_unico,
     )
     posting_date = database.Column(database.Date(), nullable=False, index=True)
     company = database.Column(database.String(10), database.ForeignKey(ENTITY_CODE), nullable=False, index=True)
@@ -2298,11 +2298,11 @@ class AuditLog(database.Model):  # type: ignore[name-defined]
 
     __tablename__ = "audit_log"
     id = database.Column(
-        database.String(10),
+        database.String(26),
         primary_key=True,
         nullable=False,
         index=True,
-        default=obtiene_texto_unico_cuid2,
+        default=obtiene_texto_unico,
     )
     entity_type = database.Column(database.String(50), nullable=False, index=True)
     entity_id = database.Column(database.String(26), nullable=False, index=True)
