@@ -16,7 +16,7 @@ from typing import cast
 # ---------------------------------------------------------------------------------------
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 # ---------------------------------------------------------------------------------------
 # Recursos locales
@@ -51,6 +51,7 @@ from cacao_accounting.database import (
 )
 from cacao_accounting.database.helpers import get_active_naming_series
 from cacao_accounting.contabilidad.posting import PostingError, cancel_document, post_bank_transaction, submit_document
+from cacao_accounting.document_flow import create_document_relation, revert_relations_for_target
 from cacao_accounting.document_flow.service import compute_outstanding_amount, refresh_outstanding_amount_cache
 from cacao_accounting.document_flow.status import _
 from cacao_accounting.document_identifiers import IdentifierConfigurationError, assign_document_identifier
@@ -58,6 +59,10 @@ from cacao_accounting.decorators import modulo_activo
 from cacao_accounting.version import APPNAME
 
 bancos = Blueprint("bancos", __name__, template_folder="templates")
+
+BANCOS_TRANSACCION_LISTA_HTML = "bancos/transaccion_lista.html"
+BANCOS_BANCO_CUENTA_NUEVO_HTML = "bancos/banco_cuenta_nuevo.html"
+BANCOS_BANCOS_PAGO = "bancos.bancos_pago"
 
 
 def _series_choices(entity_type: str, company: str | None) -> list[tuple[str, str]]:
@@ -221,7 +226,7 @@ def bancos_transaccion_lista():
         count=True,
     )
     titulo = "Listado de Transacciones Bancarias - " + APPNAME
-    return render_template("bancos/transaccion_lista.html", consulta=consulta, titulo=titulo)
+    return render_template(BANCOS_TRANSACCION_LISTA_HTML, consulta=consulta, titulo=titulo)
 
 
 @bancos.route("/bank-transaction/debit-note/list")
@@ -237,7 +242,7 @@ def bancos_nota_debito_lista():
     )
     titulo = "Listado de Notas de Débito Bancario - " + APPNAME
     return render_template(
-        "bancos/transaccion_lista.html",
+        BANCOS_TRANSACCION_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         page_heading="Listado de Notas de Débito Bancario",
@@ -258,7 +263,7 @@ def bancos_nota_credito_lista():
     )
     titulo = "Listado de Notas de Crédito Bancario - " + APPNAME
     return render_template(
-        "bancos/transaccion_lista.html",
+        BANCOS_TRANSACCION_LISTA_HTML,
         consulta=consulta,
         titulo=titulo,
         page_heading="Listado de Notas de Crédito Bancario",
@@ -617,7 +622,7 @@ def bancos_cuenta_bancaria_nuevo():
             gl_account = database.session.get(Accounts, gl_account_id)
             if not gl_account or gl_account.entity != company or gl_account.account_type != "bank":
                 flash(_("Seleccione una cuenta contable de tipo banco para la compañía indicada."), "danger")
-                return render_template("bancos/banco_cuenta_nuevo.html", form=formulario, titulo=titulo)
+                return render_template(BANCOS_BANCO_CUENTA_NUEVO_HTML, form=formulario, titulo=titulo)
         try:
             default_naming_series_id, default_external_counter_id = _validate_bank_account_numbering_defaults(
                 company=company,
@@ -626,7 +631,7 @@ def bancos_cuenta_bancaria_nuevo():
             )
         except IdentifierConfigurationError as exc:
             flash(_(str(exc)), "danger")
-            return render_template("bancos/banco_cuenta_nuevo.html", form=formulario, titulo=titulo)
+            return render_template(BANCOS_BANCO_CUENTA_NUEVO_HTML, form=formulario, titulo=titulo)
         cuenta = BankAccount(
             bank_id=request.form.get("bank_id"),
             company=company,
@@ -643,7 +648,7 @@ def bancos_cuenta_bancaria_nuevo():
         _ensure_bank_account_counter_mapping(cuenta)
         database.session.commit()
         return redirect("/cash_management/bank-account/list")
-    return render_template("bancos/banco_cuenta_nuevo.html", form=formulario, titulo=titulo)
+    return render_template(BANCOS_BANCO_CUENTA_NUEVO_HTML, form=formulario, titulo=titulo)
 
 
 @bancos.route("/bank-account/<account_id>")
@@ -703,11 +708,18 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
     """Guarda referencias de pago y actualiza saldos vivos de facturas."""
     total_allocated = Decimal("0")
     i = 0
+    processed_reference_keys: set[tuple[str, str]] = set()
     while request.form.get(f"reference_id_{i}"):
         reference_type = request.form.get(f"reference_type_{i}", "")
         reference_id = request.form.get(f"reference_id_{i}", "")
         allocated = _form_decimal(f"allocated_amount_{i}", "0")
+        reference_key = (reference_type, reference_id)
+        if reference_key in processed_reference_keys:
+            abort(409, description=_("No se puede aplicar la misma factura dos veces en un pago."))
+        processed_reference_keys.add(reference_key)
         if allocated <= 0:
+            if allocated < 0:
+                abort(409, description=_("El monto asignado no puede ser negativo."))
             i += 1
             continue
         if reference_type == "purchase_invoice":
@@ -734,6 +746,19 @@ def _save_payment_references(payment: PaymentEntry) -> Decimal:
             allocation_date=payment.posting_date,
         )
         database.session.add(reference)
+        database.session.flush()
+        create_document_relation(
+            source_type=reference_type,
+            source_id=reference_id,
+            source_item_id=None,
+            target_type="payment_entry",
+            target_id=payment.id,
+            target_item_id=reference.id,
+            qty=Decimal("1"),
+            uom=None,
+            rate=allocated,
+            amount=allocated,
+        )
         invoice.outstanding_amount = outstanding - allocated
         invoice.base_outstanding_amount = invoice.outstanding_amount
         total_allocated += allocated
@@ -763,6 +788,7 @@ def bancos_pago_nuevo():
     from cacao_accounting.bancos.forms import FormularioPago
     from cacao_accounting.contabilidad.auxiliares import obtener_lista_entidades_por_id_razonsocial
     from cacao_accounting.database import ExternalCounter, Party
+    from cacao_accounting.form_preferences import get_column_preferences
 
     formulario = FormularioPago()
     formulario.company.choices = obtener_lista_entidades_por_id_razonsocial()
@@ -803,6 +829,11 @@ def bancos_pago_nuevo():
     )
     factura_venta_origen = database.session.get(SalesInvoice, from_sales_invoice_ids[0]) if from_sales_invoice_ids else None
     titulo = "Nuevo Pago - " + APPNAME
+    transaction_config = {
+        "items": [],
+        "uoms": [],
+        "columns": get_column_preferences(getattr(current_user, "id", None), "banking.payment_entry"),
+    }
     if request.method == "POST":
         try:
             amount = _form_decimal("paid_amount", "0")
@@ -860,7 +891,7 @@ def bancos_pago_nuevo():
                     payment.base_received_amount = allocated
             database.session.commit()
             flash("Pago creado correctamente.", "success")
-            return redirect(url_for("bancos.bancos_pago", payment_id=payment.id))
+            return redirect(url_for(BANCOS_BANCOS_PAGO, payment_id=payment.id))
         except IdentifierConfigurationError as exc:
             database.session.rollback()
             flash(str(exc), "danger")
@@ -873,6 +904,7 @@ def bancos_pago_nuevo():
         factura_compra_origen=factura_compra_origen,
         factura_venta_origen=factura_venta_origen,
         facturas_origen=facturas_origen,
+        transaction_config=transaction_config,
     )
 
 
@@ -906,9 +938,9 @@ def bancos_pago_submit(payment_id: str):
     except PostingError as exc:
         database.session.rollback()
         flash(_(str(exc)), "danger")
-        return redirect(url_for("bancos.bancos_pago", payment_id=payment_id))
+        return redirect(url_for(BANCOS_BANCOS_PAGO, payment_id=payment_id))
     flash(_("Pago aprobado y contabilizado."), "success")
-    return redirect(url_for("bancos.bancos_pago", payment_id=payment_id))
+    return redirect(url_for(BANCOS_BANCOS_PAGO, payment_id=payment_id))
 
 
 @bancos.route("/payment/<payment_id>/cancel", methods=["POST"])
@@ -923,6 +955,7 @@ def bancos_pago_cancel(payment_id: str):
         abort(400)
     try:
         cancel_document(registro)
+        revert_relations_for_target("payment_entry", registro.id, reason="payment_cancelled")
         references = (
             database.session.execute(database.select(PaymentReference).filter_by(payment_id=registro.id)).scalars().all()
         )
@@ -937,6 +970,6 @@ def bancos_pago_cancel(payment_id: str):
     except PostingError as exc:
         database.session.rollback()
         flash(_(str(exc)), "danger")
-        return redirect(url_for("bancos.bancos_pago", payment_id=payment_id))
+        return redirect(url_for(BANCOS_BANCOS_PAGO, payment_id=payment_id))
     flash(_("Pago cancelado con reverso contable."), "warning")
-    return redirect(url_for("bancos.bancos_pago", payment_id=payment_id))
+    return redirect(url_for(BANCOS_BANCOS_PAGO, payment_id=payment_id))
