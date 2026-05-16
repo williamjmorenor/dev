@@ -44,6 +44,7 @@
             url_for('ventas.ventas_orden_venta_lista'),
             url_for('ventas.ventas_orden_venta_nuevo')) }}
 {% endset %}
+{% set currency_code = document_currency_code(registro) %}
 {{ dv_macros.detail_header(
     registro.document_no or registro.id,
     _('Orden de Venta'),
@@ -53,11 +54,12 @@
       (_('Número'), registro.document_no),
       (_('Cliente'), registro.customer_name),
       (_('Fecha'), registro.posting_date),
-      (_('Total'), registro.grand_total),
+      (_('Total'), format_money_with_currency(registro.grand_total, currency_code)),
+      (_('Moneda'), currency_code),
       (_('Observaciones'), registro.remarks)
     ],
     'bi-cart4'
 ) }}
-{{ macros.lineas_tabla_lectura(items) }}
+{{ macros.lineas_tabla_lectura(items, currency_code) }}
 {{ macros.document_flow_trace("sales_order", registro) }}
 {% endblock %}

@@ -39,6 +39,7 @@
             url_for('inventario.inventario_entrada_lista'),
             url_for('inventario.inventario_entrada_nuevo')) }}
 {% endset %}
+{% set currency_code = document_currency_code(registro) %}
 {{ dv_macros.detail_header(
     registro.document_no or registro.id,
     _('Movimiento de Inventario'),
@@ -49,11 +50,12 @@
       (_('Propósito'), registro.purpose),
       (_('Compañía'), registro.company),
       (_('Fecha'), registro.posting_date),
-      (_('Monto Total'), registro.total_amount),
+      (_('Monto Total'), format_money_with_currency(registro.total_amount, currency_code)),
+      (_('Moneda'), currency_code),
       (_('Observaciones'), registro.remarks)
     ],
     'bi-box-seam'
 ) }}
-{{ macros.lineas_tabla_lectura(items) }}
+{{ macros.lineas_tabla_lectura(items, currency_code) }}
 {{ macros.document_flow_trace("stock_entry", registro) }}
 {% endblock %}

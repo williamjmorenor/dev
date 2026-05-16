@@ -45,6 +45,7 @@
             url_for('compras.compras_solicitud_cotizacion_lista'),
             url_for('compras.compras_solicitud_cotizacion_nueva')) }}
 {% endset %}
+{% set currency_code = document_currency_code(registro) %}
 {{ dv_macros.detail_header(
     registro.document_no or registro.id,
     _('Solicitud de Cotización'),
@@ -54,11 +55,12 @@
       (_('Número'), registro.document_no),
       (_('Compañía'), registro.company),
       (_('Fecha'), registro.posting_date),
-      (_('Total'), registro.grand_total),
+      (_('Total'), format_money_with_currency(registro.grand_total, currency_code)),
+      (_('Moneda'), currency_code),
       (_('Observaciones'), registro.remarks)
     ],
     'bi-file-earmark-ruled'
 ) }}
-{{ macros.lineas_tabla_lectura(items) }}
+{{ macros.lineas_tabla_lectura(items, currency_code) }}
 {{ macros.document_flow_trace("purchase_quotation", registro) }}
 {% endblock %}

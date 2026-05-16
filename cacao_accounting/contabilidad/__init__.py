@@ -1865,7 +1865,7 @@ def ver_comprobante(identifier: str):
     """Ver comprobante contable."""
     from cacao_accounting.contabilidad.journal_repository import get_journal, list_journal_lines
     from cacao_accounting.contabilidad.journal_service import serialize_journal_for_form
-    from cacao_accounting.database import Accounts, Book, CostCenter, Currency, Entity, User
+    from cacao_accounting.database import Accounts, Book, CostCenter, Entity, User
 
     journal = get_journal(identifier)
     if journal is None:
@@ -1906,21 +1906,17 @@ def ver_comprobante(identifier: str):
     if not selected_books and journal.book:
         selected_books = [str(journal.book)]
 
-    entity = database.session.get(Entity, journal.entity) if journal.entity else None
+    entity = (
+        database.session.execute(database.select(Entity).filter_by(code=journal.entity)).scalars().first()
+        if journal.entity
+        else None
+    )
     company_currency_code = getattr(entity, "currency", None)
     currency_label = ""
     if journal.transaction_currency:
-        currency_row = database.session.get(Currency, journal.transaction_currency)
-        if currency_row is not None:
-            currency_label = f"{currency_row.code} - {currency_row.name}"
-        else:
-            currency_label = str(journal.transaction_currency)
+        currency_label = str(journal.transaction_currency)
     elif company_currency_code:
-        company_currency_row = database.session.get(Currency, company_currency_code)
-        if company_currency_row is not None:
-            currency_label = f"{company_currency_row.code} - {company_currency_row.name}"
-        else:
-            currency_label = f"{company_currency_code} - {_('Moneda local')}"
+        currency_label = str(company_currency_code)
     else:
         currency_label = _("Moneda local")
 

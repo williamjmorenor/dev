@@ -41,6 +41,7 @@
             url_for('compras.compras_solicitud_compra_lista'),
             url_for('compras.compras_solicitud_compra_nueva')) }}
 {% endset %}
+{% set currency_code = document_currency_code(registro) %}
 {{ dv_macros.detail_header(
     registro.document_no or registro.id,
     _('Solicitud de Compra'),
@@ -52,11 +53,12 @@
       (_('Fecha'), registro.posting_date),
       (_('Solicitado por'), registro.requested_by),
       (_('Departamento'), registro.department),
-      (_('Total'), registro.grand_total),
+      (_('Total'), format_money_with_currency(registro.grand_total, currency_code)),
+      (_('Moneda'), currency_code),
       (_('Observaciones'), registro.remarks)
     ],
     'bi-clipboard-check'
 ) }}
-{{ macros.lineas_tabla_lectura(items) }}
+{{ macros.lineas_tabla_lectura(items, currency_code) }}
 {{ macros.document_flow_trace("purchase_request", registro) }}
 {% endblock %}
