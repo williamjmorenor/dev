@@ -127,6 +127,12 @@
 - **Renombramiento de Rutas de Inventario:** Se migraron las rutas de `/stock-entry/adjustment-negative` a `/stock-entry/inventory-issue` para reflejar una semántica más genérica.
 - **Calidad y Pruebas:** Se extendió la API de flujo documental para soportar filtrado por tercero y se añadieron pruebas E2E con Playwright para validar la nueva lógica de interfaz.
 
+## 2026-05-16 (Implementacion de Registros del Modulo de Bancos)
+- **Motor Contable:** Se extendio `post_payment_entry` para soportar Notas de Debito, Notas de Credito y Transferencias Internas con conversion automatica de moneda.
+- **UI/UX:** Migracion a Alpine.js y Smart Select en formularios de bancos (`pago_nuevo.html`, `nota_nueva.html`, `transferencia_nueva.html`).
+- **Integracion:** Pagos y notas ahora utilizan el modelo `PaymentEntry` centralizado, permitiendo una trazabilidad contable uniforme.
+- **Navegacion:** Actualizados listados de bancos para diferenciar entre Pagos, Transferencias y Notas Bancarias.
+
 ## 2026-05-16 (Paridad visual entre comprobante manual y documentos operativos)
 - **Cabecera de detalle:** `detail_view_macros.detail_header` adopta el patron visual de `journal.html`: numero como titulo, tipo de documento debajo, estado junto al titulo, acciones a la derecha y datos en la misma tarjeta.
 - **Comprobante manual:** `journal.html` ahora muestra `Comprobante manual` bajo el numero para igualar la estructura visual de los documentos operativos.

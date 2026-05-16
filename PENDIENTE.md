@@ -36,7 +36,6 @@
 
 ## Pendientes Generales
 - [ ] Implementar mas reportes operativos usando el nuevo framework.
-- [ ] Seguir migrando formularios operativos al patron comun sin tocar todavia pagos bancarios ni documentos con origen complejo sin cobertura funcional suficiente.
 - [ ] Ampliar catalogos impositivos para otros paises.
 - [ ] Webhooks para integracion con sistemas externos.
 - [ ] Ampliar cobertura de pruebas Playwright en el nuevo flujo estandarizado.

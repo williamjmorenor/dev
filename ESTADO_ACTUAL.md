@@ -12,4 +12,5 @@
 - **Flujo Documental:** Soporta fusion de multiples fuentes con filtrado por Tercero y Compania.
 - **Modulos Operativos:** Compras, Ventas e Inventario usan macros compartidas y ya tienen paridad de acciones en transaccionales; pendiente de consolidar cobertura y revisar casos limite en documentos maestros/no transaccionales.
 - **Rutas de Inventario:** Renombradas a `inventory-issue` para mayor claridad semantica.
+- **Modulo de Bancos:** Migrado al patron de Comprobante Contable con Alpine.js. Soporta Notas de Debito, Notas de Credito y Transferencias Internas con conversion de moneda automatica y aplicacion a facturas pendiente.
 - **Pruebas:** Cobertura de mas de 600 tests unitarios/integracion y suite E2E Playwright basica para UI transaccional.
