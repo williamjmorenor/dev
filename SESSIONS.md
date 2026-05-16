@@ -1,5 +1,12 @@
 # SESSIONS - Historical Decisions & Milestones
 
+## 2026-05-16 (Validacion completa CI y cobertura)
+- **Solicitud:** Ejecutar pruebas unitarias completas con cobertura Python y JavaScript, asegurando que el workflow `.github/workflows/python-package.yml` pase correctamente y que la cobertura de Contabilidad, Compras, Inventario y Ventas sea adecuada.
+- **Correccion aplicada:** Se activaron los terceros demo (`Cliente Demo SA` y `Proveedor Demo SA`) en `CompanyParty` para la compania `cacao`, de modo que los `smart-select` filtrados por compania encuentren clientes/proveedores en formularios transaccionales.
+- **Pruebas E2E:** `tests/test_e2e_transactional_ui.py` se actualizo para seleccionar la compania demo real del seed y liberar la conexion SQLAlchemy antes de borrar la base temporal en Windows.
+- **Formato:** Se normalizo con Black `tests/test_e2e_modules.py` y `tests/test_uoms_full.py`.
+- **Verificacion:** `pytest` completo con cobertura paso (`623 passed`) con cobertura Python total de 83%. Mocha paso (`21 passing`) y cobertura JavaScript total fue 77%. Build/twine, flake8, ruff, mypy, black y `npm ci && npm test` quedaron en verde.
+
 ## 2026-05-15 (Inicio de implementación de paridad funcional en formularios transaccionales)
 - **Compras:** Se implementaron rutas `edit` y `duplicate` para Solicitud de Cotización, Cotización de Proveedor, Orden de Compra, Recepción de Compra y Factura de Compra. También se completaron las rutas faltantes de `submit` y `cancel` para Solicitud de Cotización y Cotización de Proveedor.
 - **Ventas:** Se implementaron rutas `edit` y `duplicate` para Pedido de Venta, Cotización, Orden de Venta, Nota de Entrega y Factura de Venta.
@@ -133,3 +140,9 @@
 - **Solicitud de Compra:** En borrador muestra `Editar`, `Duplicar`, `Aprobar`, `Listado` y `Nuevo`; en aprobado mantiene `Crear` para Solicitud de Cotizacion y Orden de Compra.
 - **Actualizar Elementos:** Orden de Compra y Solicitud de Cotizacion precargan origen `purchase_request` cuando se crean desde una Solicitud de Compra.
 - **Backlog:** Se dejo pendiente completar la paridad de formatos y acciones especificas en el resto de Compras, Inventario y Ventas.
+
+## 2026-05-16 (Verificación de patch E2E/ULID)
+- **Solicitud:** Verificar que los cambios reportados para pruebas E2E de Compras/Ventas/Inventario, ajuste de valuación de inventario y migración de IDs a ULID estuvieran aplicados correctamente.
+- **Ajuste aplicado:** Se corrigieron los campos `GLEntry.reversal_of` y `GLEntryDimension.gl_entry_id` a `String(26)` para alinear referencias con `gl_entry.id` ULID.
+- **Pruebas E2E:** Se robusteció `tests/test_e2e_modules.py` para detectar errores reales vía `alert-danger` en lugar de buscar el literal `danger` en todo el HTML.
+- **Verificación:** Suite completa `pytest` ejecutada con éxito (`618 passed, 5 skipped`).
